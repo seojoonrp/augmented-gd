@@ -62,3 +62,5 @@ build-*/
 # CLion
 .idea/
 /cmake-build-*/
+# Reference mod sources (scripts/fetch-refs.ps1)
+refs/
