@@ -15,17 +15,43 @@
 		"geode.node-ids": ">=v1.23.3"
 	},
 	"settings": {
-		"deaths-per-draft": {
+		"min-charge": {
 			"type": "int",
-			"name": "Deaths per draft",
-			"description": "How many deaths (in one run) it takes to earn an augment draft. Temporary rule until the real draft condition is decided.",
-			"default": 3,
+			"name": "Minimum charge per death",
+			"description": "Each death charges the draft gauge by the percent you reached, but never less than this.",
+			"default": 10,
 			"min": 1,
-			"max": 50,
+			"max": 100,
 			"control": {
 				"arrows": true,
 				"slider": false
 			}
+		},
+		"draft-threshold": {
+			"type": "int",
+			"name": "Draft gauge threshold",
+			"description": "Gauge charge needed to earn one augment draft. Leftover charge carries over.",
+			"default": 100,
+			"min": 10,
+			"max": 1000,
+			"control": {
+				"arrows": true,
+				"slider": false
+			}
+		},
+		"keybind-slowmo": {
+			"type": "keybind",
+			"name": "Toggle Slow-Mo",
+			"description": "Toggles the Slow-Mo augment on/off during a run.",
+			"default": "X",
+			"category": "gameplay"
+		},
+		"keybind-checkpoint": {
+			"type": "keybind",
+			"name": "Place Checkpoint",
+			"description": "Places a checkpoint (Checkpoint augment) during a run.",
+			"default": "Z",
+			"category": "gameplay"
 		}
 	}
 }

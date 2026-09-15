@@ -81,7 +81,6 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
                     auto popup = AugmentDraftPopup::create(mgr.rollDraft(3), [](std::string const& id) {
                         log::info("Preview pick (not applied): {}", id);
                     });
-                    log::info("preview popup = {}", fmt::ptr(popup));
                     if (popup) popup->show();
                 }
             }

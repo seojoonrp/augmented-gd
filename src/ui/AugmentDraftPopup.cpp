@@ -33,7 +33,6 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
     auto const n = static_cast<float>(m_choices.size());
     float width = n * kCardWidth + (n - 1) * kCardGap + kPopupPadding * 2;
     float height = kCardHeight + kTitleSpace + kPopupPadding;
-    log::info("AugmentDraftPopup::init with {} choices, size {}x{}", m_choices.size(), width, height);
     if (!Popup::init(width, height)) {
         log::error("Popup::init failed");
         return false;
@@ -67,7 +66,6 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
     m_buttonMenu->setContentHeight(m_size.height - kTitleSpace);
     m_buttonMenu->updateLayout();
 
-    log::info("AugmentDraftPopup ready");
     return true;
 }
 
@@ -79,7 +77,7 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     name->limitLabelWidth(kCardWidth - 16.f, 0.5f, 0.2f);
     bg->addChildAtPosition(name, Anchor::Top, { 0.f, -18.f });
 
-    int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
+    int const nextLevel = std::min(currentLevel + 1, def.maxLevel());
     std::string levelText = currentLevel == 0
         ? fmt::format("NEW  Lv {}", nextLevel)
         : fmt::format("Lv {} -> {}", currentLevel, nextLevel);
@@ -88,7 +86,7 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     bg->addChildAtPosition(level, Anchor::Top, { 0.f, -38.f });
 
     auto desc = CCLabelBMFont::create(
-        describeAtLevel(def, nextLevel).c_str(), "chatFont.fnt",
+        def.describe(nextLevel).c_str(), "chatFont.fnt",
         (kCardWidth - 16.f) / 0.6f, kCCTextAlignmentCenter
     );
     desc->setScale(0.6f);

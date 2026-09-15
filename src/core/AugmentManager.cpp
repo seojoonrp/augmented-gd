@@ -22,11 +22,12 @@ void AugmentManager::startRun(GJGameLevel* level) {
     m_levelID = level->m_levelID.value();
     m_levelName = std::string(level->m_levelName);
     m_deaths = 0;
-    m_deathsSinceDraft = 0;
     m_draftsTaken = 0;
     m_bestPercent = 0.f;
+    m_gauge = 0.f;
     m_pendingDraft = false;
     m_levels.clear();
+    m_slowMoEnabled = true;
 
     log::info("Run started on '{}' (id {})", m_levelName, m_levelID);
 }
@@ -43,25 +44,33 @@ void AugmentManager::endRun() {
     m_pendingDraft = false;
 }
 
-int AugmentManager::deathsPerDraft() const {
-    auto v = static_cast<int>(Mod::get()->getSettingValue<int64_t>("deaths-per-draft"));
-    return std::max(1, v);
+float AugmentManager::minCharge() const {
+    return static_cast<float>(Mod::get()->getSettingValue<int64_t>("min-charge"));
+}
+
+float AugmentManager::gaugeThreshold() const {
+    return std::max(1.f, static_cast<float>(Mod::get()->getSettingValue<int64_t>("draft-threshold")));
 }
 
 void AugmentManager::onDeath(float percent) {
     if (!m_active) return;
 
     m_deaths++;
-    m_deathsSinceDraft++;
     m_bestPercent = std::max(m_bestPercent, percent);
 
-    // TODO: draft condition is still undecided (attempt count / percent / ...).
-    // For now: every N deaths, while there is still something left to draft.
-    if (m_deathsSinceDraft >= this->deathsPerDraft() && !this->rollDraft(1).empty()) {
-        m_deathsSinceDraft = 0;
+    float charge = std::max(this->minCharge(), percent);
+    m_gauge += charge;
+
+    // One draft per death at most; leftover charge carries over.
+    if (m_gauge >= this->gaugeThreshold() && !this->rollDraft(1).empty()) {
+        m_gauge -= this->gaugeThreshold();
         m_pendingDraft = true;
-        log::info("Draft pending (death #{}, {:.1f}%)", m_deaths, percent);
     }
+    log::info(
+        "Death #{} at {:.1f}% -> +{:.0f} charge, gauge {:.0f}/{:.0f}{}",
+        m_deaths, percent, charge, m_gauge, this->gaugeThreshold(),
+        m_pendingDraft ? " (draft pending)" : ""
+    );
 }
 
 int AugmentManager::levelOf(std::string const& id) const {
@@ -72,7 +81,7 @@ int AugmentManager::levelOf(std::string const& id) const {
 std::vector<AugmentDef const*> AugmentManager::rollDraft(size_t count) const {
     std::vector<AugmentDef const*> candidates;
     for (auto const& def : allAugments()) {
-        if (this->levelOf(def.id) < def.maxLevel) candidates.push_back(&def);
+        if (this->levelOf(def.id) < def.maxLevel()) candidates.push_back(&def);
     }
 
     static std::mt19937 rng{ std::random_device{}() };
@@ -88,9 +97,15 @@ void AugmentManager::applyPick(std::string const& id) {
         return;
     }
     int& lvl = m_levels[id];
-    lvl = std::min(lvl + 1, def->maxLevel);
+    lvl = std::min(lvl + 1, def->maxLevel());
     m_draftsTaken++;
     log::info("Picked '{}' -> level {}", def->name, lvl);
+}
+
+float AugmentManager::slowMoScale() const {
+    int lvl = this->levelOf(ids::SlowMo);
+    if (lvl <= 0) return 1.f;
+    return tune::SlowMoScale[std::min(lvl, 3) - 1];
 }
 
 void AugmentManager::pauseGameForDraft() {
