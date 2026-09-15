@@ -13,5 +13,19 @@
 	"description": "Turn every level into a roguelite run. Die, draft an augment, get stronger, and finally beat it.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
+	},
+	"settings": {
+		"deaths-per-draft": {
+			"type": "int",
+			"name": "Deaths per draft",
+			"description": "How many deaths (in one run) it takes to earn an augment draft. Temporary rule until the real draft condition is decided.",
+			"default": 3,
+			"min": 1,
+			"max": 50,
+			"control": {
+				"arrows": true,
+				"slider": false
+			}
+		}
 	}
 }

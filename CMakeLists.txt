@@ -8,6 +8,13 @@ else()
 endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+# On Windows, default to LLVM clang (Geode needs an MSVC-compatible toolchain;
+# without this CMake may pick up an unrelated GCC from PATH, e.g. MSYS2).
+if (WIN32 AND NOT DEFINED CMAKE_CXX_COMPILER AND NOT DEFINED ENV{CXX})
+    set(CMAKE_C_COMPILER clang)
+    set(CMAKE_CXX_COMPILER clang++)
+endif()
+
 project(AugmentedGD VERSION 1.0.0)
 
 # Add all source files inside src (recursively)
