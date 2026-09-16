@@ -44,6 +44,9 @@ public:
     std::vector<AugmentDef const*> rollDraft(size_t count = 3) const;
     // Picking an augment increments its level (or adds it at level 1).
     void applyPick(std::string const& id);
+    // Same level bump without counting a draft (debug keys). Returns the new
+    // level, or 0 for an unknown id.
+    int grant(std::string const& id);
 
     // --- slow-mo toggle (persists across attempts within a run) ---
     bool slowMoEnabled() const { return m_slowMoEnabled; }

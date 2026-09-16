@@ -44,17 +44,13 @@ Geode Team's reference for the Geode 5 keybind-settings API: it *only* uses
   up, `win 0x4cde50`) still sees every key.
 - `PauseLayer::keyDown` is likewise reduced to Escape (`:104-108`).
 
-## Open problem (ours): hotkeys never fire
+## Solved (2026-09-16): why our hotkeys never fired
 
-Our `PlayLayerHook.cpp` `$execute` block matches qolmod's working pattern
-byte-for-byte (`KeyboardInputEvent().listen(...).leak()`), and the saved
-settings contain X (88) and Z (90). Three different approaches all produced
-*no log line*, which points at "code not running" rather than API misuse.
-Order of checks for the next test round:
-1. `log::info` at the top of the `$execute` block and in `$on_mod(Loaded)` —
-   proves the binary and static init ran.
-2. Log **every** key in the listener (not only X/Z).
-3. Switch to the node-scoped `addEventListener(KeybindSettingPressedEventV3(...))`
-   inside `PlayLayer::init` (this ref's pattern) — no global state at all.
-4. Disable qolmod and custom-keybinds (`scripts\mods.ps1` shows what's on) to
-   rule out a `Stop` from another listener.
+This mod's `place-checkpoint` (Z) and `delete-checkpoint` (X) settings
+(`mod.json:80-92`, priority 0) get node-scoped listeners on the PlayLayer that
+return `Stop` unless the level is paused (`src/UILayer.cpp:229-242`) — in
+every mode, not just practice. The loader dispatches keybind settings from a
+`KeyboardInputEvent` listener registered before any mod binary loads
+(`LoaderImpl.cpp:409`), so it ran before ours and stopped the event. Our fix:
+`"priority": -5` on our settings (dispatched first) + a raw listener at
+priority -1. Full account in `docs/GD-INTERNALS.md` → "Keyboard input".

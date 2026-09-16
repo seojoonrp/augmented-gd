@@ -8,6 +8,8 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/loader/SettingV3.hpp>
+#include <Geode/utils/Keyboard.hpp>
 
 using namespace geode::prelude;
 using namespace augment;
@@ -30,6 +32,16 @@ void setGameSpeed(float scale) {
     }
     log::info("Game speed -> {:.2f}", scale);
 }
+
+enum class Hotkey { SlowMo = 0, Checkpoint = 1 };
+constexpr int HotkeyCount = 2;
+
+char const* hotkeyName(Hotkey which) {
+    return which == Hotkey::SlowMo ? "slowmo" : "checkpoint";
+}
+
+// Defined with the input paths at the bottom of the file.
+bool routeHotkey(Hotkey which, char const* source);
 
 bool isMirrorPortal(GameObject* obj) {
     return obj->m_objectType == GameObjectType::InverseMirrorPortal
@@ -66,6 +78,11 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         RunHud* hud = nullptr;
 
+        // One physical press can reach onHotkey through two input paths in
+        // the same frame; the second one is dropped.
+        unsigned lastHotkeyFrame[HotkeyCount] = { ~0u, ~0u };
+        bool lastHotkeyHandled[HotkeyCount] = { false, false };
+
         // Foresight: our own draw node + objects sorted by x for cheap
         // "what's near the player" queries.
         cocos2d::CCDrawNode* hitboxNode = nullptr;
@@ -92,6 +109,24 @@ class $modify(AugPlayLayer, PlayLayer) {
             parent->addChild(m_fields->hud, 1000);
             this->refreshHud();
         }
+
+        // Hotkey path 1 (see the comment above $on_mod(Loaded) at the bottom).
+        // Node-scoped: removed with the layer, so nothing captures `this`.
+        this->addEventListener(
+            KeybindSettingPressedEventV3(Mod::get(), "keybind-slowmo"),
+            [](Keybind const&, bool down, bool repeat, double) {
+                if (!down || repeat) return ListenerResult::Propagate;
+                return routeHotkey(Hotkey::SlowMo, "setting");
+            }
+        );
+        this->addEventListener(
+            KeybindSettingPressedEventV3(Mod::get(), "keybind-checkpoint"),
+            [](Keybind const&, bool down, bool repeat, double) {
+                if (!down || repeat) return ListenerResult::Propagate;
+                return routeHotkey(Hotkey::Checkpoint, "setting");
+            }
+        );
+        log::info("Hotkey setting listeners attached to PlayLayer (run level: {})", this->isRunLevel());
         return true;
     }
 
@@ -196,10 +231,11 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         this->refreshHud();
 
-        // isRunning() is false during PlayLayer::init (scene not yet on
-        // screen); a draft pending from a previous visit waits for the next
-        // reset instead of attaching itself to the old scene.
-        if (this->isRunLevel() && mgr.hasPendingDraft() && this->isRunning()) {
+        // A checkpoint respawn is still the same attempt: the draft waits for
+        // the reset that starts over from 0. isRunning() is false during
+        // PlayLayer::init (scene not yet on screen); a draft pending from a
+        // previous visit likewise waits for the next reset.
+        if (!fromCheckpoint && this->isRunLevel() && mgr.hasPendingDraft() && this->isRunning()) {
             mgr.clearPendingDraft();
             this->showDraft();
         }
@@ -346,11 +382,28 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     // ---------------------------------------------------------------- input
 
-    void toggleSlowMo() {
+    // Every input path ends here. Returns Stop when the press was acted on.
+    bool onHotkey(Hotkey which, char const* source) {
+        auto f = m_fields.self();
+        unsigned frame = CCDirector::sharedDirector()->getTotalFrames();
+        int i = static_cast<int>(which);
+        if (f->lastHotkeyFrame[i] == frame) {
+            log::info("Hotkey {} via {} duplicate in frame {}, ignored", hotkeyName(which), source, frame);
+            return f->lastHotkeyHandled[i] ? ListenerResult::Stop : ListenerResult::Propagate;
+        }
+        log::info("Hotkey {} via {} (frame {})", hotkeyName(which), source, frame);
+
+        bool handled = which == Hotkey::SlowMo ? this->toggleSlowMo() : this->tryPlaceCheckpoint();
+        f->lastHotkeyFrame[i] = frame;
+        f->lastHotkeyHandled[i] = handled;
+        return handled ? ListenerResult::Stop : ListenerResult::Propagate;
+    }
+
+    bool toggleSlowMo() {
         auto& mgr = AugmentManager::get();
         if (!this->isRunAttempt() || !mgr.has(ids::SlowMo)) {
             log::info("X ignored: runAttempt={} slowmoLv={}", this->isRunAttempt(), mgr.levelOf(ids::SlowMo));
-            return;
+            return false;
         }
         mgr.toggleSlowMo();
         log::info("Slow-mo toggled -> {}", mgr.slowMoEnabled() ? "ON" : "OFF");
@@ -358,25 +411,28 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (m_fields->hud) {
             m_fields->hud->notice(mgr.slowMoEnabled() ? "SLOW-MO ON" : "SLOW-MO OFF", { 255, 220, 120 });
         }
+        return true;
     }
 
-    void tryPlaceCheckpoint() {
+    // Returns true when the key was consumed (also when it only showed a
+    // "none left" notice: the player has the augment, so Z is ours).
+    bool tryPlaceCheckpoint() {
         auto& mgr = AugmentManager::get();
         auto f = m_fields.self();
         int lvl = mgr.levelOf(ids::Checkpoint);
         if (!this->isRunAttempt() || m_isPaused || lvl == 0 || !m_player1 || m_player1->m_isDead) {
             log::info("Z ignored: runAttempt={} paused={} cpLv={} dead={}",
                 this->isRunAttempt(), m_isPaused, lvl, m_player1 ? m_player1->m_isDead : true);
-            return;
+            return false;
         }
 
         if (f->respawnUsed) {
             if (f->hud) f->hud->notice("NO RESPAWN LEFT", { 255, 120, 120 });
-            return;
+            return true;
         }
         if (f->checkpointsPlaced >= lvl) {
             if (f->hud) f->hud->notice("NO CHECKPOINTS LEFT", { 255, 120, 120 });
-            return;
+            return true;
         }
 
         bool wasPractice = m_isPracticeMode;
@@ -392,6 +448,35 @@ class $modify(AugPlayLayer, PlayLayer) {
         else {
             log::info("markCheckpoint returned null");
         }
+        return true;
+    }
+
+    // Debug aid: number key N grants one level of the N-th augment in the
+    // table. Applies the same side effects a draft pick would.
+    bool debugGrantAugment(int index) {
+        auto const& defs = allAugments();
+        if (index < 0 || index >= static_cast<int>(defs.size())) return false;
+        if (!this->isRunLevel()) {
+            log::info("Debug grant ignored: not a run level");
+            return false;
+        }
+        auto& mgr = AugmentManager::get();
+        auto const& def = defs[index];
+        auto f = m_fields.self();
+
+        if (mgr.levelOf(def.id) >= def.maxLevel()) {
+            log::info("Debug grant: '{}' already maxed", def.id);
+            if (f->hud) f->hud->notice(fmt::format("{} MAXED", def.name), { 255, 120, 120 });
+            return true;
+        }
+        int lvl = mgr.grant(def.id);
+        log::info("Debug grant: '{}' -> level {}", def.id, lvl);
+
+        if (def.id == ids::Unmirror) this->applyUnmirrorNow();
+        if (def.id == ids::SlowMo) this->applyTimeScale();
+        this->refreshHud();
+        if (f->hud) f->hud->notice(fmt::format("+{} Lv{} (DEBUG)", def.name, lvl), { 200, 160, 255 });
+        return true;
     }
 
     // ---------------------------------------------------------------- hud
@@ -471,51 +556,69 @@ class $modify(AugPlayLayer, PlayLayer) {
     }
 };
 
-// Hotkeys: the keys are configured through the "keybind" settings in
-// mod.json (rebindable in the mod's settings page). We read them from Geode's
-// raw KeyboardInputEvent, which fires before any keyboard hooks, so other
-// keybind mods can't swallow them.
+// Hotkeys (keys come from the "keybind" settings in mod.json).
+//
+// Why the old listener never fired: the loader registers its own
+// KeyboardInputEvent listener in queueMods(), before any mod binary is loaded,
+// so at priority 0 it runs ahead of every listener a mod adds from $execute /
+// $on_mod. That listener turns presses into KeybindSettingPressedEventV3 and
+// returns Stop as soon as one setting's listener does. Custom Keybinds binds
+// Z / X (practice checkpoints) on the PlayLayer and returns Stop whenever the
+// level isn't paused, so in a level X and Z were consumed before they reached
+// us (or CCKeyboardDispatcher, which is why hooking that saw nothing either).
+//
+// Two paths, each ahead of that:
+//   1. our settings carry "priority": -5, so the loader dispatches them before
+//      Custom Keybinds' for the same key; the node-scoped listener lives in
+//      PlayLayer::init and dies with the layer.
+//   2. a raw KeyboardInputEvent listener at priority -1, ahead of the loader's.
+// Whichever runs first handles the press; the other one hits the frame guard.
 namespace {
-    // RTTI casts across the DLL boundary are unreliable, so use Geode's
-    // typeinfo-based cast like Mod::getSettingValue does. If the setting
-    // can't be resolved at all, fall back to the mod.json defaults.
-    bool keybindMatches(char const* settingKey, enumKeyCodes fallback, KeyboardInputData const& data) {
-        auto setting = cast::typeinfo_pointer_cast<KeybindSettingV3>(Mod::get()->getSetting(settingKey));
-        if (!setting) {
-            return data.key == fallback && data.modifiers == KeyboardModifier::None;
-        }
-        for (auto const& bind : setting->getValue()) {
-            if (bind.key == data.key && bind.modifiers == data.modifiers) return true;
-        }
-        return false;
+    // getSettingValue does the typeinfo cast for us; an empty result means the
+    // setting couldn't be resolved, so fall back to the mod.json default.
+    bool keybindMatches(char const* settingKey, enumKeyCodes fallback, Keybind const& pressed) {
+        auto binds = Mod::get()->getSettingValue<std::vector<Keybind>>(settingKey);
+        if (binds.empty()) return pressed == Keybind(fallback, KeyboardModifier::None);
+        return std::ranges::contains(binds, pressed);
     }
 
-    AugPlayLayer* activeRunLayer() {
-        if (AugmentManager::get().isGamePausedForDraft()) return nullptr;
-        return static_cast<AugPlayLayer*>(PlayLayer::get());
+    // Routes a press to the current run layer. Returns Stop only when the
+    // press was acted on, so an idle key still reaches other mods.
+    bool routeHotkey(Hotkey which, char const* source) {
+        if (AugmentManager::get().isGamePausedForDraft()) {
+            log::info("Hotkey {} via {} ignored: draft open", hotkeyName(which), source);
+            return ListenerResult::Propagate;
+        }
+        auto pl = static_cast<AugPlayLayer*>(PlayLayer::get());
+        if (!pl) {
+            log::info("Hotkey {} via {} ignored: no PlayLayer", hotkeyName(which), source);
+            return ListenerResult::Propagate;
+        }
+        return pl->onHotkey(which, source);
     }
 }
 
-$execute {
+$on_mod(Loaded) {
     KeyboardInputEvent().listen([](KeyboardInputData& data) {
         if (data.action != KeyboardInputData::Action::Press) return ListenerResult::Propagate;
+        // Text fields get their keys untouched.
+        if (CCIMEDispatcher::sharedDispatcher()->hasDelegate()) return ListenerResult::Propagate;
 
-        bool slowmo = keybindMatches("keybind-slowmo", KEY_X, data);
-        bool checkpoint = keybindMatches("keybind-checkpoint", KEY_Z, data);
-        if (data.key == KEY_X || data.key == KEY_Z) {
-            log::info("Raw key {} down (mods {}), matches: slowmo={} checkpoint={}",
-                static_cast<int>(data.key), static_cast<int>(data.modifiers.value), slowmo, checkpoint);
+        Keybind pressed(data.key, data.modifiers);
+        if (keybindMatches("keybind-slowmo", KEY_X, pressed)) return routeHotkey(Hotkey::SlowMo, "raw");
+        if (keybindMatches("keybind-checkpoint", KEY_Z, pressed)) return routeHotkey(Hotkey::Checkpoint, "raw");
+
+        // Debug: 1..9 grant augments (table order). Never while a draft is up.
+        if (data.key >= KEY_One && data.key <= KEY_Nine && data.modifiers == KeyboardModifier::None
+            && Mod::get()->getSettingValue<bool>("debug-augment-keys")
+            && !AugmentManager::get().isGamePausedForDraft()) {
+            if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
+                if (pl->debugGrantAugment(data.key - KEY_One)) return ListenerResult::Stop;
+            }
         }
-        if (!slowmo && !checkpoint) return ListenerResult::Propagate;
-
-        auto pl = activeRunLayer();
-        log::info("Hotkey {} pressed, play layer = {}", slowmo ? "slowmo" : "checkpoint", fmt::ptr(pl));
-        if (!pl) return ListenerResult::Propagate;
-
-        if (slowmo) pl->toggleSlowMo();
-        else pl->tryPlaceCheckpoint();
-        return ListenerResult::Stop;
-    }).leak();
+        return ListenerResult::Propagate;
+    }, -1).leak();
+    log::info("Hotkey raw listener registered (priority -1)");
 }
 
 // Slow-mo time scaling. Every scheduled update (PlayLayer::update included)

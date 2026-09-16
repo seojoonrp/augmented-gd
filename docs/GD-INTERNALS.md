@@ -133,62 +133,57 @@ Practice" sets `m_isPracticeMode = false` there to make a practice clear count
 (`refs/qolmod/src/Hacks/Level/PracticeComplete.cpp:44-52`). So whichever way
 DESIGN.md decides, it is a one-line hook. **(from refs, unverified here)**
 
-## Keyboard input on Windows (Geode 5) — OPEN PROBLEM
+## Keyboard input on Windows (Geode 5)
 
-Facts:
+Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
 - Geode 5 replaces GD's key handling with its own raw-input path
-  (`$GEODE_SDK/loader/src/platform/windows/input.cpp`). It sends
-  `KeyboardInputEvent(keyCode).send(data)` first, then
-  `CCKeyboardDispatcher::dispatchKeyboardMSG(...)`.
-- `mod.json` supports `"type": "keybind"` settings; Geode turns presses into
-  `KeybindSettingPressedEventV3(modID, settingKey)` from a `KeyboardInputEvent`
-  listener in `LoaderImpl.cpp` (~line 409). CustomKeybinds uses exactly this
-  (`refs/custom-keybinds/src/UILayer.cpp`).
-- RTTI across DLLs is unreliable: use `cast::typeinfo_pointer_cast`, never
+  (`platform/windows/input.cpp:457-535`): `KeyboardInputEvent(keyCode).send(data)`
+  first, then IME, then `CCKeyboardDispatcher::dispatchKeyboardMSG` — the
+  latter **only if no listener returned `Stop`**. So a hook on
+  `dispatchKeyboardMSG` / `UILayer::keyDown` never sees a key some listener ate.
+- Delivery order inside `GlobalEvent::send` (`loader/Event.hpp:1045-1058`):
+  key-filtered listeners (`KeyboardInputEvent(KEY_X).listen`) first — if one
+  returns `Stop` the unfiltered ones never run — then unfiltered listeners
+  (`KeyboardInputEvent().listen`), ordered by ascending `priority` (second
+  argument of `listen`, default 0; `Port::addReceiver`, `Event.hpp:122-137`),
+  equal priority = registration order.
+- **The loader's keybind-settings listener is registered in `queueMods()`
+  (`LoaderImpl.cpp:409`), before any mod binary is loaded (`loadModGraph`,
+  `:546`).** At priority 0 it therefore runs *before* every listener a mod adds
+  from `$execute` / `$on_mod(Loaded)`. It sends `KeybindSettingPressedEventV3`
+  for every setting bound to the key, in ascending mod.json `"priority"`
+  order (`onKeybindSettingChanged`, `:1440-1449`; default 0), and returns
+  `Stop` as soon as one setting's listener does (`:440`).
+- CustomKeybinds (installed) binds `place-checkpoint` = Z and
+  `delete-checkpoint` = X (its `mod.json:80-92`, priority 0) with node-scoped
+  listeners on `GJBaseGameLayer` that return `Stop` whenever the level isn't
+  paused, practice mode or not (`refs/custom-keybinds/src/UILayer.cpp:229-242`).
+- **Root cause of "hotkeys never fire" (2026-09-16):** in a level, X/Z went
+  loader listener → CustomKeybinds `Stop` → event stopped. Our unfiltered
+  listener (registered later, priority 0) never ran, `dispatchKeyboardMSG` was
+  never called, and `listenForKeybindSettingPresses` on our own setting lost
+  to CustomKeybinds' same-key setting that was dispatched first. All three
+  failed attempts had this single cause. Outside a level the keys would have
+  reached us — nobody tested there.
+- Fix (both in `PlayLayerHook.cpp`, either alone suffices, per-frame dedup on
+  the layer): our keybind settings carry `"priority": -5` and are handled by
+  node-scoped `addEventListener(KeybindSettingPressedEventV3(Mod::get(), "…"))`
+  in `PlayLayer::init` (CustomKeybinds' own pattern); plus a raw
+  `KeyboardInputEvent().listen(fn, -1)` from `$on_mod(Loaded)` that runs ahead
+  of the loader's listener. Return `Stop` only when the press was acted on so
+  an idle X/Z still reaches CustomKeybinds. **Verified in game 2026-09-16.**
+- `mod.json` keybind settings: `"default"` string or array, `"priority"` int
+  (lower dispatched first), `"category"`; read with
+  `Mod::get()->getSettingValue<std::vector<Keybind>>("key")`.
+- RTTI across DLLs is unreliable: `cast::typeinfo_pointer_cast`, never
   `dynamic_pointer_cast`, on Geode objects.
-- Delivery order inside Geode (`loader/include/Geode/loader/Event.hpp:1045-1058`,
-  `platform/windows/input.cpp:492-520`): key-filtered listeners
-  (`KeyboardInputEvent(KEY_X).listen`) first — if one returns `Stop`, the
-  unfiltered listeners (`KeyboardInputEvent().listen`) never run — then IME,
-  then `CCKeyboardDispatcher::dispatchKeyboardMSG`.
-- The loader's own listener (`LoaderImpl.cpp:409-455`) turns keybind settings
-  into `KeybindSettingPressedEventV3` and returns `Stop` only if a listener
-  for that setting returned `Stop`.
-- Working code on this machine: qolmod registers the unfiltered listener from
-  `$execute` with `.leak()` and also uses `listenForKeybindSettingPresses`
-  (`refs/qolmod/src/Keybinds/Hooks.cpp:51-96`); DevTools registers from
-  `$on_mod(Loaded)` (`refs/devtools/src/backend.cpp:504`); CustomKeybinds uses
-  node-scoped `this->addEventListener(KeybindSettingPressedEventV3(Mod::get(), "id"), lambda)`
-  in `PauseLayer::customSetup` / `UILayer::init` (`refs/custom-keybinds/src/UILayer.cpp:47-102, 321-329`).
 - CustomKeybinds overrides `UILayer::handleKeypress` completely (only Escape
   passes), so hooking `handleKeypress` sees nothing; `UILayer::keyDown`
-  (`win 0x4cde50`) still sees every key.
-- Our `$execute` listener is the same code as qolmod's, and the saved settings
-  hold X=88 / Z=90 — so "no log line from three approaches" most likely means
-  the code never ran (stale install? `$execute` not linked?) rather than a
-  wrong API.
-
-Tried and **did not fire** (no log line at all, in this order):
-1. `$modify(CCKeyboardDispatcher)::dispatchKeyboardMSG` — even with
-   `setHookPriorityBefore(..., "geode.custom-keybinds")`.
-2. `listenForKeybindSettingPresses("keybind-slowmo", ...)` in `$execute`.
-3. `KeyboardInputEvent().listen(...)` in `$execute`, logging every X/Z press.
-
-Since (3) logged nothing, either the listener isn't registered the way we think
-(`$execute` timing? `GlobalEvent` default filter?) or key events reach GD by a
-path that bypasses `KeyboardInputEvent` on this machine.
-
-Next things to try, in order (see `docs/refs/custom-keybinds.md` "Open problem"):
-1. `log::info` at the top of the `$execute` block and in `$on_mod(Loaded)`, and
-   log *any* key inside the listener (not just X/Z) — proves the binary,
-   registration and delivery separately.
-2. Node-scoped listener in `PlayLayer::init`:
-   `this->addEventListener(KeybindSettingPressedEventV3(Mod::get(), "keybind-slowmo"), [this](Keybind const&, bool down, bool repeat, double){ … })`
-   — CustomKeybinds' pattern; no global state, auto-removed with the layer.
-3. Hook `UILayer::keyDown(enumKeyCodes, double)` (`win 0x4cde50`) — sees every
-   key even with CustomKeybinds installed.
-4. Test with qolmod and custom-keybinds disabled (`scripts\mods.ps1`) to rule
-   out a `Stop` from another listener.
+  (`win 0x4cde50`) still sees every key that reaches the dispatcher.
+- Working references: qolmod unfiltered listener from `$execute`
+  (`refs/qolmod/src/Keybinds/Hooks.cpp:51-96`), DevTools from `$on_mod(Loaded)`
+  (`refs/devtools/src/backend.cpp:504`), CustomKeybinds node-scoped
+  (`refs/custom-keybinds/src/UILayer.cpp:47-102, 321-329`).
 
 ## Misc
 

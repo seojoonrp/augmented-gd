@@ -91,15 +91,21 @@ std::vector<AugmentDef const*> AugmentManager::rollDraft(size_t count) const {
 }
 
 void AugmentManager::applyPick(std::string const& id) {
+    if (int lvl = this->grant(id)) {
+        m_draftsTaken++;
+        log::info("Picked '{}' -> level {}", id, lvl);
+    }
+}
+
+int AugmentManager::grant(std::string const& id) {
     auto def = findAugment(id);
     if (!def) {
-        log::warn("applyPick: unknown augment id '{}'", id);
-        return;
+        log::warn("grant: unknown augment id '{}'", id);
+        return 0;
     }
     int& lvl = m_levels[id];
     lvl = std::min(lvl + 1, def->maxLevel());
-    m_draftsTaken++;
-    log::info("Picked '{}' -> level {}", def->name, lvl);
+    return lvl;
 }
 
 float AugmentManager::slowMoScale() const {

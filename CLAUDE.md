@@ -67,7 +67,7 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 ## Code map
 
 ```
-mod.json                     id, GD/Geode versions, settings (gauge numbers, keybinds)
+mod.json                     id, GD/Geode versions, settings (gauge numbers, keybinds, debug keys)
 CMakeLists.txt               forces clang on Windows, then standard Geode setup
 src/main.cpp                 entry (load log only)
 src/core/AugmentDef.*        static augment table: ids::*, names, per-level descriptions, tune::*
@@ -79,7 +79,8 @@ src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
 src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              checkpoint, slow-mo (CCScheduler hook + FMOD pitch),
                              foresight (own CCDrawNode), unmirror, HUD refresh,
-                             draft popup on resetLevel, hotkey listener ($execute)
+                             draft popup on resetLevel, hotkeys (node-scoped keybind
+                             listeners in init + raw listener in $on_mod(Loaded))
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
 scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods
