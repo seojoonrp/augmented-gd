@@ -91,7 +91,7 @@ Extras qolmod handles (`HitboxNode.cpp:159-243`): slopes via `m_slopeDirection`,
 rotated boxes via `m_orientedBox->m_corners`. Sort `m_objects` by x once and
 `lower_bound` per frame — there can be 10k+ objects.
 
-## Shrink / reshape an object's collision — (from ref qolmod `AccurateHitboxes.cpp:122-163`; ours in `src/hooks/HazardHitboxHook.cpp`, unverified 2026-09-16)
+## Shrink / reshape an object's collision — verified 2026-09-16 (from ref qolmod `AccurateHitboxes.cpp:122-163`; ours in `src/hooks/HazardHitboxHook.cpp`, namespace `augment::hazard`)
 
 ```cpp
 #include <Geode/modify/GameObject.hpp>
@@ -207,6 +207,31 @@ IDs: `scripts\nodeids.ps1 LevelInfoLayer`. PauseLayer: hook `customSetup`, menu
 Ours is a node on the PlayLayer. qolmod attaches its labels to `m_uiLayer`
 (`refs/qolmod/src/Labels/Hooks.cpp:9`), which is the screen-space layer GD
 itself uses for the pause button — use that if the HUD ever drifts with the camera.
+
+## Korean text / custom font — verified at build 2026-09-17 (`src/ui/Fonts.hpp`, `mod.json`, `scripts/fontcharset.ps1`)
+
+```json
+"resources": { "fonts": {
+    "AugName": { "path": "resources/fonts/Pretendard-SemiBold.ttf", "size": 96, "charset": "32-126,8226,…" }
+} }
+```
+```cpp
+// src/ui/Fonts.hpp
+constexpr char const* Name = "AugName.fnt"_spr;
+// anywhere
+auto label = CCLabelBMFont::create("결계인가?", fonts::Name);   // UTF-8 literal, file saved as UTF-8
+label->setExtraKerning(-1);                                     // RobTop addition, unit unverified
+auto wrapped = CCLabelBMFont::create(text, fonts::Text, widthInFontUnits / scale, kCCTextAlignmentCenter);
+wrapped->setScale(scale);
+popup->setTitle("증강 선택", fonts::Name, 0.7f);
+```
+- `size` is the UHD pixel size (sd = size / 4). 96 ≈ goldFont, 64 ≈ chatFont.
+- Never put Korean in a `bigFont` / `goldFont` / `chatFont` label (draws nothing).
+- New Korean literal in `src/` → just build; `build.ps1` regenerates the charset.
+  Text that is *not* a literal (read from a file, typed by the user) needs the
+  full Hangul range instead.
+- Wrapping: CCLabelBMFont breaks at spaces and newlines only, so Korean text
+  needs spaces between words (it has them) — width is in unscaled font units.
 
 ## Cross-DLL casts — verified 2026-09-16
 

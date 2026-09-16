@@ -81,7 +81,7 @@ int AugmentManager::levelOf(std::string const& id) const {
 std::vector<AugmentDef const*> AugmentManager::rollDraft(size_t count) const {
     std::vector<AugmentDef const*> candidates;
     for (auto const& def : allAugments()) {
-        if (this->levelOf(def.id) < def.maxLevel()) candidates.push_back(&def);
+        if (this->levelOf(def.id) < def.maxLevel) candidates.push_back(&def);
     }
 
     static std::mt19937 rng{ std::random_device{}() };
@@ -104,20 +104,16 @@ int AugmentManager::grant(std::string const& id) {
         return 0;
     }
     int& lvl = m_levels[id];
-    lvl = std::min(lvl + 1, def->maxLevel());
+    lvl = std::min(lvl + 1, def->maxLevel);
     return lvl;
 }
 
 float AugmentManager::slowMoScale() const {
-    int lvl = this->levelOf(ids::SlowMo);
-    if (lvl <= 0) return 1.f;
-    return tune::SlowMoScale[std::min(lvl, 3) - 1];
+    return 1.f - tune::SlowMoStep * this->levelOf(ids::SlowMo);
 }
 
-float AugmentManager::bluntScale() const {
-    int lvl = this->levelOf(ids::Blunt);
-    if (lvl <= 0) return 1.f;
-    return tune::BluntScale[std::min(lvl, 3) - 1];
+float AugmentManager::hazardScale() const {
+    return 1.f - tune::HazardStep * this->levelOf(ids::HazardHitbox);
 }
 
 void AugmentManager::pauseGameForDraft() {

@@ -16,7 +16,7 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 ## Build & test loop
 
 ```powershell
-.\scripts\build.ps1          # geode build --ninja + install into GD (fixes stale PATH)
+.\scripts\build.ps1          # fontcharset + geode build --ninja + install into GD (fixes stale PATH)
 .\scripts\build.ps1 -Clean   # after CMake/CPM/env changes ("Unknown CMake command CPMAddPackage" → this)
 .\scripts\logs.ps1           # [Augmented GD] lines from the newest Geode log
 .\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored, pinned commits, writes refs/MANIFEST.md)
@@ -24,6 +24,7 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 .\scripts\refgrep.ps1 pattern [-Sdk|-All]   # rg over refs/ (+ loader source, bindings)
 .\scripts\nodeids.ps1 Layer  # node IDs for a layer (from NodeIDs source)
 .\scripts\mods.ps1           # mods installed in the user's GD, enabled or not
+.\scripts\fontcharset.ps1    # rebuild mod.json font charset from Korean literals in src/ (build.ps1 runs it)
 ```
 
 - Build must end with `| Done | Installed selenophile.augmented-gd.geode` and exit 0.
@@ -61,32 +62,44 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 6. Never block or count `destroyPlayer(player, m_anticheatSpike)`.
 7. Geode objects: `cast::typeinfo_pointer_cast`, not `dynamic_pointer_cast`.
 8. Prefer `Write`/`Edit` tools over bash heredocs for source files (quoting issues on
-   this Windows setup). Python one-off patch scripts via bash are fine.
+   this Windows setup). Python one-off patch scripts are fine **only if they contain
+   no backslashes**: a heredoc on this setup turns `\n` / `\f` / `\b` into real
+   control characters even inside quoted `<<'EOF'`. Anything with a backslash
+   (Windows paths, `\n` in strings) goes in a script file in the scratchpad via
+   `Write`, then `python file.py`.
 9. Don't commit; the user commits. Don't change mod ID / name.
+10. In-game augment text is Korean (names, descriptions, popup title) and must
+    use the mod fonts in `src/ui/Fonts.hpp`; GD's fonts draw nothing for Hangul.
+    Logs, notices and HUD wording stay English. New Korean literals need no
+    extra step: `build.ps1` regenerates the font charset.
 
 ## Code map
 
 ```
-mod.json                     id, GD/Geode versions, settings (gauge numbers, keybinds, debug keys)
+mod.json                     id, GD/Geode versions, fonts (resources.fonts, charset generated),
+                             settings (gauge numbers, keybinds, debug keys)
+resources/fonts/             Pretendard SemiBold/Regular TTF (OFL) -> Geode builds AugName/AugText .fnt
 CMakeLists.txt               forces clang on Windows, then standard Geode setup
 src/main.cpp                 entry (load log only)
-src/core/AugmentDef.*        static augment table: ids::*, names, per-level descriptions, tune::*
+src/core/AugmentDef.*        static augment table: ids::*, Korean names, initial / level-up
+                             descriptions, maxLevel, stub flag, tune::* (steps, nerve mult)
 src/core/AugmentManager.*    run state singleton: run lifecycle, gauge, augment levels,
                              slow-mo toggle, director pause/resume for drafts, cursor state
-src/ui/AugmentDraftPopup.*   geode::Popup with 3 cards, no close, mandatory pick
-src/ui/RunHud.*              top-left text lines + centre notice
+src/ui/Fonts.hpp             "AugName.fnt"_spr / "AugText.fnt"_spr + name kerning
+src/ui/AugmentDraftPopup.*   geode::Popup with 3 cards (140x180), no close, mandatory pick
+src/ui/RunHud.*              top-left text lines + centre notice (mod fonts)
 src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
 src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              checkpoint, slow-mo (CCScheduler hook + FMOD pitch),
                              foresight (own CCDrawNode), unmirror, HUD refresh,
                              draft popup on resetLevel, hotkeys (node-scoped keybind
                              listeners in init + raw listener in $on_mod(Loaded)),
-                             blunt scale publish / radius scaling (init, addObject, applyBlunt)
-src/hooks/HazardHitboxHook.* blunt: global hazard scale + GameObject hooks
+                             hazard scale publish / radius scaling (init, addObject, applyHazardScale)
+src/hooks/HazardHitboxHook.* hazard-hitbox: global hazard scale (augment::hazard) + GameObject hooks
                              (getObjectRect AABB in place, updateOrientedBox OBB corners)
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
-scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods
+scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods / fontcharset
 refs/                        reference mod sources (gitignored; MANIFEST.md lists pins)
 ```
 

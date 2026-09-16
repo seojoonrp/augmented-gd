@@ -23,6 +23,10 @@ if ($Clean -and (Test-Path build)) {
     Remove-Item -Recurse -Force build
 }
 
+# Keep the mod fonts' charset in step with the Korean text in src/ (mod.json
+# resources.fonts); Geode regenerates the fonts when it changes.
+& "$PSScriptRoot\fontcharset.ps1"
+
 # geode writes warnings to stderr; under "Stop" PS 5.1 would abort on them.
 $ErrorActionPreference = "Continue"
 geode build --ninja

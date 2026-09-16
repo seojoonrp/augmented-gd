@@ -1,4 +1,5 @@
 #include "AugmentDraftPopup.hpp"
+#include "Fonts.hpp"
 #include "../core/AugmentManager.hpp"
 
 #include <Geode/Geode.hpp>
@@ -8,11 +9,16 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    constexpr float kCardWidth = 110.f;
-    constexpr float kCardHeight = 150.f;
+    // Sized for the Korean descriptions: the longest wraps to ~6 lines at
+    // kDescScale. Three cards + padding = 492 pt, inside GD's 569 pt width.
+    constexpr float kCardWidth = 140.f;
+    constexpr float kCardHeight = 180.f;
     constexpr float kCardGap = 12.f;
     constexpr float kPopupPadding = 24.f;
     constexpr float kTitleSpace = 30.f;
+    constexpr float kCardInset = 8.f;
+    constexpr float kNameScale = 0.55f;
+    constexpr float kDescScale = 0.55f;
 }
 
 AugmentDraftPopup* AugmentDraftPopup::create(std::vector<AugmentDef const*> choices, PickCallback onPick) {
@@ -38,7 +44,7 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
         return false;
     }
 
-    this->setTitle("Choose an Augment");
+    this->setTitle("증강 선택", fonts::Name, 0.7f);
 
     // No way out but picking a card: drop the close button (Popup adds it to
     // m_buttonMenu, and we're about to lay that menu out as a card row).
@@ -73,11 +79,13 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     auto bg = CCScale9Sprite::create("GJ_square02.png");
     bg->setContentSize({ kCardWidth, kCardHeight });
 
-    auto name = CCLabelBMFont::create(def.name.c_str(), "bigFont.fnt");
-    name->limitLabelWidth(kCardWidth - 16.f, 0.5f, 0.2f);
+    auto name = CCLabelBMFont::create(def.name.c_str(), fonts::Name);
+    name->setExtraKerning(fonts::NameKerning);
+    name->limitLabelWidth(kCardWidth - 2 * kCardInset, kNameScale, 0.2f);
     bg->addChildAtPosition(name, Anchor::Top, { 0.f, -18.f });
 
-    int const nextLevel = std::min(currentLevel + 1, def.maxLevel());
+    // Level line stays GD-style (digits only, so goldFont is fine).
+    int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
     std::string levelText = currentLevel == 0
         ? fmt::format("NEW  Lv {}", nextLevel)
         : fmt::format("Lv {} -> {}", currentLevel, nextLevel);
@@ -85,11 +93,13 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     level->setScale(0.45f);
     bg->addChildAtPosition(level, Anchor::Top, { 0.f, -38.f });
 
+    // Width is in font units (pre-scale). CCLabelBMFont wraps at spaces, which
+    // Korean has between words; the explicit newlines in the text also break.
     auto desc = CCLabelBMFont::create(
-        def.describe(nextLevel).c_str(), "chatFont.fnt",
-        (kCardWidth - 16.f) / 0.6f, kCCTextAlignmentCenter
+        def.describe(nextLevel).c_str(), fonts::Text,
+        (kCardWidth - 2 * kCardInset) / kDescScale, kCCTextAlignmentCenter
     );
-    desc->setScale(0.6f);
+    desc->setScale(kDescScale);
     desc->setAnchorPoint({ 0.5f, 1.f });
     bg->addChildAtPosition(desc, Anchor::Top, { 0.f, -54.f });
 

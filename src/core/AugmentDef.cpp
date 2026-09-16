@@ -1,42 +1,46 @@
 #include "AugmentDef.hpp"
 
-#include <algorithm>
-
 namespace augment {
 
 std::string const& AugmentDef::describe(int level) const {
-    int idx = std::clamp(level, 1, this->maxLevel()) - 1;
-    return descriptions[idx];
+    if (level <= 1 || levelUpDesc.empty()) return initialDesc;
+    return levelUpDesc;
 }
 
+// Text is the design table verbatim (docs/DESIGN.md). Number keys 1-9 grant
+// augments in this order.
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
-        { ids::Shield, "Shield", {
-            "1 shield per attempt. When it breaks, you are noclipped for 3s.",
-            "2 shields per attempt. When one breaks, you are noclipped for 3s.",
-            "3 shields per attempt. When one breaks, you are noclipped for 3s.",
-        }},
-        { ids::SlowMo, "Slow-Mo", {
-            "Game runs at 93% speed. Press X to toggle.",
-            "Game runs at 86% speed. Press X to toggle.",
-            "Game runs at 79% speed. Press X to toggle.",
-        }},
-        { ids::Checkpoint, "Checkpoint", {
-            "Press Z to place 1 checkpoint per attempt. Die once and respawn there.",
-            "Press Z to place up to 2 checkpoints per attempt. Die once and respawn at the last one.",
-            "Press Z to place up to 3 checkpoints per attempt. Die once and respawn at the last one.",
-        }},
-        { ids::Foresight, "Foresight", {
-            "Shows hitboxes.",
-        }},
-        { ids::Unmirror, "Unmirror", {
-            "Removes every mirror portal from the level.",
-        }},
-        { ids::Blunt, "Blunt", {
-            "Hazard hitboxes shrink to 80% of their size.",
-            "Hazard hitboxes shrink to 60% of their size.",
-            "Hazard hitboxes shrink to 40% of their size.",
-        }},
+        { ids::Shield, "결계인가?", 3,
+            "매 어템마다 보호막이 지급됩니다.\n보호막이 깨지면 1.5초간 노클립 상태로 전환됩니다.",
+            "보호막 개수가 하나 늘어납니다." },
+        { ids::SlowMo, "나무늘보", 3,
+            "게임 속도가 5% 감소합니다.\nX를 눌러 토글할 수 있습니다.",
+            "게임 속도가 5% 더 감소합니다." },
+        { ids::StartPos, "스타트포스", 5,
+            "매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다.\n해당 어템에 죽으면 체크포인트에서 부활합니다.",
+            "체크포인트를 한 번 더 찍을 수 있습니다." },
+        { ids::Foresight, "사륜안", 1,
+            "히트박스를 보여줍니다.",
+            "" },
+        { ids::Unmirror, "멀미약", 1,
+            "레벨 내 모든 미러포탈을 제거합니다.",
+            "" },
+        { ids::HazardHitbox, "위협제거", 5,
+            "위험 요소(빨간 히트박스)의 크기가 5% 감소합니다.",
+            "위험 요소의 크기가 5% 더 감소합니다." },
+        { ids::WaveHitbox, "웨이브브레이커", 5,
+            "웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다.",
+            "웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다.",
+            /* stub */ true },
+        { ids::Nerve, "청심환", 2,
+            "레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다.\nX% 도달 시 두 능력의 효과가 각각 X% 증가합니다.",
+            "X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다.",
+            /* stub */ true },
+        { ids::DraftCount, "기회비용", 1,
+            "다음 드래프트부터 카드가 4개씩 등장합니다.",
+            "",
+            /* stub */ true },
     };
     return pool;
 }
@@ -46,6 +50,11 @@ AugmentDef const* findAugment(std::string const& id) {
         if (def.id == id) return &def;
     }
     return nullptr;
+}
+
+std::string augmentName(std::string const& id) {
+    if (auto def = findAugment(id)) return def->name;
+    return id;
 }
 
 } // namespace augment

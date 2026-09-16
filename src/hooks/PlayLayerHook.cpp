@@ -1,6 +1,7 @@
 // PlayLayer integration: death counting / draft popup, and the per-attempt
-// mechanics of every augment (shield, slow-mo, checkpoint, foresight, unmirror,
-// blunt — whose GameObject hooks live in HazardHitboxHook.cpp).
+// mechanics of every augment (shield, slow-mo, startpos, foresight, unmirror,
+// hazard-hitbox — whose GameObject hooks live in HazardHitboxHook.cpp).
+// wave-hitbox, nerve and draft-count are stubs: drafted and recorded, no effect.
 
 #include "../core/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
@@ -72,11 +73,15 @@ class $modify(AugPlayLayer, PlayLayer) {
         int shieldsUsed = 0;
         float noclipTimer = 0.f;
 
-        // Checkpoint: one respawn per attempt; placements limited by level.
+        // Checkpoint: `level` placements per attempt (life from 0 %), each one
+        // good for one respawn. `checkpoints` = placed and not yet used, oldest
+        // first; GD's m_checkpointArray is kept in step with it at reset time.
         int checkpointsPlaced = 0;
-        bool respawnUsed = false;
+        std::vector<Ref<CheckpointObject>> checkpoints;
         bool respawnPending = false;
-        Ref<CheckpointObject> savedCheckpoint;
+        // The checkpoint used by the last respawn. GD may still point at it
+        // this attempt, so it stays alive until the next reset.
+        Ref<CheckpointObject> lastRespawn;
 
         RunHud* hud = nullptr;
 
@@ -90,10 +95,10 @@ class $modify(AugPlayLayer, PlayLayer) {
         cocos2d::CCDrawNode* hitboxNode = nullptr;
         std::vector<GameObject*> objectsByX;
 
-        // Blunt: the hazard scale every object currently in the level carries
+        // hazard-hitbox: the hazard scale every object currently in the level carries
         // (radii are multiplied in place, so a change is applied as a ratio).
-        float bluntApplied = 1.f;
-        int bluntRadiiAtLoad = 0;
+        float hazardApplied = 1.f;
+        int hazardRadiiAtLoad = 0;
     };
 
     bool isRunLevel() {
@@ -108,13 +113,13 @@ class $modify(AugPlayLayer, PlayLayer) {
     // ---------------------------------------------------------------- setup
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
-        // Blunt shrinks hitboxes as objects first compute them, so the scale
+        // hazard-hitbox shrinks hitboxes as objects first compute them, so the scale
         // has to be in place before PlayLayer::init creates the first object.
         {
             auto& mgr = AugmentManager::get();
             bool run = level && mgr.isRunFor(level->m_levelID.value());
-            blunt::setScale(run ? mgr.bluntScale() : 1.f);
-            m_fields->bluntApplied = blunt::scale();
+            hazard::setScale(run ? mgr.hazardScale() : 1.f);
+            m_fields->hazardApplied = hazard::scale();
         }
 
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
@@ -154,35 +159,35 @@ class $modify(AugPlayLayer, PlayLayer) {
             neutralizeMirrorPortal(object);
         }
 
-        // Blunt: rects and oriented boxes are shrunk lazily by the GameObject
+        // hazard-hitbox: rects and oriented boxes are shrunk lazily by the GameObject
         // hooks; the radius is a plain field GD reads inline, so scale it
         // here. Dirtying makes sure anything GD cached during addObject is
         // recomputed through the hooks.
-        float s = m_fields->bluntApplied;
-        if (s < 1.f && blunt::isTarget(object)) {
+        float s = m_fields->hazardApplied;
+        if (s < 1.f && hazard::isTarget(object)) {
             if (object->m_objectRadius > 0.f) {
                 object->m_objectRadius *= s;
-                m_fields->bluntRadiiAtLoad++;
+                m_fields->hazardRadiiAtLoad++;
             }
             object->m_isObjectRectDirty = true;
             object->m_isOrientedBoxDirty = true;
         }
     }
 
-    // Blunt: publish the run's current hazard scale and bring every object
+    // hazard-hitbox: publish the run's current hazard scale and bring every object
     // already in the level in line with it. Cheap when nothing changed, so it
     // runs on every reset (also covers "run ended, still playing" -> 1.0).
-    void applyBlunt() {
+    void applyHazardScale() {
         auto f = m_fields.self();
-        float want = this->isRunLevel() ? AugmentManager::get().bluntScale() : 1.f;
-        blunt::setScale(want);
-        if (std::abs(want - f->bluntApplied) < 0.001f) return;
+        float want = this->isRunLevel() ? AugmentManager::get().hazardScale() : 1.f;
+        hazard::setScale(want);
+        if (std::abs(want - f->hazardApplied) < 0.001f) return;
 
         int hazards = 0, radii = 0;
         if (m_objects) {
-            float ratio = want / f->bluntApplied;
+            float ratio = want / f->hazardApplied;
             for (auto obj : CCArrayExt<GameObject*>(m_objects)) {
-                if (!blunt::isTarget(obj)) continue;
+                if (!hazard::isTarget(obj)) continue;
                 hazards++;
                 if (obj->m_objectRadius > 0.f) {
                     obj->m_objectRadius *= ratio;
@@ -192,8 +197,8 @@ class $modify(AugPlayLayer, PlayLayer) {
                 obj->m_isOrientedBoxDirty = true;
             }
         }
-        f->bluntApplied = want;
-        log::info("Blunt: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
+        f->hazardApplied = want;
+        log::info("HazardHitbox: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
     }
 
     // Called when Unmirror is drafted while the level is already loaded.
@@ -240,13 +245,16 @@ class $modify(AugPlayLayer, PlayLayer) {
                 f->deathCounted = true;
                 mgr.onDeath(this->getCurrentPercent());
 
-                // Checkpoint: remember where to come back to. GD may clear the
-                // checkpoint array during a normal-mode death, so keep a ref.
-                if (mgr.has(ids::Checkpoint) && !f->respawnUsed) {
-                    if (auto cp = this->getLastCheckpoint()) {
-                        f->savedCheckpoint = cp;
-                        f->respawnPending = true;
-                    }
+                // Checkpoint: any unused placement means we come back to the
+                // newest one. Our own refs decide, not GD's array: GD drops a
+                // checkpoint placed < 0.1 s before the death (removePlacedCheckpoint).
+                if (mgr.has(ids::StartPos)) {
+                    f->respawnPending = !f->checkpoints.empty();
+                    log::info(
+                        "Checkpoint: death with {}/{} placed, {} ready, GD array {} -> {}",
+                        f->checkpointsPlaced, mgr.levelOf(ids::StartPos), f->checkpoints.size(),
+                        this->gdCheckpointCount(), f->respawnPending ? "respawn" : "restart from 0"
+                    );
                 }
             }
         }
@@ -258,42 +266,54 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto& mgr = AugmentManager::get();
         auto f = m_fields.self();
 
-        this->applyBlunt();
-        if (blunt::scale() < 1.f) {
-            auto st = blunt::takeStats();
+        this->applyHazardScale();
+        if (hazard::scale() < 1.f) {
+            auto st = hazard::takeStats();
             log::info(
-                "Blunt: shrunk {} rects, {} oriented boxes since the last reset ({} circular hazards scaled at load)",
-                st.rects, st.boxes, f->bluntRadiiAtLoad
+                "HazardHitbox: shrunk {} rects, {} oriented boxes since the last reset ({} circular hazards scaled at load)",
+                st.rects, st.boxes, f->hazardRadiiAtLoad
             );
         }
 
-        bool fromCheckpoint = f->respawnPending && f->savedCheckpoint && this->isRunAttempt();
+        bool fromCheckpoint = f->respawnPending && !f->checkpoints.empty() && this->isRunAttempt();
+        if (f->respawnPending && !fromCheckpoint) {
+            log::info("Checkpoint: respawn dropped (ready {}, runAttempt {})", f->checkpoints.size(), this->isRunAttempt());
+        }
         f->respawnPending = false;
         f->deathCounted = false;
         f->noclipTimer = 0.f;
+        f->lastRespawn = nullptr;
 
         if (fromCheckpoint) {
+            Ref<CheckpointObject> target = f->checkpoints.back();
+            f->checkpoints.pop_back();
+
             // Borrow the practice-mode respawn path for exactly this reset.
-            f->respawnUsed = true;
-            if (m_checkpointArray && m_checkpointArray->count() == 0) {
-                this->storeCheckpoint(f->savedCheckpoint);
-            }
+            // GD respawns at m_currentCheckpoint / the last array entry, so
+            // both are pointed at `target` first.
+            this->syncCheckpointArray(target);
+            m_currentCheckpoint = target;
             bool wasPractice = m_isPracticeMode;
             m_isPracticeMode = true;
             PlayLayer::resetLevel();
             m_isPracticeMode = wasPractice;
-            log::info("Respawned from checkpoint");
+            this->consumeCheckpoint(target);
+
+            log::info(
+                "Respawned from checkpoint ({} ready, {}/{} placed this attempt)",
+                f->checkpoints.size(), f->checkpointsPlaced, mgr.levelOf(ids::StartPos)
+            );
             if (f->hud) f->hud->notice("CHECKPOINT", { 120, 255, 120 });
         }
         else {
             // Fresh attempt: refill everything.
             f->shieldsUsed = 0;
             f->checkpointsPlaced = 0;
-            f->respawnUsed = false;
-            f->savedCheckpoint = nullptr;
-            if (m_checkpointArray && m_checkpointArray->count() > 0) {
-                this->removeAllCheckpoints();
-            }
+            f->checkpoints.clear();
+            // Same as qolmod's StartposSwitcher: a null current checkpoint
+            // makes GD start from the start position.
+            m_currentCheckpoint = nullptr;
+            if (this->gdCheckpointCount() > 0) this->removeAllCheckpoints();
             PlayLayer::resetLevel();
         }
 
@@ -309,6 +329,48 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
     }
 
+    // ---------------------------------------------------------------- checkpoint
+
+    int gdCheckpointCount() {
+        return m_checkpointArray ? static_cast<int>(m_checkpointArray->count()) : 0;
+    }
+
+    CheckpointObject* gdLastCheckpoint() {
+        // getLastCheckpoint() is inline and dereferences the array unguarded.
+        return m_checkpointArray ? this->getLastCheckpoint() : nullptr;
+    }
+
+    // GD respawns at the last entry of m_checkpointArray. Normally that already
+    // is `target` (GD kept our placements). If GD dropped them on the
+    // normal-mode death, rebuild the array from our refs so the older
+    // checkpoints stay available for later respawns too.
+    void syncCheckpointArray(CheckpointObject* target) {
+        auto f = m_fields.self();
+        int count = this->gdCheckpointCount();
+        bool inSync = count == static_cast<int>(f->checkpoints.size()) + 1 && this->gdLastCheckpoint() == target;
+        if (inSync) return;
+
+        if (count > 0) this->removeAllCheckpoints();
+        for (auto& cp : f->checkpoints) this->storeCheckpoint(cp);
+        this->storeCheckpoint(target);
+        log::info("Checkpoint: rebuilt GD array ({} -> {} entries)", count, this->gdCheckpointCount());
+    }
+
+    // A respawn uses its checkpoint up. removeCheckpoint(false) drops the
+    // newest entry — it is what GD itself calls (removePlacedCheckpoint) to
+    // undo a checkpoint placed right before a death — so the next death goes
+    // to the previous one. The object stays alive in lastRespawn.
+    void consumeCheckpoint(CheckpointObject* target) {
+        auto f = m_fields.self();
+        f->lastRespawn = target;
+        int before = this->gdCheckpointCount();
+        if (this->gdLastCheckpoint() == target) this->removeCheckpoint(false);
+        log::info(
+            "Checkpoint: consumed (GD array {} -> {}{})",
+            before, this->gdCheckpointCount(), this->gdLastCheckpoint() == target ? ", still on top!" : ""
+        );
+    }
+
     void levelComplete() {
         PlayLayer::levelComplete();
         setGameSpeed(1.f);
@@ -321,7 +383,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         // Never leave the next scene frozen or slowed down, and never let the
         // hazard scale leak into the editor or the next level.
         setGameSpeed(1.f);
-        blunt::setScale(1.f);
+        hazard::setScale(1.f);
         AugmentManager::get().resumeGameAfterDraft();
         PlayLayer::onQuit();
     }
@@ -489,17 +551,13 @@ class $modify(AugPlayLayer, PlayLayer) {
     bool tryPlaceCheckpoint() {
         auto& mgr = AugmentManager::get();
         auto f = m_fields.self();
-        int lvl = mgr.levelOf(ids::Checkpoint);
+        int lvl = mgr.levelOf(ids::StartPos);
         if (!this->isRunAttempt() || m_isPaused || lvl == 0 || !m_player1 || m_player1->m_isDead) {
             log::info("Z ignored: runAttempt={} paused={} cpLv={} dead={}",
                 this->isRunAttempt(), m_isPaused, lvl, m_player1 ? m_player1->m_isDead : true);
             return false;
         }
 
-        if (f->respawnUsed) {
-            if (f->hud) f->hud->notice("NO RESPAWN LEFT", { 255, 120, 120 });
-            return true;
-        }
         if (f->checkpointsPlaced >= lvl) {
             if (f->hud) f->hud->notice("NO CHECKPOINTS LEFT", { 255, 120, 120 });
             return true;
@@ -512,11 +570,18 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         if (cp) {
             f->checkpointsPlaced++;
-            log::info("Checkpoint placed ({}/{})", f->checkpointsPlaced, lvl);
+            f->checkpoints.push_back(cp);
+            log::info(
+                "Checkpoint placed ({}/{}), {} ready, GD array {}",
+                f->checkpointsPlaced, lvl, f->checkpoints.size(), this->gdCheckpointCount()
+            );
             if (f->hud) f->hud->notice("CHECKPOINT PLACED", { 120, 255, 120 });
         }
         else {
-            log::info("markCheckpoint returned null");
+            // GD refused (its own conditions, e.g. mid-dash). Say so, or the
+            // player believes a checkpoint exists.
+            log::info("markCheckpoint returned null at {:.1f}%", this->getCurrentPercent());
+            if (f->hud) f->hud->notice("CAN'T PLACE HERE", { 255, 120, 120 });
         }
         return true;
     }
@@ -534,7 +599,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto const& def = defs[index];
         auto f = m_fields.self();
 
-        if (mgr.levelOf(def.id) >= def.maxLevel()) {
+        if (mgr.levelOf(def.id) >= def.maxLevel) {
             log::info("Debug grant: '{}' already maxed", def.id);
             if (f->hud) f->hud->notice(fmt::format("{} MAXED", def.name), { 255, 120, 120 });
             return true;
@@ -544,7 +609,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         if (def.id == ids::Unmirror) this->applyUnmirrorNow();
         if (def.id == ids::SlowMo) this->applyTimeScale();
-        if (def.id == ids::Blunt) this->applyBlunt();
+        if (def.id == ids::HazardHitbox) this->applyHazardScale();
         this->refreshHud();
         if (f->hud) f->hud->notice(fmt::format("+{} Lv{} (DEBUG)", def.name, lvl), { 200, 160, 255 });
         return true;
@@ -564,30 +629,41 @@ class $modify(AugPlayLayer, PlayLayer) {
             mgr.gauge(), mgr.gaugeThreshold(), mgr.deaths(), now, std::max(now, mgr.bestPercent())
         ));
 
+        // Augment names are the Korean display names; the rest stays English
+        // (the HUD is a debug readout).
         if (int lvl = mgr.levelOf(ids::Shield)) {
             if (f->noclipTimer > 0.f) {
-                lines.push_back(fmt::format("Shield Lv{}: NOCLIP {:.1f}s", lvl, f->noclipTimer));
+                lines.push_back(fmt::format("{} Lv{}: NOCLIP {:.1f}s", augmentName(ids::Shield), lvl, f->noclipTimer));
             }
             else {
-                lines.push_back(fmt::format("Shield Lv{}: {}/{}", lvl, lvl - f->shieldsUsed, lvl));
+                lines.push_back(fmt::format("{} Lv{}: {}/{}", augmentName(ids::Shield), lvl, lvl - f->shieldsUsed, lvl));
             }
         }
         if (int lvl = mgr.levelOf(ids::SlowMo)) {
             lines.push_back(fmt::format(
-                "Slow-Mo Lv{}: {} ({:.0f}%)  [X]",
-                lvl, mgr.slowMoEnabled() ? "ON" : "OFF", mgr.slowMoScale() * 100.f
+                "{} Lv{}: {} ({:.0f}%)  [X]",
+                augmentName(ids::SlowMo), lvl, mgr.slowMoEnabled() ? "ON" : "OFF", mgr.slowMoScale() * 100.f
             ));
         }
-        if (int lvl = mgr.levelOf(ids::Checkpoint)) {
+        if (int lvl = mgr.levelOf(ids::StartPos)) {
             lines.push_back(fmt::format(
-                "Checkpoint Lv{}: {}/{} placed{}  [Z]",
-                lvl, f->checkpointsPlaced, lvl, f->respawnUsed ? ", respawn used" : ""
+                "{} Lv{}: {}/{} placed, {} ready  [Z]",
+                augmentName(ids::StartPos), lvl, f->checkpointsPlaced, lvl, f->checkpoints.size()
             ));
         }
-        if (mgr.has(ids::Foresight)) lines.push_back("Foresight");
-        if (mgr.has(ids::Unmirror)) lines.push_back("Unmirror");
-        if (int lvl = mgr.levelOf(ids::Blunt)) {
-            lines.push_back(fmt::format("Blunt Lv{}: hazards {:.0f}%", lvl, mgr.bluntScale() * 100.f));
+        if (mgr.has(ids::Foresight)) lines.push_back(augmentName(ids::Foresight));
+        if (mgr.has(ids::Unmirror)) lines.push_back(augmentName(ids::Unmirror));
+        if (int lvl = mgr.levelOf(ids::HazardHitbox)) {
+            lines.push_back(fmt::format(
+                "{} Lv{}: hazards {:.0f}%", augmentName(ids::HazardHitbox), lvl, mgr.hazardScale() * 100.f
+            ));
+        }
+        // Stubs: show that they were picked, nothing else to report.
+        for (auto const& def : allAugments()) {
+            if (!def.stub) continue;
+            if (int lvl = mgr.levelOf(def.id)) {
+                lines.push_back(fmt::format("{} Lv{} (stub)", def.name, lvl));
+            }
         }
 
         f->hud->setLines(lines);
@@ -611,7 +687,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
             if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
                 if (id == ids::Unmirror) pl->applyUnmirrorNow();
-                if (id == ids::Blunt) pl->applyBlunt();
+                if (id == ids::HazardHitbox) pl->applyHazardScale();
                 pl->refreshHud();
             }
         });

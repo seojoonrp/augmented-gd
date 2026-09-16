@@ -2,7 +2,7 @@
 
 class GameObject;
 
-// Blunt augment: hazard hitboxes shrink around their centre. GD keeps three
+// hazard-hitbox augment: hazard hitboxes shrink around their centre. GD keeps three
 // collision shapes per object and reads each from a different place, so the
 // GameObject hooks in HazardHitboxHook.cpp scale the first two as GD computes
 // them and PlayLayerHook scales the third in place:
@@ -14,7 +14,7 @@ class GameObject;
 //     itself is scaled when the object is added / the level changes).
 // The scale is a global because getObjectRect() is hot and runs for every
 // GameObject in the game; the PlayLayer hook owns it for the life of a level.
-namespace augment::blunt {
+namespace augment::hazard {
 
 // 1.0 = untouched. Logs on change.
 void setScale(float scale);
@@ -31,4 +31,4 @@ struct Stats {
 };
 Stats takeStats();
 
-} // namespace augment::blunt
+} // namespace augment::hazard

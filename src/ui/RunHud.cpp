@@ -1,4 +1,5 @@
 #include "RunHud.hpp"
+#include "Fonts.hpp"
 
 using namespace geode::prelude;
 
@@ -29,7 +30,9 @@ bool RunHud::init() {
     this->setPosition({ 0.f, 0.f });
     this->setID("run-hud"_spr);
 
-    m_notice = CCLabelBMFont::create("", "goldFont.fnt");
+    // Mod fonts: notices and lines carry Korean augment names.
+    m_notice = CCLabelBMFont::create("", fonts::Name);
+    m_notice->setExtraKerning(fonts::NameKerning);
     m_notice->setScale(0.7f);
     m_notice->setPosition({ winSize.width / 2, winSize.height * 0.7f });
     m_notice->setOpacity(0);
@@ -44,7 +47,7 @@ void RunHud::setLines(std::vector<std::string> const& lines) {
 
     // Grow the label pool as needed.
     while (m_labels.size() < lines.size()) {
-        auto label = CCLabelBMFont::create("", "chatFont.fnt");
+        auto label = CCLabelBMFont::create("", fonts::Text);
         label->setScale(kLineScale);
         label->setAnchorPoint({ 0.f, 1.f });
         label->setPosition({ kMargin, winSize.height - kMargin - kLineHeight * m_labels.size() });

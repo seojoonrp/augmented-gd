@@ -40,7 +40,8 @@ public:
     int levelOf(std::string const& id) const;
     bool has(std::string const& id) const { return this->levelOf(id) > 0; }
     std::map<std::string, int> const& augments() const { return m_levels; }
-    // Up to `count` random augments that are not yet maxed.
+    // Up to `count` random augments that are not yet maxed. Stub augments
+    // are drafted like any other; only their level is recorded.
     std::vector<AugmentDef const*> rollDraft(size_t count = 3) const;
     // Picking an augment increments its level (or adds it at level 1).
     void applyPick(std::string const& id);
@@ -53,8 +54,8 @@ public:
     void toggleSlowMo() { m_slowMoEnabled = !m_slowMoEnabled; }
     // 1.0 when the run has no slow-mo; otherwise the level's speed scale.
     float slowMoScale() const;
-    // 1.0 when the run has no Blunt; otherwise the level's hazard hitbox scale.
-    float bluntScale() const;
+    // 1.0 when the run has no hazard-hitbox; otherwise the level's hazard hitbox scale.
+    float hazardScale() const;
 
     // --- gameplay pause used while the draft popup is up ---
     // Pauses CCDirector without dropping the frame rate to 4 fps.

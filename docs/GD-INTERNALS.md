@@ -92,7 +92,7 @@ Side effect on this machine: death-tracker (hook priority `First`) sees
   `getObjectRect(m_vehicleSize, m_vehicleSize)` and `getObjectRect(0.3f, 0.3f)`.
   **(from refs)**
 
-## Object collision shapes (Blunt) — (from refs + bindings, unverified in game)
+## Object collision shapes (hazard-hitbox, formerly "Blunt") — verified in game 2026-09-16
 
 GD keeps three collision shapes per `GameObject`, read from different places:
 
@@ -112,8 +112,8 @@ GD keeps three collision shapes per `GameObject`, read from different places:
 - Player rects come from `getObjectRect(float w, float h)` (by value:
   `m_vehicleSize` / `0.3f`), a different virtual — untouched by the hook above.
   `PlayerObject` does not override `getObjectRect()`.
-- Open questions the Blunt log answers: is `getObjectRect()` the only path that
-  fills `m_objectRect` (counter `Blunt: shrunk N rects`), is the returned
+- Open questions the hazard-hitbox log answers: is `getObjectRect()` the only path that
+  fills `m_objectRect` (counter `HazardHitbox: shrunk N rects`), is the returned
   reference `m_objectRect` (`[returned ref is NOT m_objectRect]` marker), does
   nothing reset `m_objectRadius` during an attempt.
 
@@ -131,11 +131,41 @@ covers portals spawned later too. **(from refs, unverified here)**
 
 ## Checkpoints in normal mode
 
-Approach (implemented, **unverified** because the Z key never fired):
-`markCheckpoint()` / `resetLevel()` wrapped in a temporary `m_isPracticeMode = true`,
-keeping a `Ref<CheckpointObject>` from `getLastCheckpoint()` at death time in case
-GD clears `m_checkpointArray` on a normal-mode death, and re-`storeCheckpoint`ing it
-before the reset. See `PlayLayerHook.cpp::resetLevel`.
+Approach (implemented; placement + single respawn **verified in game 2026-09-16**,
+multi-respawn model unverified): `markCheckpoint()` / `resetLevel()` wrapped in a
+temporary `m_isPracticeMode = true`. Our own `std::vector<Ref<CheckpointObject>>`
+is the source of truth; before a checkpoint reset GD's `m_checkpointArray` is
+rebuilt from it if it diverged, and `m_currentCheckpoint` is pointed at the
+target. See `PlayLayerHook.cpp::resetLevel` / `syncCheckpointArray` / `consumeCheckpoint`.
+
+Facts read from Geode's inline implementations (= reverse-engineered GD code,
+`build/_deps/bindings-src/bindings/2.2081/inline/`), 2026-09-16:
+- `PlayerObject::removePlacedCheckpoint()` (`PlayerObject.cpp:549`) =
+  `if (m_checkpointTimeout) { m_playLayer->removeCheckpoint(false); m_checkpointTimeout = false; }`,
+  located right before `playerDestroyed` → **GD deletes a checkpoint placed
+  less than 0.1 s before the death** (`updateCheckpointTest` clears
+  `m_checkpointTimeout` after `.1f` s, `:722-727`). So `m_checkpointArray` can
+  legitimately lose our newest checkpoint during a death — never rely on it
+  alone. Whether `PlayLayer::markCheckpoint()` (our path) sets the timeout is
+  **(unverified)**; `PlayerObject::tryPlaceCheckpoint` (`win 0x3a32d0`) is GD's
+  auto-checkpoint path.
+- Same site shows `removeCheckpoint(bool first)` with `false` = **remove the
+  newest** checkpoint, callable mid-death without triggering a reset. Used by
+  us to consume a checkpoint right after respawning at it. **(from GD's own
+  usage; our call unverified)**
+- `getLastCheckpoint()` / `loadLastCheckpoint()` (`PlayLayer.cpp:132, 205`)
+  read `m_checkpointArray->lastObject()` with no null check on the array.
+- `queueCheckpoint()` (`:214`) just sets `m_tryPlaceCheckpoint = true`; GD's own
+  Z key defers placement to the next update that way. We call
+  `markCheckpoint()` directly from the key handler (between frames).
+- `GJBaseGameLayer::removeAllCheckpoints()` is an empty inline; the real one
+  is `PlayLayer::removeAllCheckpoints()` `win 0x3b8040` (virtual).
+- qolmod's StartposSwitcher sets `m_currentCheckpoint = nullptr` before
+  `resetLevel()` to force a start-pos respawn (`StartposSwitcher.cpp:149`) →
+  GD's `resetLevel` consults `m_currentCheckpoint`. We set it explicitly on
+  both branches.
+- `PlayerObject::m_pendingCheckpoint` exists (`GeometryDash.bro:14788`);
+  purpose unknown.
 
 Bindings (2.2081, `bro.ps1`): `storeCheckpoint(CheckpointObject*)` `win 0x3b74a0`,
 `loadFromCheckpoint(CheckpointObject*)` `win 0x3b7640`, `markCheckpoint()`
@@ -209,6 +239,40 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
   (`refs/qolmod/src/Keybinds/Hooks.cpp:51-96`), DevTools from `$on_mod(Loaded)`
   (`refs/devtools/src/backend.cpp:504`), CustomKeybinds node-scoped
   (`refs/custom-keybinds/src/UILayer.cpp:47-102, 321-329`).
+
+## Fonts & Korean text — verified at build 2026-09-17 (in-game render pending)
+
+- GD's `bigFont` / `goldFont` / `chatFont` (`Resources/*.fnt`) carry
+  `32-126,8226` only: a Korean string in them draws nothing. `CCLabelBMFont`
+  itself is UTF-8 aware; it only needs the glyphs.
+- `mod.json` `resources.fonts.<Name> { path, size, charset, outline? }` makes
+  Geode CLI (3.9.0) convert a TTF/OTF at package time
+  (`refs/geode-docs/mods/resources.md:74-105`). Verified output: `<Name>.fnt/.png`,
+  `<Name>-hd.*`, `<Name>-uhd.*` where **`size` is the UHD size** and hd / sd
+  are ½ / ¼ (GD's own: bigFont 32/64/128, goldFont 24/48/96, chatFont 16/32/56).
+  Every `.fnt` says `file="<Name>.png"`; cocos adds the -hd/-uhd suffix itself.
+  Atlases are single-page and NPOT (e.g. 1063×1393 for 227 glyphs at 96);
+  `base=` is wrong-looking (3/7/15) but cocos2d 2.x ignores it (uses lineHeight).
+- Charset syntax: `32-126,8226,44032-44033,…` — ranges with `-`, comma-separated,
+  decimal codepoints. The full Hangul block (44032-55203, 11 172 glyphs) would
+  blow the atlas at a readable size, so `scripts/fontcharset.ps1` lists only the
+  codepoints found in string literals under `src/` (comments skipped) and
+  rewrites the charset in `mod.json`; `build.ps1` runs it first. The CLI caches
+  fonts by content hash (`.geode_cache`), so a charset change rebuilds them.
+- Standalone check without a full build:
+  `geode package resources <dir with mod.json> <out>` (needs `description` in
+  mod.json). `Add-Type System.Drawing` + draw the png over black to eyeball it
+  (the atlas is white-on-transparent).
+- Use in code: `CCLabelBMFont::create(text, "AugName.fnt"_spr)`; `_spr` is a
+  constexpr literal, so `constexpr char const* Name = "AugName.fnt"_spr;` works
+  (`src/ui/Fonts.hpp`). `Popup::setTitle(title, font, scale)` takes the font too.
+- Letter spacing: `CCLabelBMFont::setExtraKerning(int)` is a RobTop addition
+  (`Geode/cocos/label_nodes/CCLabelBMFont.h:327`, `CC_SYNTHESIZE_NV`). Whether
+  GD applies it per glyph and in which unit is **(unverified)**; we set -1 on
+  name labels — if spacing looks wrong in game, that is the knob.
+- Pretendard (OFL) is installed per-user at
+  `%LOCALAPPDATA%\Microsoft\Windows\Fonts\Pretendard-*.ttf`; static TTFs, so no
+  variable-font question. License text is shipped in `resources/fonts/`.
 
 ## Misc
 
