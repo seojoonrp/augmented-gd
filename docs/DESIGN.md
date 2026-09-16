@@ -11,6 +11,11 @@ cleared. Dying keeps your augments; clearing ends the run.
 - Practice / test-mode attempts never count and get no augments.
 - Level clears made with augments currently **count as normal GD clears**.
   Decided 2026-09-16: ignore for now; revisit before any public release.
+  Mechanism when we do: flip `m_isTestMode` / `m_isPracticeMode` around
+  `PlayLayer::levelComplete()` (see `docs/GD-INTERNALS.md` "Does a clear count?").
+- Public release note (2026-09-16): `$GEODE_SDK/AGENTS.md` states the Geode
+  index does not accept AI-written mods. Private use is unaffected; any index
+  submission is the user's call.
 
 ## Draft gauge (decided 2026-09-16)
 
@@ -51,6 +56,6 @@ PLACED, SLOW-MO ON/OFF…).
 
 - Real draft trigger tuning (numbers above are placeholders).
 - Whether augmented clears should be recorded as GD clears.
-- Remaining ~5 augments. Rejected so far: player-hitbox shrink (bindings
-  unclear), speed-portal changes (breaks sync), input buffering (too deep).
+- Remaining augments and systems: candidates, difficulty tiers, rejected ideas
+  and build order are in `ROADMAP.md` (2026-09-16).
 - Run persistence across game restarts (currently in-memory only).

@@ -7,7 +7,9 @@ Mod ID `selenophile.augmented-gd`. The user tests in game; you cannot.
 Read in this order at the start of a session:
 1. `docs/STATUS.md` — what works, what's broken, what to try next.
 2. `docs/GD-INTERNALS.md` — verified facts about GD/Geode. **Check it before touching anything GD-internal.**
-3. `docs/DESIGN.md` — game rules and decisions.
+3. `docs/refs/INDEX.md` — problem → "how a working mod does it" (file:line in `refs/`).
+4. `docs/DESIGN.md` — game rules and decisions.
+5. `docs/RECIPES.md` — snippets in our style, each marked verified / from-ref.
 
 Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 
@@ -17,7 +19,11 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 .\scripts\build.ps1          # geode build --ninja + install into GD (fixes stale PATH)
 .\scripts\build.ps1 -Clean   # after CMake/CPM/env changes ("Unknown CMake command CPMAddPackage" → this)
 .\scripts\logs.ps1           # [Augmented GD] lines from the newest Geode log
-.\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored)
+.\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored, pinned commits, writes refs/MANIFEST.md)
+.\scripts\bro.ps1 Class [member]   # binding line + hookable verdict (win ok / win inline / field)
+.\scripts\refgrep.ps1 pattern [-Sdk|-All]   # rg over refs/ (+ loader source, bindings)
+.\scripts\nodeids.ps1 Layer  # node IDs for a layer (from NodeIDs source)
+.\scripts\mods.ps1           # mods installed in the user's GD, enabled or not
 ```
 
 - Build must end with `| Done | Installed selenophile.augmented-gd.geode` and exit 0.
@@ -36,13 +42,15 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 
 1. **GD internals: read a reference mod first, don't guess.** GD is closed source and
    its checks are often inlined assembly. Two features (hitboxes, hotkeys) burned
-   several test rounds on plausible-but-wrong assumptions. Grep `refs/` (OpenHack,
-   CustomKeybinds, miscbugfixes) and `$GEODE_SDK/loader/src` before designing a hook.
-   If nothing there covers it, say so and mark the approach **(unverified)** in the
-   reply and in `docs/GD-INTERNALS.md`.
-2. **Verify bindings, never recall them.** Every class member / function you use must
-   be grepped in `build/_deps/bindings-src/bindings/2.2081/*.bro` first. `= inline` /
-   `win inline` functions cannot be hooked on Windows.
+   several test rounds on plausible-but-wrong assumptions. Start at
+   `docs/refs/INDEX.md`, then `scripts\refgrep.ps1` over `refs/` and
+   `$GEODE_SDK/loader/src`. If nothing there covers it, say so and mark the
+   approach **(unverified)** in the reply and in `docs/GD-INTERNALS.md`.
+   Refs are read for *patterns*; licenses are mixed (qolmod is all-rights-reserved),
+   so never paste their code.
+2. **Verify bindings, never recall them.** Run `scripts\bro.ps1 Class member` for
+   every class member / function you use. `= inline` / `win inline` functions
+   cannot be hooked on Windows.
 3. **Instrument before the user tests.** Every new code path gets a `log::info` on entry
    and on each early return, so one failed test round pinpoints the stage. Trim once
    verified (list in `docs/STATUS.md`).
@@ -72,9 +80,10 @@ src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              checkpoint, slow-mo (CCScheduler hook + FMOD pitch),
                              foresight (own CCDrawNode), unmirror, HUD refresh,
                              draft popup on resetLevel, hotkey listener ($execute)
-docs/                        STATUS / GD-INTERNALS / DESIGN (keep current)
-scripts/                     build / logs / fetch-refs
-refs/                        reference mod sources (gitignored)
+docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
+docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
+scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods
+refs/                        reference mod sources (gitignored; MANIFEST.md lists pins)
 ```
 
 Per-attempt state lives in `AugPlayLayer::Fields`; per-run state in `AugmentManager`.
