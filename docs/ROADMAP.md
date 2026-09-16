@@ -27,7 +27,7 @@ Augment design space (every candidate falls in one):
 | Forgiveness | survive a mistake | Shield, Checkpoint |
 | Time | more reaction time | Slow-Mo |
 | Information | see what is coming | Foresight |
-| Level edit | remove a specific difficulty | Unmirror |
+| Level edit | remove a specific difficulty | Unmirror, Blunt |
 | Economy | more / faster drafts | — |
 | Curse | downside now, bigger payoff | — |
 
@@ -110,7 +110,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 | `ghost` | Ghost | 3 | forgiveness | Hold a key for up to 1.5/2.5/3.5 s of noclip per attempt. | T1 once keys work (`noclipTimer` infra). |
 | `bullettime` | Bullet Time | 2 | time | Hold a key → 40 % speed, 3/6 s budget per attempt. | T1 once keys work. |
 | `checkpoint` | Checkpoint (existing) | 3 | forgiveness | — | Blocked on the Z key. |
-| `tiny` | Tiny | 1 | forgiveness | Player hitbox −20 %. | `checkCollisions(PlayerObject*, float, bool)` is hookable, but the rect it reads is inlined (`getObjectRectPointer` is `win inline`). Stays **rejected** until a reference mod shows the path. |
+| `tiny` | Tiny | 1 | forgiveness | Player hitbox −20 %. | `checkCollisions(PlayerObject*, float, bool)` is hookable, but the player rect comes from `getObjectRect(float, float)` by value (`m_vehicleSize` / `0.3f`) at call sites we can't see. Stays **rejected** until a reference mod shows the path. *Hazard*-side shrinking is a different, hookable path — see Blunt (built 2026-09-16, T2, `HazardHitboxHook.cpp`). |
 | `trajectory` | Trajectory | 1 | info | Predicted path line. | Needs a physics simulation. Rejected for now. |
 
 ### Rejected (keep the reasons)
@@ -119,7 +119,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 |---|---|
 | Speed-portal changes | breaks music sync (DESIGN). |
 | Input buffering / coyote time | too deep (DESIGN). |
-| Hitbox shrink | inlined rect (above). |
+| Player hitbox shrink | inlined rect (above). Hazard hitboxes are shrinkable (Blunt). |
 | Warp / later StartPos | starting past 0 % is not a clear; breaks the run model. (`setStartPosObject` is `win inline` anyway.) |
 | Auto-jump, instant complete, auto coins | plays for you. |
 | Disable fade / pulse / flash triggers | `GJEffectManager` too deep. |

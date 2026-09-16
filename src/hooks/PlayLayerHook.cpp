@@ -1,9 +1,11 @@
 // PlayLayer integration: death counting / draft popup, and the per-attempt
-// mechanics of every augment (shield, slow-mo, checkpoint, foresight, unmirror).
+// mechanics of every augment (shield, slow-mo, checkpoint, foresight, unmirror,
+// blunt — whose GameObject hooks live in HazardHitboxHook.cpp).
 
 #include "../core/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
 #include "../ui/RunHud.hpp"
+#include "HazardHitboxHook.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -87,6 +89,11 @@ class $modify(AugPlayLayer, PlayLayer) {
         // "what's near the player" queries.
         cocos2d::CCDrawNode* hitboxNode = nullptr;
         std::vector<GameObject*> objectsByX;
+
+        // Blunt: the hazard scale every object currently in the level carries
+        // (radii are multiplied in place, so a change is applied as a ratio).
+        float bluntApplied = 1.f;
+        int bluntRadiiAtLoad = 0;
     };
 
     bool isRunLevel() {
@@ -101,6 +108,15 @@ class $modify(AugPlayLayer, PlayLayer) {
     // ---------------------------------------------------------------- setup
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+        // Blunt shrinks hitboxes as objects first compute them, so the scale
+        // has to be in place before PlayLayer::init creates the first object.
+        {
+            auto& mgr = AugmentManager::get();
+            bool run = level && mgr.isRunFor(level->m_levelID.value());
+            blunt::setScale(run ? mgr.bluntScale() : 1.f);
+            m_fields->bluntApplied = blunt::scale();
+        }
+
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
 
         if (this->isRunLevel()) {
@@ -132,9 +148,52 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     void addObject(GameObject* object) {
         PlayLayer::addObject(object);
-        if (object && this->isRunLevel() && AugmentManager::get().has(ids::Unmirror) && isMirrorPortal(object)) {
+        if (!object || !this->isRunLevel()) return;
+
+        if (AugmentManager::get().has(ids::Unmirror) && isMirrorPortal(object)) {
             neutralizeMirrorPortal(object);
         }
+
+        // Blunt: rects and oriented boxes are shrunk lazily by the GameObject
+        // hooks; the radius is a plain field GD reads inline, so scale it
+        // here. Dirtying makes sure anything GD cached during addObject is
+        // recomputed through the hooks.
+        float s = m_fields->bluntApplied;
+        if (s < 1.f && blunt::isTarget(object)) {
+            if (object->m_objectRadius > 0.f) {
+                object->m_objectRadius *= s;
+                m_fields->bluntRadiiAtLoad++;
+            }
+            object->m_isObjectRectDirty = true;
+            object->m_isOrientedBoxDirty = true;
+        }
+    }
+
+    // Blunt: publish the run's current hazard scale and bring every object
+    // already in the level in line with it. Cheap when nothing changed, so it
+    // runs on every reset (also covers "run ended, still playing" -> 1.0).
+    void applyBlunt() {
+        auto f = m_fields.self();
+        float want = this->isRunLevel() ? AugmentManager::get().bluntScale() : 1.f;
+        blunt::setScale(want);
+        if (std::abs(want - f->bluntApplied) < 0.001f) return;
+
+        int hazards = 0, radii = 0;
+        if (m_objects) {
+            float ratio = want / f->bluntApplied;
+            for (auto obj : CCArrayExt<GameObject*>(m_objects)) {
+                if (!blunt::isTarget(obj)) continue;
+                hazards++;
+                if (obj->m_objectRadius > 0.f) {
+                    obj->m_objectRadius *= ratio;
+                    radii++;
+                }
+                obj->m_isObjectRectDirty = true;
+                obj->m_isOrientedBoxDirty = true;
+            }
+        }
+        f->bluntApplied = want;
+        log::info("Blunt: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
     }
 
     // Called when Unmirror is drafted while the level is already loaded.
@@ -199,6 +258,15 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto& mgr = AugmentManager::get();
         auto f = m_fields.self();
 
+        this->applyBlunt();
+        if (blunt::scale() < 1.f) {
+            auto st = blunt::takeStats();
+            log::info(
+                "Blunt: shrunk {} rects, {} oriented boxes since the last reset ({} circular hazards scaled at load)",
+                st.rects, st.boxes, f->bluntRadiiAtLoad
+            );
+        }
+
         bool fromCheckpoint = f->respawnPending && f->savedCheckpoint && this->isRunAttempt();
         f->respawnPending = false;
         f->deathCounted = false;
@@ -250,8 +318,10 @@ class $modify(AugPlayLayer, PlayLayer) {
     }
 
     void onQuit() {
-        // Never leave the next scene frozen or slowed down.
+        // Never leave the next scene frozen or slowed down, and never let the
+        // hazard scale leak into the editor or the next level.
         setGameSpeed(1.f);
+        blunt::setScale(1.f);
         AugmentManager::get().resumeGameAfterDraft();
         PlayLayer::onQuit();
     }
@@ -474,6 +544,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         if (def.id == ids::Unmirror) this->applyUnmirrorNow();
         if (def.id == ids::SlowMo) this->applyTimeScale();
+        if (def.id == ids::Blunt) this->applyBlunt();
         this->refreshHud();
         if (f->hud) f->hud->notice(fmt::format("+{} Lv{} (DEBUG)", def.name, lvl), { 200, 160, 255 });
         return true;
@@ -515,6 +586,9 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
         if (mgr.has(ids::Foresight)) lines.push_back("Foresight");
         if (mgr.has(ids::Unmirror)) lines.push_back("Unmirror");
+        if (int lvl = mgr.levelOf(ids::Blunt)) {
+            lines.push_back(fmt::format("Blunt Lv{}: hazards {:.0f}%", lvl, mgr.bluntScale() * 100.f));
+        }
 
         f->hud->setLines(lines);
     }
@@ -537,6 +611,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
             if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
                 if (id == ids::Unmirror) pl->applyUnmirrorNow();
+                if (id == ids::Blunt) pl->applyBlunt();
                 pl->refreshHud();
             }
         });

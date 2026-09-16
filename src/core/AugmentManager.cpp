@@ -114,6 +114,12 @@ float AugmentManager::slowMoScale() const {
     return tune::SlowMoScale[std::min(lvl, 3) - 1];
 }
 
+float AugmentManager::bluntScale() const {
+    int lvl = this->levelOf(ids::Blunt);
+    if (lvl <= 0) return 1.f;
+    return tune::BluntScale[std::min(lvl, 3) - 1];
+}
+
 void AugmentManager::pauseGameForDraft() {
     if (m_directorPaused) return;
     auto director = CCDirector::get();

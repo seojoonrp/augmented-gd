@@ -91,6 +91,34 @@ Extras qolmod handles (`HitboxNode.cpp:159-243`): slopes via `m_slopeDirection`,
 rotated boxes via `m_orientedBox->m_corners`. Sort `m_objects` by x once and
 `lower_bound` per frame — there can be 10k+ objects.
 
+## Shrink / reshape an object's collision — (from ref qolmod `AccurateHitboxes.cpp:122-163`; ours in `src/hooks/HazardHitboxHook.cpp`, unverified 2026-09-16)
+
+```cpp
+#include <Geode/modify/GameObject.hpp>
+class $modify(AugGameObject, GameObject) {
+    // AABB: shrink only a fresh recompute (GD rebuilds from position + size,
+    // so this never compounds); cached reads already carry the shrink.
+    CCRect const& getObjectRect() {                       // win 0x1976a0
+        bool wasDirty = m_isObjectRectDirty;
+        auto& rect = GameObject::getObjectRect();
+        if (wasDirty && isTarget(this) && !(m_shouldUseOuterOb && m_orientedBox)) shrinkInPlace(m_objectRect);
+        return rect;
+    }
+    // OBB (off-grid rotations only): same pattern as qolmod.
+    void updateOrientedBox() {                            // win 0x1a1570
+        bool dirty = m_isOrientedBoxDirty || !m_orientedBox;
+        GameObject::updateOrientedBox();
+        if (!dirty || !m_orientedBox || !isTarget(this)) return;
+        auto c = m_orientedBox->m_center;
+        for (auto& p : m_orientedBox->m_corners) p = c + (p - c) * scale;
+        m_orientedBox->computeAxes();                     // Geode inline body, callable
+        m_orientedBox->orderCorners();                    // win 0x6dda0
+    }
+};
+// Circles: GD reads m_objectRadius inline -> write the field (PlayLayer::addObject).
+// Force a recompute later: obj->m_isObjectRectDirty = obj->m_isOrientedBoxDirty = true;
+```
+
 ## Mirror portals — (from ref qolmod `NoMirrorPortal.cpp:22-31`, unverified here)
 
 ```cpp

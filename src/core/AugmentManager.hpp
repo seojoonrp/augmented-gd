@@ -53,6 +53,8 @@ public:
     void toggleSlowMo() { m_slowMoEnabled = !m_slowMoEnabled; }
     // 1.0 when the run has no slow-mo; otherwise the level's speed scale.
     float slowMoScale() const;
+    // 1.0 when the run has no Blunt; otherwise the level's hazard hitbox scale.
+    float bluntScale() const;
 
     // --- gameplay pause used while the draft popup is up ---
     // Pauses CCDirector without dropping the frame rate to 4 fps.

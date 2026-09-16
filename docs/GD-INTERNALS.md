@@ -92,6 +92,31 @@ Side effect on this machine: death-tracker (hook priority `First`) sees
   `getObjectRect(m_vehicleSize, m_vehicleSize)` and `getObjectRect(0.3f, 0.3f)`.
   **(from refs)**
 
+## Object collision shapes (Blunt) — (from refs + bindings, unverified in game)
+
+GD keeps three collision shapes per `GameObject`, read from different places:
+
+| Shape | Where GD reads it | How we scale it |
+|---|---|---|
+| Axis-aligned rect `m_objectRect` | virtual `getObjectRect()` (`win 0x1976a0`, hookable) recomputes it when `m_isObjectRectDirty`; `getObjectRectPointer()` is `win inline` = `if (dirty) getObjectRect(); return &m_objectRect;` | hook `getObjectRect()`, shrink `m_objectRect` in place **only when it was dirty before the call** (fresh recompute from position/size → never compounds). `HazardHitboxHook.cpp` |
+| Oriented box `m_orientedBox` (`OBB2D`) — only for rotations off the 90° grid | `updateOrientedBox()` (`win 0x1a1570`, hookable) rebuilds it when `m_isOrientedBoxDirty` or `m_orientedBox == nullptr`; collision uses `m_orientedBox->overlaps(player->m_orientedBox)` when `m_orientedBox && m_shouldUseOuterOb` (qolmod trajectory `ShowTrajectory/Hooks.cpp:61`, AllModesPlatformer `:47`) | hook `updateOrientedBox()`, move `m_corners[i]` toward `m_center`, then `computeAxes()` (Geode inline body) + `orderCorners()` — exactly what qolmod AccurateHitboxes does with its own corners (`refs/qolmod/src/Hacks/Level/AccurateHitboxes.cpp:122-163`) and that changes real collision |
+| Circle `m_objectRadius` (saws) | `getObjectRadius()` is `win inline` = `m_objectRadius * max(m_scaleX, m_scaleY)`; test is `GJBaseGameLayer::playerCircleCollision(PlayerObject*, GameObject*)` (`win 0x211df0`, hookable, unused) | write the field: `m_objectRadius *= scale` in `PlayLayer::addObject` and by ratio when the level changes |
+
+- Grid-aligned objects (rotation % 90 == 0) never use the OBB — qolmod nudges
+  their rotation by 1° in `PlayLayer::addObject` to force the OBB path
+  (`AccurateHitboxes.cpp:169-181`). For them the AABB *is* the hitbox.
+- `dirtifyObjectRect()` (`win inline`) is just `m_isObjectRectDirty = m_isOrientedBoxDirty = true`;
+  setting both flags forces a recompute through the hooks on next use.
+- `getObjectRect()` when dirty also clears `m_isObjectRectDirty` and sets
+  `m_boxOffsetCalculated` (qolmod restores both after peeking, `HitboxNode.cpp:140-157`).
+- Player rects come from `getObjectRect(float w, float h)` (by value:
+  `m_vehicleSize` / `0.3f`), a different virtual — untouched by the hook above.
+  `PlayerObject` does not override `getObjectRect()`.
+- Open questions the Blunt log answers: is `getObjectRect()` the only path that
+  fills `m_objectRect` (counter `Blunt: shrunk N rects`), is the returned
+  reference `m_objectRect` (`[returned ref is NOT m_objectRect]` marker), does
+  nothing reset `m_objectRadius` during an attempt.
+
 ## Mirror portals
 
 `GameObjectType::InverseMirrorPortal (14)` / `NormalMirrorPortal (15)`.

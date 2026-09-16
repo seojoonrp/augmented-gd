@@ -32,6 +32,11 @@ std::vector<AugmentDef> const& allAugments() {
         { ids::Unmirror, "Unmirror", {
             "Removes every mirror portal from the level.",
         }},
+        { ids::Blunt, "Blunt", {
+            "Hazard hitboxes shrink to 80% of their size.",
+            "Hazard hitboxes shrink to 60% of their size.",
+            "Hazard hitboxes shrink to 40% of their size.",
+        }},
     };
     return pool;
 }

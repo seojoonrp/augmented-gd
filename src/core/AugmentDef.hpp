@@ -12,6 +12,7 @@ namespace ids {
     constexpr char const* Checkpoint = "checkpoint";
     constexpr char const* Foresight  = "foresight";
     constexpr char const* Unmirror   = "unmirror";
+    constexpr char const* Blunt      = "blunt";
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
@@ -34,6 +35,9 @@ namespace tune {
     constexpr float NoclipSeconds = 3.f;
     // Game speed at slow-mo level 1..3.
     constexpr float SlowMoScale[3] = { 0.93f, 0.86f, 0.79f };
+    // Hazard hitbox size at blunt level 1..3. Deliberately coarse for testing;
+    // the real numbers will be smaller steps.
+    constexpr float BluntScale[3] = { 0.8f, 0.6f, 0.4f };
 }
 
 } // namespace augment

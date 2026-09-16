@@ -32,7 +32,7 @@ them up when progressing. Future tuning idea: raise the threshold per draft.
 
 Three random augments that are not yet maxed, shown on respawn. Picking is
 mandatory (no close button, back key ignored). Duplicate picks level the
-augment up. Pool is ~10 augments eventually; 5 now.
+augment up. Pool is ~10 augments eventually; 6 now.
 
 ## Augments (current pool)
 
@@ -43,6 +43,7 @@ augment up. Pool is ~10 augments eventually; 5 now.
 | `checkpoint` | Checkpoint | 3 | Hotkey (default Z) places up to 1/2/3 checkpoints per attempt. On death, respawn once at the latest checkpoint; the next death restarts from the beginning. Placements are consumed even if a later one supersedes them. |
 | `foresight` | Foresight | 1 | Draws hitboxes (GD colours: blue solid, red hazard, green interactive, yellow player). |
 | `unmirror` | Unmirror | 1 | Neutralises every mirror portal, including ones already loaded when drafted. |
+| `blunt` | Blunt | 3 | Hazard hitboxes (Hazard / AnimatedHazard types: spikes, saws, …) shrink around their centre to 80/60/40 %. Solids, slopes and the player are untouched. Numbers are test values (2026-09-16); real steps will be smaller. |
 
 Definitions live in `src/core/AugmentDef.cpp`; behaviour in `src/hooks/PlayLayerHook.cpp`.
 

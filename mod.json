@@ -50,7 +50,7 @@
 		"debug-augment-keys": {
 			"type": "bool",
 			"name": "Debug: number keys grant augments",
-			"description": "During a run, keys 1-5 add one level of the matching augment (table order: Shield, Slow-Mo, Checkpoint, Foresight, Unmirror). Testing aid.",
+			"description": "During a run, keys 1-6 add one level of the matching augment (table order: Shield, Slow-Mo, Checkpoint, Foresight, Unmirror, Blunt). Testing aid.",
 			"default": true
 		},
 		"keybind-checkpoint": {

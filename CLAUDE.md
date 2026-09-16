@@ -80,7 +80,10 @@ src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              checkpoint, slow-mo (CCScheduler hook + FMOD pitch),
                              foresight (own CCDrawNode), unmirror, HUD refresh,
                              draft popup on resetLevel, hotkeys (node-scoped keybind
-                             listeners in init + raw listener in $on_mod(Loaded))
+                             listeners in init + raw listener in $on_mod(Loaded)),
+                             blunt scale publish / radius scaling (init, addObject, applyBlunt)
+src/hooks/HazardHitboxHook.* blunt: global hazard scale + GameObject hooks
+                             (getObjectRect AABB in place, updateOrientedBox OBB corners)
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
 scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods
