@@ -16,8 +16,11 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 ## Build & test loop
 
 ```powershell
-.\scripts\build.ps1          # fontcharset + fontgen + geode build --ninja + install into GD (fixes stale PATH)
+.\scripts\build.ps1          # host tests + fontcharset + fontgen + geode build --ninja + install into GD (fixes stale PATH)
 .\scripts\build.ps1 -Clean   # after CMake/CPM/env changes ("Unknown CMake command CPMAddPackage" → this)
+.\scripts\test.ps1           # compile + run tests/core_tests.cpp against src/core with clang, no Geode (build.ps1 runs it)
+.\scripts\check.ps1          # static audit: every $modify override must be `win ok` in the bindings; doc → source cites must resolve
+.\scripts\diag.ps1 [-Pattern x]   # inventory of log:: lines in src/ (what a test round can print)
 .\scripts\logs.ps1           # [Augmented GD] lines from the newest Geode log
 .\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored, pinned commits, writes refs/MANIFEST.md)
 .\scripts\bro.ps1 Class [member]   # binding line + hookable verdict (win ok / win inline / field)
@@ -28,6 +31,9 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 ```
 
 - Build must end with `| Done | Installed selenophile.augmented-gd.geode` and exit 0.
+- `src/core/` has no Geode headers and is covered by `tests/core_tests.cpp`: gauge
+  economy, formulas, roll, table text. Change a rule there → add or fix a test; run
+  `scripts\check.ps1` after adding a hook or moving a file.
 - Plain `geode`/`clang` may be missing in VS Code terminals (stale PATH). The scripts
   reload PATH from the registry; if running commands by hand, do the same first.
 - The user launches GD and reports. Ask for the log (`scripts/logs.ps1`) with every
@@ -84,10 +90,14 @@ resources/fonts/             ImcreSoojin.ttf (UI) + Pretendard-Regular.ttf (debu
                              AugName/AugText sd/hd/uhd baked by scripts/fontgen.py (white, black outline, shadow)
 CMakeLists.txt               forces clang on Windows, then standard Geode setup
 src/main.cpp                 entry (load log only)
-src/core/AugmentDef.*        static augment table: ids::*, Korean names, initial / level-up
-                             descriptions, maxLevel, tune::* (steps, nerve mult, draft cards)
-src/core/AugmentManager.*    run state singleton: run lifecycle, gauge, augment levels,
-                             slow-mo toggle, director pause/resume for drafts, cursor state
+src/core/                    pure C++ (no Geode); host-tested by tests/core_tests.cpp
+  AugmentDef.*               static augment table: ids::*, Korean names, maxLevel, descriptions
+                             built from tune::* at startup (numbers have one home), tune::*
+  Formulas.hpp               level → effect: slowMoScale, nerveBoost, hazard/waveScale, cat*, cards
+  RunState.*                 one run: lifecycle, gauge economy (GaugeRule injected), levels,
+                             pending drafts, slow-mo toggle, effects at the current levels
+src/game/AugmentManager.*    Geode-side singleton wrapping RunState: settings (debug-mode /
+                             threshold), logging, director pause/resume for drafts, cursor state
 src/ui/Fonts.hpp             fonts::Name / Text (ImcreSoojin, outlined) / Debug (Pretendard)
 src/ui/AugmentDraftPopup.*   geode::Popup, bg hidden, GD-button-style cards (140x210: name / image box /
                              description fit-to-slot / footer pips), no close, mandatory pick; whole card
@@ -113,12 +123,14 @@ src/hooks/PlayerHitboxHook.* wave-hitbox: global player scale (augment::player) 
                              the getObjectRect(w, h) overload, gated on PlayerObject + m_isDart
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
-scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods / fontcharset /
-                             fontgen.py (Windows `py -3` + Pillow; Geode CLI's font "outline" is a no-op)
+tests/core_tests.cpp         host tests for src/core (plain asserts, run by scripts/test.ps1)
+scripts/                     build / test / check / diag / logs / fetch-refs / bro / refgrep / nodeids / mods /
+                             fontcharset / fontgen.py (Windows `py -3` + Pillow; Geode CLI's font "outline" is a no-op)
 refs/                        reference mod sources (gitignored; MANIFEST.md lists pins)
 ```
 
-Per-attempt state lives in `AugPlayLayer::Fields`; per-run state in `AugmentManager`.
+Per-attempt state lives in `AugPlayLayer::Fields`; per-run state in `RunState` (via `AugmentManager`).
+Refactor in progress: `docs/REFACTOR-PLAN.md` (step status at the bottom).
 Charges are derived (`level - used`) so an augment drafted mid-run works next attempt.
 
 ## Style

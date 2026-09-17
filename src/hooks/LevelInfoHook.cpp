@@ -1,6 +1,6 @@
 // M2: "AUG" button on the level info screen that starts (or previews) a run.
 
-#include "../core/AugmentManager.hpp"
+#include "../game/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
 
 #include <Geode/Geode.hpp>
@@ -78,7 +78,7 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
                 }
                 else {
                     // Preview: just show the draft UI, don't apply anything.
-                    auto popup = AugmentDraftPopup::create(mgr.rollDraft(3), [](std::string const& id) {
+                    auto popup = AugmentDraftPopup::create(mgr.rollDraft(tune::DefaultDraftCards), [](std::string const& id) {
                         log::info("Preview pick (not applied): {}", id);
                     });
                     if (popup) popup->show();

@@ -4,7 +4,7 @@
 // PlayerHitboxHook.cpp — and this file owns the scales they read, because
 // nerve makes both depend on how far into the level the player is.
 
-#include "../core/AugmentManager.hpp"
+#include "../game/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
 #include "../ui/CatNode.hpp"
 #include "../ui/RunHud.hpp"
@@ -933,7 +933,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto choices = mgr.rollDraft(mgr.draftCardCount());
         if (choices.empty()) {
             log::info("Draft: nothing left to draft, {} pending dropped", mgr.pendingDrafts());
-            while (mgr.hasPendingDraft()) mgr.clearPendingDraft();
+            mgr.dropPendingDrafts();
             return;
         }
         log::info("Draft: showing {} cards, {} more pending", choices.size(), mgr.pendingDrafts());

@@ -1,5 +1,8 @@
 #pragma once
 
+// Static augment table + tuning constants. No Geode headers: src/core is
+// compiled on the host by scripts/test.ps1 as well as into the mod.
+
 #include <string>
 #include <vector>
 
@@ -21,14 +24,15 @@ namespace ids {
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
-// lives in AugmentManager, not here.
+// lives in RunState, not here.
 struct AugmentDef {
     std::string id;
     // Display name, Korean. Drawn with the mod's own font (GD's fonts have no
     // Hangul), so never feed it to a bigFont/goldFont/chatFont label.
     std::string name;
     int maxLevel = 1;
-    // Shown on the card when drafting level 1.
+    // Shown on the card when drafting level 1. Built from tune:: at startup
+    // so the numbers on the card and in the code cannot drift apart.
     std::string initialDesc;
     // Shown when drafting level 2+ (same text for every level-up). Empty
     // when maxLevel == 1.
@@ -42,8 +46,7 @@ AugmentDef const* findAugment(std::string const& id);
 // Display name for an id; falls back to the id itself.
 std::string augmentName(std::string const& id);
 
-// Tuning constants shared by hooks. The card descriptions in AugmentDef.cpp
-// quote these numbers as literal text, so change both together.
+// Tuning constants shared by hooks and by the card descriptions.
 namespace tune {
     constexpr float NoclipSeconds = 1.5f;
     // Game speed at slow-mo level n: 1 - SlowMoStep * n.
@@ -67,6 +70,7 @@ namespace tune {
     constexpr int CatCountStep = 1;
     constexpr float CatBaseInterval = 4.f;
     constexpr float CatIntervalStep = 0.5f;
+    constexpr float CatMinInterval = 0.5f;
     // Draft gauge: a death charges by the percent reached, plus every percent
     // of new best times NewBestBonusMult. A draft costs GaugeThresholdStart
     // and each gauge-earned draft raises the next cost by GaugeThresholdStep

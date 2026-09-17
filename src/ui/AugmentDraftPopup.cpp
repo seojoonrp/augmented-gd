@@ -1,6 +1,6 @@
 #include "AugmentDraftPopup.hpp"
 #include "Fonts.hpp"
-#include "../core/AugmentManager.hpp"
+#include "../game/AugmentManager.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/ui/NineSlice.hpp>
