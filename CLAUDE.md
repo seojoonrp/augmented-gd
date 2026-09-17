@@ -5,45 +5,42 @@ roguelite run: die → draft an augment → get stronger → clear.
 Mod ID `selenophile.augmented-gd`. The user tests in game; you cannot.
 
 Read in this order at the start of a session:
-1. `docs/STATUS.md` — what works, what's broken, what to try next.
+1. `docs/STATUS.md` — what works, what's broken, what to test next (short; history is in `docs/SESSIONS.md`).
 2. `docs/GD-INTERNALS.md` — verified facts about GD/Geode. **Check it before touching anything GD-internal.**
 3. `docs/refs/INDEX.md` — problem → "how a working mod does it" (file:line in `refs/`).
 4. `docs/DESIGN.md` — game rules and decisions.
 5. `docs/RECIPES.md` — snippets in our style, each marked verified / from-ref.
 
-Update `docs/STATUS.md` at the end of every session (verified / broken / next).
+`docs/HARNESS.md` explains every script and doc convention; open it when a
+script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
+`docs/SESSIONS.md` (one entry) at the end of every session.
 
 ## Build & test loop
 
 ```powershell
-.\scripts\build.ps1          # host tests + fontcharset + fontgen + geode build --ninja + install into GD (fixes stale PATH)
+.\scripts\build.ps1          # host tests → fontcharset → fontgen → geode build --ninja → install into GD
 .\scripts\build.ps1 -Clean   # after CMake/CPM/env changes ("Unknown CMake command CPMAddPackage" → this)
-.\scripts\test.ps1           # compile + run tests/core_tests.cpp against src/core with clang, no Geode (build.ps1 runs it)
-.\scripts\check.ps1          # static audit: every $modify override must be `win ok` in the bindings; doc → source cites must resolve
-.\scripts\diag.ps1 [-Pattern x]   # inventory of log:: lines in src/ (what a test round can print)
+.\scripts\test.ps1           # tests/core_tests.cpp against src/core, clang only, no Geode
+.\scripts\check.ps1          # every $modify override must be `win ok`; doc → source cites must resolve
 .\scripts\logs.ps1           # [Augmented GD] lines from the newest Geode log
-.\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored, pinned commits, writes refs/MANIFEST.md)
+.\scripts\diag.ps1 [-Pattern x]    # inventory of log:: lines in src/
 .\scripts\bro.ps1 Class [member]   # binding line + hookable verdict (win ok / win inline / field)
 .\scripts\refgrep.ps1 pattern [-Sdk|-All]   # rg over refs/ (+ loader source, bindings)
-.\scripts\nodeids.ps1 Layer  # node IDs for a layer (from NodeIDs source)
-.\scripts\mods.ps1           # mods installed in the user's GD, enabled or not
-.\scripts\fontcharset.ps1    # rebuild mod.json font charset from Korean literals in src/ (build.ps1 runs it)
+.\scripts\nodeids.ps1 Layer / mods.ps1 / fetch-refs.ps1 / fontcharset.ps1   # see docs/HARNESS.md
 ```
 
-- Build must end with `| Done | Installed selenophile.augmented-gd.geode` and exit 0.
-- `src/core/` has no Geode headers and is covered by `tests/core_tests.cpp`: gauge
-  economy, formulas, roll, table text. Change a rule there → add or fix a test; run
-  `scripts\check.ps1` after adding a hook or moving a file.
+- Build must end with `| Done | Installed selenophile.augmented-gd.geode` and exit 0;
+  `check.ps1` must report 0 errors after any hook or file move.
+- `src/core/` has no Geode headers and is covered by `tests/core_tests.cpp` (gauge
+  economy, formulas, roll, card text). A rule change there = a test change.
 - Plain `geode`/`clang` may be missing in VS Code terminals (stale PATH). The scripts
   reload PATH from the registry; if running commands by hand, do the same first.
 - The user launches GD and reports. Ask for the log (`scripts/logs.ps1`) with every
   bug report; don't guess from the description alone.
-- Environment facts: SDK at `$env:GEODE_SDK` (`C:\Users\seojo\Documents\Geode`),
-  CPM cache `C:\Users\seojo\.cpm-cache`, GD at
-  `C:\Program Files (x86)\Steam\steamapps\common\Geometry Dash`. Compiler is LLVM
-  clang (MSYS2 GCC is also on PATH and must **not** be picked — CMakeLists handles it).
-- `.vscode/` is gitignored; it holds CMake Tools (Ninja, compile_commands) and clangd
-  (`-header-insertion=never`) settings. Recreate if missing.
+- Environment: SDK at `$env:GEODE_SDK` (`C:\Users\seojo\Documents\Geode`), CPM cache
+  `C:\Users\seojo\.cpm-cache`, GD at `C:\Program Files (x86)\Steam\steamapps\common\Geometry Dash`.
+  Compiler is LLVM clang (MSYS2 GCC is also on PATH and must **not** be picked — CMakeLists handles it).
+- `.vscode/` is gitignored (CMake Tools: Ninja, compile_commands; clangd `-header-insertion=never`).
 
 ## Working rules (learned the hard way)
 
@@ -56,15 +53,15 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
    Refs are read for *patterns*; licenses are mixed (qolmod is all-rights-reserved),
    so never paste their code.
 2. **Verify bindings, never recall them.** Run `scripts\bro.ps1 Class member` for
-   every class member / function you use. `= inline` / `win inline` functions
-   cannot be hooked on Windows.
+   every class member / function you use (`check.ps1` re-audits the hooks). `= inline` /
+   `win inline` functions cannot be hooked on Windows.
 3. **Instrument before the user tests.** Every new code path gets a `log::info` on entry
    and on each early return, so one failed test round pinpoints the stage. Trim once
-   verified (list in `docs/STATUS.md`).
+   verified (`scripts\diag.ps1` lists what is there).
 4. **One failed round → change approach, not parameters.** If a test shows *no* log
    line from a path, the path isn't reached; don't re-tune it.
-5. Popup callbacks must not capture `PlayLayer*` (may be gone). Use
-   `AugmentManager` and `PlayLayer::get()` at call time.
+5. Never hold a `PlayLayer*` across frames (popup callbacks, listeners): ask
+   `AugmentManager::get().session()` at call time; it is null once the layer is gone.
 6. Never block or count `destroyPlayer(player, m_anticheatSpike)`.
 7. Geode objects: `cast::typeinfo_pointer_cast`, not `dynamic_pointer_cast`.
 8. Prefer `Write`/`Edit` tools over bash heredocs for source files (quoting issues on
@@ -80,62 +77,51 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
     debug readouts (HUD lines) = `fonts::Debug` (Pretendard). Logs, notices and
     HUD wording stay English. New Korean literals need no extra step:
     `build.ps1` regenerates the charset and re-bakes the fonts.
+11. Docs cite our own sources as `` `path/File.cpp` `symbol` `` or `File.cpp::symbol`,
+    never by line number (`check.ps1` warns). Line numbers are fine for `refs/` (pinned).
 
 ## Code map
 
 ```
-mod.json                     id, GD/Geode versions, fonts (resources.fonts = AugDebug, charset generated;
-                             resources.files = baked UI fonts), settings (gauge numbers, keybinds, debug keys)
-resources/fonts/             ImcreSoojin.ttf (UI) + Pretendard-Regular.ttf (debug HUD); gen/ (gitignored) holds
-                             AugName/AugText sd/hd/uhd baked by scripts/fontgen.py (white, black outline, shadow)
-CMakeLists.txt               forces clang on Windows, then standard Geode setup
-src/main.cpp                 entry (load log only)
-src/core/                    pure C++ (no Geode); host-tested by tests/core_tests.cpp
-  AugmentDef.*               static augment table: ids::*, Korean names, maxLevel, descriptions
-                             built from tune::* at startup (numbers have one home), tune::*
-  Formulas.hpp               level → effect: slowMoScale, nerveBoost, hazard/waveScale, cat*, cards
-  RunState.*                 one run: lifecycle, gauge economy (GaugeRule injected), levels,
-                             pending drafts, slow-mo toggle, effects at the current levels
-src/game/AugmentManager.*    Geode-side singleton wrapping RunState: settings (debug-mode /
-                             threshold), logging, director pause/resume for drafts, cursor state
-src/ui/Fonts.hpp             fonts::Name / Text (ImcreSoojin, outlined) / Debug (Pretendard)
-src/ui/AugmentDraftPopup.*   geode::Popup, bg hidden, GD-button-style cards (140x210: name / image box /
-                             description fit-to-slot / footer pips), no close, mandatory pick; whole card
-                             scaled when draft-count makes it 4; fan-out reveal driven from visit()
-                             (director is paused -> cocos actions don't run)
-src/ui/RunHud.*              draft gauge = GD's progress bar mirrored to the bottom edge (attached from
-                             setupHasCompleted, see GD-INTERNALS) + left augment rows (icon box placeholder,
-                             name, state) + centre notice (mod fonts)
-src/ui/ProgressMarks.*       best / checkpoint dots drawn on GD's progress bar (child of it)
-src/ui/CatNode.*             cat placeholder square bottom-right of m_uiLayer + per-frame lasers to the
-                             hazards it just removed (screen space, fade 0.45 s)
-src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
-src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
-                             checkpoint, slow-mo (CCScheduler hook + FMOD pitch),
-                             foresight (own CCDrawNode), unmirror, HUD refresh,
-                             draft popup on resetLevel, hotkeys (node-scoped keybind
-                             listeners in init + raw listener in $on_mod(Loaded)),
-                             both hitbox scales published per frame (applyHitboxScales /
-                             updateHitboxScales — nerve makes them depend on level progress)
-src/hooks/HazardHitboxHook.* hazard-hitbox: global hazard scale (augment::hazard) + GameObject hooks
-                             (getObjectRect AABB in place, updateOrientedBox OBB corners)
-src/hooks/PlayerHitboxHook.* wave-hitbox: global player scale (augment::player) + GameObject hook on
-                             the getObjectRect(w, h) overload, gated on PlayerObject + m_isDart
-docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
-docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
-tests/core_tests.cpp         host tests for src/core (plain asserts, run by scripts/test.ps1)
-scripts/                     build / test / check / diag / logs / fetch-refs / bro / refgrep / nodeids / mods /
-                             fontcharset / fontgen.py (Windows `py -3` + Pillow; Geode CLI's font "outline" is a no-op)
-refs/                        reference mod sources (gitignored; MANIFEST.md lists pins)
+mod.json                 id, GD/Geode versions, fonts (AugDebug generated, charset from src/; baked UI
+                         fonts via resources.files), settings (keybinds, debug-mode, debug-threshold)
+resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
+src/core/                pure C++, host-tested (tests/core_tests.cpp)
+  AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup
+  Formulas.hpp           level → effect (slowMoScale, nerveBoost, hazard/waveScale, cat*, draftCardCount)
+  RunState.*             one run: gauge economy (GaugeRule injected), levels, pending drafts, slow-mo toggle
+src/game/                Geode glue
+  AugmentManager.*       singleton: RunState + settings + logging; owns the LevelSession
+                         (beginLevel / endLevel; session() checks PlayLayer::get(), hooks use sessionFor(this))
+  LevelSession.*         one PlayLayer of a run level: the Augment objects, HUD + progress marks, objectsByX(),
+                         death-once, debug grants, refreshHud (10 Hz); fans lifecycle events out in table order
+  DraftSession.*         draft::showNext / isOpen / abandon — popup, director pause, cursor, chaining
+  Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters)
+src/augments/            one file per augment behind Augment.hpp (all hooks default to no-op):
+  Augment.hpp            onLevelInit (before PlayLayer::init) / onLevelReady / onObjectAdded / onBeforeReset→resume? /
+                         onAttemptStart(fromCheckpoint) / onHit→swallow / onDeath / onFrame / onPause /
+                         onGranted(id, lv) (every augment hears every grant) / onHotkey / hudState(id) / onQuit
+  Augments.*             factories + makeAllAugments() (table order)
+  Shield SlowMo StartPos Foresight Unmirror(+toggleFlipped hook) HitboxScales(hazard+wave+nerve) DraftCount Cat
+src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-frame dedup → session->onHotkey),
+                         raw KeyboardInputEvent listener at priority -1, debug number keys
+src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (AUG button),
+                         HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
+                         (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time())
+src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
+                         notice), ProgressMarks (dots on GD's bar), CatNode (square + lasers)
+tests/core_tests.cpp     host tests, plain asserts (scripts/test.ps1)
+docs/                    STATUS / SESSIONS / GD-INTERNALS / DESIGN / RECIPES / HARNESS / ROADMAP / VISUAL-IDEAS / refs/
+scripts/                 see docs/HARNESS.md
 ```
 
-Per-attempt state lives in `AugPlayLayer::Fields`; per-run state in `RunState` (via `AugmentManager`).
-Refactor in progress: `docs/REFACTOR-PLAN.md` (step status at the bottom).
-Charges are derived (`level - used`) so an augment drafted mid-run works next attempt.
+Per-run state: `RunState`. Per-level: `LevelSession`. Per-attempt: each `Augment`'s own
+members, reset in `onAttemptStart`. Adding an augment = one row in `AugmentDef.cpp` + one
+file in `src/augments/` + one line in `makeAllAugments()` (+ a debug key follows for free).
 
 ## Style
 
-Match the existing files: `geode::prelude`, `$modify(AugX, X)` classes with a
-`struct Fields`, `m_fields.self()`, comments only where the *why* isn't obvious,
-`log::info` with `{}` formatting, English identifiers and strings, Korean is fine
-in chat with the user.
+Match the existing files: `geode::prelude`, `$modify(AugX, X)` classes for hooks,
+`Augment` subclasses in an anonymous namespace with a `makeX()` factory, `s.` for the
+session, comments only where the *why* isn't obvious, `log::info` with `{}` formatting,
+English identifiers and strings, Korean is fine in chat with the user.

@@ -1,7 +1,10 @@
 #include "AugmentManager.hpp"
+#include "DraftSession.hpp"
+#include "LevelSession.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
+#include <Geode/binding/PlayLayer.hpp>
 
 #include <random>
 
@@ -14,14 +17,36 @@ AugmentManager& AugmentManager::get() {
     return instance;
 }
 
+AugmentManager::AugmentManager() = default;
+AugmentManager::~AugmentManager() = default;
+
+LevelSession& AugmentManager::beginLevel(PlayLayer* layer, int levelID) {
+    if (m_session) log::warn("beginLevel: replacing a session that never saw onQuit");
+    m_session = std::make_unique<LevelSession>(layer, levelID);
+    return *m_session;
+}
+
+void AugmentManager::endLevel() {
+    m_session.reset();
+}
+
+LevelSession* AugmentManager::session() const {
+    return this->sessionFor(PlayLayer::get());
+}
+
+LevelSession* AugmentManager::sessionFor(PlayLayer* layer) const {
+    if (!layer || !m_session || m_session->layer() != layer) return nullptr;
+    return m_session.get();
+}
+
 void AugmentManager::startRun(GJGameLevel* level) {
-    this->resumeGameAfterDraft();
+    draft::abandon();
     m_state.start(level->m_levelID.value(), std::string(level->m_levelName));
     log::info("Run started on '{}' (id {}), opening draft queued", m_state.levelName(), m_state.levelID());
 }
 
 void AugmentManager::endRun() {
-    this->resumeGameAfterDraft();
+    draft::abandon();
     if (!m_state.active()) return;
 
     log::info(
@@ -79,24 +104,6 @@ int AugmentManager::grant(std::string const& id) {
     int lvl = m_state.grant(id);
     if (!lvl) log::warn("grant: unknown augment id '{}'", id);
     return lvl;
-}
-
-void AugmentManager::pauseGameForDraft() {
-    if (m_directorPaused) return;
-    auto director = CCDirector::get();
-    // CCDirector::pause() saves the current interval and drops to 4 fps;
-    // put the real interval back so the popup stays responsive.
-    // resume() restores the saved value, so nothing extra is needed there.
-    auto interval = director->getAnimationInterval();
-    director->pause();
-    director->setAnimationInterval(interval);
-    m_directorPaused = true;
-}
-
-void AugmentManager::resumeGameAfterDraft() {
-    if (!m_directorPaused) return;
-    CCDirector::get()->resume();
-    m_directorPaused = false;
 }
 
 } // namespace augment

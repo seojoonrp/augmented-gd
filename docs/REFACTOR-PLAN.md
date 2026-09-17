@@ -67,17 +67,20 @@ Decisions
 - [x] **1. Core extraction + tests** (2026-09-17, built; in-game smoke pending) (in-game smoke ×1: start run → die →
   draft → HUD numbers unchanged): `RunState`, formulas into `AugmentDef`,
   description templates, `tests/` + `scripts/test.ps1`, `build.ps1 -Test`.
-- [ ] **2a. Augment modules, simple ones** (in-game regression ×1):
+- [x] **2a. Augment modules** (2026-09-17, built; regression pending) (in-game regression ×1):
   `Augment` interface, `DraftSession`, `Scales`, `input/Hotkeys.cpp`; move
-  shield, slow-mo, foresight, unmirror, draft-count.
-- [ ] **2b. Stateful augments** (in-game regression ×1): startpos (checkpoint
-  array sync), cat (restore), HitboxScales (apply/update + deadband). HUD
-  slots come from the session.
-- [ ] **3. Docs** (no in-game test): STATUS = current state only, log →
+  shield, slow-mo, foresight, unmirror, draft-count — and HitboxScales
+  (hazard+wave+nerve) too, since it only needs `onGranted` fan-out.
+- [x] **2b. Stateful augments** (2026-09-17, built; regression pending): startpos (checkpoint
+  array sync; drops `hotkeys::legacyRoute`), cat (restore). HUD slots then
+  come entirely from the session and `refreshHud` moves into it.
+- [x] **3. Docs** (2026-09-17): STATUS = current state only, log →
   `SESSIONS.md`; `HARNESS-PLAN.md` → `HARNESS.md`; our-source cites by
   file + symbol; CLAUDE.md code map; CI decision.
-- [ ] **4. Follow-ups that change behaviour** (separate): Unmirror via
-  `toggleFlipped` hook, HUD refresh throttle, run persistence, enum ids.
+- [~] **4. Follow-ups that change behaviour**: Unmirror via `toggleFlipped`
+  hook and the HUD refresh throttle done 2026-09-17 (untested). Not done, on
+  purpose: run persistence is a feature (ROADMAP T2, now a one-function
+  serialisation of `RunState`), enum ids are optional.
 
 ## Progress
 
@@ -88,4 +91,15 @@ Decisions
   moved to `src/game/` with the same public API (only `dropPendingDrafts()` added and the
   preview draft now uses `tune::DefaultDraftCards`). Descriptions built from `tune::`.
   `tests/core_tests.cpp` 582 checks pass via `scripts/test.ps1`; `build.ps1` runs it first.
-  Awaiting the in-game smoke test.
+  Verified in game by the user the same day.
+- 2026-09-17: step 2a — see STATUS. Design notes: the session is made before
+  `PlayLayer::init` (`onLevelInit` publishes globals objects read as they are
+  created); hooks look it up with `sessionFor(this)`, everyone else with
+  `session()` (checks `PlayLayer::get()`); every augment hears every grant
+  (`onGranted(id, level)`), which is how nerve reaches HitboxScales without
+  wiring. `draft::close()` restores the cursor, `draft::abandon()` (quit / run
+  start / run end) does not — a hidden cursor in a menu would be worse than
+  a visible one in a level.
+- 2026-09-17: 2a verified by the user. Steps 2b, 3 and the two step-4 items done
+  in one go (user: "나머지 그냥 한번에 다 해줘"); see SESSIONS.md for the details.
+  `PlayLayerHook.cpp` is now 170 lines with nothing augment-specific in it.

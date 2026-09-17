@@ -131,10 +131,12 @@ if ($Docs) {
                 if ($m.Groups[3].Success) {
                     Warn "${rel}:$($i + 1) cites our source by line (${name}:$($m.Groups[3].Value)) - lines rot, cite a symbol"
                 }
-                # `file.cpp` `symbol` (same line, any number of them)
-                foreach ($s in [regex]::Matches($l.Substring($m.Index + $m.Length), '``(\w+)``|`(\w+)`')) {
-                    $sym = if ($s.Groups[1].Success) { $s.Groups[1].Value } else { $s.Groups[2].Value }
-                    if ($sym -match '\.(cpp|hpp)$' -or $sym.Length -lt 4) { continue }
+                # `file.cpp` `symbol` / `file.cpp::symbol`: identifiers right after the file.
+                $rest = $l.Substring($m.Index + $m.Length)
+                while ($rest -match '^`?\s*`(\w+)`' -or $rest -match '^::(\w+)') {
+                    $sym = $Matches[1]
+                    $rest = $rest.Substring($Matches[0].Length)
+                    if ($sym.Length -lt 4) { continue }
                     if ((Get-Content $byName[$name] -Raw) -notmatch "\b$sym\b") {
                         Warn "${rel}:$($i + 1) '$sym' not found in $name"
                     }

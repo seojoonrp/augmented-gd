@@ -81,7 +81,7 @@ Side effect on this machine: death-tracker (hook priority `First`) sees
   `m_objectLayer` (world coordinates). `GameObject::getObjectRect()` gives the box,
   `m_objectRadius > 0` means GD treats it as a circle. Colour by `m_objectType`.
   `CCDrawNode` expects **premultiplied alpha** — a translucent fill renders as
-  solid; use `{0,0,0,0}` for no fill. Implemented in `PlayLayerHook.cpp::drawHitboxes`.
+  solid; use `{0,0,0,0}` for no fill. Implemented in `src/augments/Foresight.cpp`.
 - `m_objects` can be 10k+ objects; sort once by x and `lower_bound` per frame.
 - qolmod's node (`refs/qolmod/src/Hacks/Level/Hitboxes/HitboxNode.cpp:140-243`)
   also handles what ours skips: slopes (`m_objectType == GameObjectType::Slope`,
@@ -172,7 +172,7 @@ version with the break effect) is what qolmod calls on coins
   claimed from a pool via `claimParticle()`, hiding one could hit another
   object).
 - Whether `GameObject::resetObject()` (`win 0x1906d0`) clears the flags on
-  reset is **(unverified)**; `PlayLayerHook.cpp::catRestore()` restores
+  reset is **(unverified)**; `Cat.cpp::onBeforeReset` restores
   flags + the recorded opacity itself before every `resetLevel`, and logs how
   many were still disabled (0 there = GD reset them first, so the fallback
   could go).
@@ -199,7 +199,7 @@ multi-respawn model unverified): `markCheckpoint()` / `resetLevel()` wrapped in 
 temporary `m_isPracticeMode = true`. Our own `std::vector<Ref<CheckpointObject>>`
 is the source of truth; before a checkpoint reset GD's `m_checkpointArray` is
 rebuilt from it if it diverged, and `m_currentCheckpoint` is pointed at the
-target. See `PlayLayerHook.cpp::resetLevel` / `syncCheckpointArray` / `consumeCheckpoint`.
+target. See `StartPos.cpp::onBeforeReset` (sync + practice flag) / `onAttemptStart` (consume); `PlayLayerHook.cpp::resetLevel` only calls the original between them.
 
 Facts read from Geode's inline implementations (= reverse-engineered GD code,
 `build/_deps/bindings-src/bindings/2.2081/inline/`), 2026-09-16:
@@ -283,8 +283,8 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
   to CustomKeybinds' same-key setting that was dispatched first. All three
   failed attempts had this single cause. Outside a level the keys would have
   reached us — nobody tested there.
-- Fix (both in `PlayLayerHook.cpp`, either alone suffices, per-frame dedup on
-  the layer): our keybind settings carry `"priority": -5` and are handled by
+- Fix (`Hotkeys.cpp::route` + the listeners in `PlayLayerHook.cpp::init`, either alone suffices, per-frame dedup in
+  `Hotkeys.cpp`): our keybind settings carry `"priority": -5` and are handled by
   node-scoped `addEventListener(KeybindSettingPressedEventV3(Mod::get(), "…"))`
   in `PlayLayer::init` (CustomKeybinds' own pattern); plus a raw
   `KeyboardInputEvent().listen(fn, -1)` from `$on_mod(Loaded)` that runs ahead
@@ -373,7 +373,7 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
 
 ## Director pause vs. animation — verified in game 2026-09-17 (reveal plays while paused)
 
-`CCDirector::pause()` (what `AugmentManager::pauseGameForDraft` calls) makes
+`CCDirector::pause()` (what `DraftSession.cpp::showNext` calls) makes
 `drawScene` skip `m_pScheduler->update()`, and `CCActionManager` is driven by
 the scheduler, so **no cocos action runs while a draft is open** — including
 `FLAlertLayer::show()`'s elastic pop-in (hence `m_noElasticity = true`) and

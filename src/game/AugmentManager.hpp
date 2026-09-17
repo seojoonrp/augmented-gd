@@ -2,20 +2,37 @@
 
 #include "../core/RunState.hpp"
 
+#include <memory>
 #include <string>
 #include <vector>
 
 class GJGameLevel;
+class PlayLayer;
 
 namespace augment {
 
-// Geode-side owner of the current run: wraps RunState with settings, logging
-// and the game pause used while a draft is up. Singleton so UI callbacks
-// never need to hold a pointer to a PlayLayer (which may be gone by the
-// time they fire).
+class LevelSession;
+
+// Geode-side owner of the current run: wraps RunState with settings and
+// logging, and owns the LevelSession while a run level is loaded. Singleton
+// so UI callbacks never need to hold a pointer to a PlayLayer (which may be
+// gone by the time they fire): they ask for session() at call time.
 class AugmentManager {
 public:
     static AugmentManager& get();
+
+    // --- level session (see LevelSession.hpp) ---
+    // Called by the PlayLayer hook around the layer's life. beginLevel
+    // replaces any stale session (a layer that went without onQuit).
+    LevelSession& beginLevel(PlayLayer* layer, int levelID);
+    void endLevel();
+    // The live session, or null when no run level is loaded or the layer it
+    // was made for is no longer the current PlayLayer.
+    LevelSession* session() const;
+    // For the PlayLayer hook itself: the session made for `layer`, or null.
+    // No PlayLayer::get() check, because inside PlayLayer::init GD may not
+    // have published the layer yet.
+    LevelSession* sessionFor(PlayLayer* layer) const;
 
     // Read access to the run; every mutation goes through the methods below
     // so it gets logged in one place.
@@ -76,22 +93,13 @@ public:
     int catCount() const { return m_state.catCount(); }
     float catInterval() const { return m_state.catInterval(); }
 
-    // --- gameplay pause used while the draft popup is up ---
-    // Pauses CCDirector without dropping the frame rate to 4 fps.
-    void pauseGameForDraft();
-    // No-op if not paused by us, so it is safe to call from PlayLayer::onQuit.
-    void resumeGameAfterDraft();
-    bool isGamePausedForDraft() const { return m_directorPaused; }
-    void setCursorWasHidden(bool hidden) { m_cursorWasHidden = hidden; }
-    bool cursorWasHidden() const { return m_cursorWasHidden; }
-
 private:
-    AugmentManager() = default;
+    AugmentManager();
+    ~AugmentManager();
     GaugeRule gaugeRule() const;
 
     RunState m_state;
-    bool m_directorPaused = false;
-    bool m_cursorWasHidden = false;
+    std::unique_ptr<LevelSession> m_session;
 };
 
 } // namespace augment

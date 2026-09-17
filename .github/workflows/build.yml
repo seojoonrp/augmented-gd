@@ -1,5 +1,9 @@
 name: Build Geode Mod
 
+# Windows only: the mod uses Windows-only input / cursor APIs, and the baked UI
+# fonts (resources/fonts/gen, gitignored) are produced by scripts/fontgen.py,
+# which runs here before the build. See docs/HARNESS.md "CI".
+
 on:
   workflow_dispatch:
   push:
@@ -8,50 +12,28 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-        - name: Windows
-          os: windows-latest
-
-        - name: macOS
-          os: macos-latest
-
-        - name: iOS
-          os: macos-latest
-          target: iOS
-
-        - name: Android32
-          os: ubuntu-latest
-          target: Android32
-
-        - name: Android64
-          os: ubuntu-latest
-          target: Android64
-
-    name: ${{ matrix.config.name }}
-    runs-on: ${{ matrix.config.os }}
+    name: Windows
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bake the UI fonts
+        run: |
+          pip install pillow fonttools
+          python scripts/fontgen.py
+
       - name: Build the mod
+        id: build
         uses: geode-sdk/build-geode-mod@main
         with:
-          combine: true
-          target: ${{ matrix.config.target }}
-
-  package:
-    name: Package builds
-    runs-on: ubuntu-latest
-    needs: ['build']
-
-    steps:
-      - uses: geode-sdk/build-geode-mod/combine@main
-        id: build
+          combine: false
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Build Output
+          name: selenophile.augmented-gd
           path: ${{ steps.build.outputs.build-output }}

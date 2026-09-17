@@ -57,7 +57,7 @@ because that — not code volume — is what has cost test rounds so far.
 | **T4** | Needs the input path (blocked by M4) or engine-deep work (physics, prediction). | unbounded until M4 |
 
 **Reference caveat.** Precedents below cite OpenHack, which targets GD 2.206 /
-Geode 3.4 (stale — patterns only, never offsets). `HARNESS-PLAN.md` is replacing
+Geode 3.4 (stale — patterns only, never offsets). the harness (`HARNESS.md`) replaced
 it with 2.2081-era refs; before building a T2/T3 item, grep the newer ones first:
 QOLMod (hitboxes, noclip, speedhack, key input), xdBot (checkpoints, frame step,
 slow-mo), click-between-frames (raw Windows input).
@@ -154,7 +154,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 
 | system | what | note |
 |---|---|---|
-| **Hotkeys** | The open problem in `GD-INTERNALS.md`; also the acceptance test of `HARNESS-PLAN.md` (Phase 4). | Read how QOLMod / click-between-frames receive keys on Geode 5 first, then the listed steps (≤ 2 rounds); if still dead, ship the HUD-button fallback and depend on `geode.custom-keybinds` later. |
+| **Hotkeys** | The open problem in `GD-INTERNALS.md`; solved 2026-09-16 through the harness (see `SESSIONS.md`). | Read how QOLMod / click-between-frames receive keys on Geode 5 first, then the listed steps (≤ 2 rounds); if still dead, ship the HUD-button fallback and depend on `geode.custom-keybinds` later. |
 
 ## 5. Recommended order
 

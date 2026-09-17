@@ -6,7 +6,7 @@ here. Bindings quoted were checked with `scripts\bro.ps1` on 2026-09-16.
 Match `src/` conventions: `geode::prelude`, `$modify(AugX, X)`, `struct Fields`,
 `m_fields.self()`, `log::info("{}", …)`.
 
-## Hook with per-attempt state — verified 2026-09-16 (`src/hooks/PlayLayerHook.cpp`)
+## Hook with per-attempt state — verified 2026-09-16 (`src/hooks/PlayLayerHook.cpp`; in this mod per-attempt state now lives in an `Augment` subclass, see `src/augments/Shield.cpp` `onAttemptStart`)
 
 ```cpp
 #include <Geode/modify/PlayLayer.hpp>
@@ -52,17 +52,18 @@ Don't call `PlayLayer::destroyPlayer` and the player passes through. Always
 forward when `object == m_anticheatSpike`; qolmod also forwards when `!player`
 or `m_levelEndAnimationStarted` (`refs/qolmod/src/Hacks/Level/Noclip/Hooks.cpp:202-235`).
 
-## Slow-mo — verified 2026-09-16 (`PlayLayerHook.cpp` top + `AugScheduler`)
+## Slow-mo — verified 2026-09-16 (`src/hooks/SchedulerHook.cpp` + `src/game/Scales.cpp` `setTime`; driven by `src/augments/SlowMo.cpp`)
 
 ```cpp
 #include <Geode/modify/CCScheduler.hpp>
-float g_timeScale = 1.f;
+inline float g_time = 1.f;               // scales::time() in Scales.hpp
 
 class $modify(AugScheduler, CCScheduler) {
-    void update(float dt) { CCScheduler::update(dt * g_timeScale); }
+    void update(float dt) { CCScheduler::update(dt * g_time); }
 };
 
-void setGameSpeed(float scale) {          // music follows the game
+void setTime(float scale) {               // music follows the game
+    g_time = scale;
     FMOD::ChannelGroup* master = nullptr;
     auto engine = FMODAudioEngine::sharedEngine();
     if (engine && engine->m_system && engine->m_system->getMasterChannelGroup(&master) == FMOD_OK && master)
@@ -182,7 +183,7 @@ $execute {
 }
 ```
 
-## Read settings / react to changes — verified (`AugmentManager.cpp:48-52`) / (from ref CBF `main.cpp:707-737`)
+## Read settings / react to changes — verified (`src/game/AugmentManager.cpp` `gaugeRule`) / (from ref CBF `main.cpp:707-737`)
 
 ```cpp
 auto n = Mod::get()->getSettingValue<int64_t>("debug-threshold");   // int settings are int64_t
@@ -191,7 +192,7 @@ $on_mod(Loaded) {
 }
 ```
 
-## Button on a GD layer via node IDs — verified 2026-09-16 (`src/hooks/LevelInfoHook.cpp:12-30`)
+## Button on a GD layer via node IDs — verified 2026-09-16 (`src/hooks/LevelInfoHook.cpp` `init`)
 
 ```cpp
 class $modify(AugLevelInfoLayer, LevelInfoLayer) {
@@ -210,7 +211,7 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
 IDs: `scripts\nodeids.ps1 LevelInfoLayer`. PauseLayer: hook `customSetup`, menu
 `left-button-menu` (from ref death-tracker `DTPauseLayer.cpp:3-27`).
 
-## Modal popup that must be answered — verified 2026-09-16 (`src/ui/AugmentDraftPopup.*`, `PlayLayerHook.cpp:440-470`)
+## Modal popup that must be answered — verified 2026-09-16 (`src/ui/AugmentDraftPopup.*`, `src/game/DraftSession.cpp` `showNext`)
 
 - Subclass `geode::Popup`, override `keyBackClicked() {}` and `onClose(CCObject*) {}`.
 - `Popup::init` puts the close button in `m_buttonMenu`; remove it before `setLayout`.
