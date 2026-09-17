@@ -11,9 +11,6 @@ using namespace geode::prelude;
 namespace {
 
 float g_waveScale = 1.f;
-augment::player::Stats g_stats;
-// The first few shrinks after every scale change are logged in detail.
-int g_logBudget = 0;
 
 } // namespace
 
@@ -22,17 +19,10 @@ namespace augment::player {
 void setWaveScale(float scale) {
     if (std::abs(g_waveScale - scale) < 0.001f) return;
     g_waveScale = scale;
-    g_logBudget = 2;
     log::info("WaveHitbox: player hitbox scale -> {:.2f}", scale);
 }
 
 float waveScale() { return g_waveScale; }
-
-Stats takeStats() {
-    auto s = g_stats;
-    g_stats = {};
-    return s;
-}
 
 } // namespace augment::player
 
@@ -49,15 +39,6 @@ class $modify(AugPlayerRect, GameObject) {
         auto player = typeinfo_cast<PlayerObject*>(this);
         if (!player || !player->m_isDart) return GameObject::getObjectRect(width, height);
 
-        auto rect = GameObject::getObjectRect(width * g_waveScale, height * g_waveScale);
-        g_stats.rects++;
-        if (g_logBudget > 0) {
-            g_logBudget--;
-            log::info(
-                "WaveHitbox: player rect (factor {:.2f} x {:.2f}) -> {:.1f}x{:.1f}",
-                width, g_waveScale, rect.size.width, rect.size.height
-            );
-        }
-        return rect;
+        return GameObject::getObjectRect(width * g_waveScale, height * g_waveScale);
     }
 };

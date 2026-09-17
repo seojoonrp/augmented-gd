@@ -16,7 +16,7 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 ## Build & test loop
 
 ```powershell
-.\scripts\build.ps1          # fontcharset + geode build --ninja + install into GD (fixes stale PATH)
+.\scripts\build.ps1          # fontcharset + fontgen + geode build --ninja + install into GD (fixes stale PATH)
 .\scripts\build.ps1 -Clean   # after CMake/CPM/env changes ("Unknown CMake command CPMAddPackage" → this)
 .\scripts\logs.ps1           # [Augmented GD] lines from the newest Geode log
 .\scripts\fetch-refs.ps1     # clone reference mods into refs/ (gitignored, pinned commits, writes refs/MANIFEST.md)
@@ -70,24 +70,29 @@ Update `docs/STATUS.md` at the end of every session (verified / broken / next).
 9. Don't commit; the user commits. Don't change mod ID / name.
 10. In-game augment text is Korean (names, descriptions, popup title) and must
     use the mod fonts in `src/ui/Fonts.hpp`; GD's fonts draw nothing for Hangul.
-    Logs, notices and HUD wording stay English. New Korean literals need no
-    extra step: `build.ps1` regenerates the font charset.
+    Player-facing UI = `fonts::Name` / `fonts::Text` (ImcreSoojin, outlined);
+    debug readouts (HUD lines) = `fonts::Debug` (Pretendard). Logs, notices and
+    HUD wording stay English. New Korean literals need no extra step:
+    `build.ps1` regenerates the charset and re-bakes the fonts.
 
 ## Code map
 
 ```
-mod.json                     id, GD/Geode versions, fonts (resources.fonts, charset generated),
-                             settings (gauge numbers, keybinds, debug keys)
-resources/fonts/             Pretendard SemiBold/Regular TTF (OFL) -> Geode builds AugName/AugText .fnt
+mod.json                     id, GD/Geode versions, fonts (resources.fonts = AugDebug, charset generated;
+                             resources.files = baked UI fonts), settings (gauge numbers, keybinds, debug keys)
+resources/fonts/             ImcreSoojin.ttf (UI) + Pretendard-Regular.ttf (debug HUD); gen/ (gitignored) holds
+                             AugName/AugText sd/hd/uhd baked by scripts/fontgen.py (white, black outline, shadow)
 CMakeLists.txt               forces clang on Windows, then standard Geode setup
 src/main.cpp                 entry (load log only)
 src/core/AugmentDef.*        static augment table: ids::*, Korean names, initial / level-up
                              descriptions, maxLevel, tune::* (steps, nerve mult, draft cards)
 src/core/AugmentManager.*    run state singleton: run lifecycle, gauge, augment levels,
                              slow-mo toggle, director pause/resume for drafts, cursor state
-src/ui/Fonts.hpp             "AugName.fnt"_spr / "AugText.fnt"_spr + name kerning
-src/ui/AugmentDraftPopup.*   geode::Popup with 3 cards (140x180), no close, mandatory pick;
-                             layoutFor() narrows + rescales cards when draft-count makes it 4
+src/ui/Fonts.hpp             fonts::Name / Text (ImcreSoojin, outlined) / Debug (Pretendard)
+src/ui/AugmentDraftPopup.*   geode::Popup, bg hidden, GD-button-style cards (140x210: name / image box /
+                             description fit-to-slot / footer pips), no close, mandatory pick; whole card
+                             scaled when draft-count makes it 4; fan-out reveal driven from visit()
+                             (director is paused -> cocos actions don't run)
 src/ui/RunHud.*              top-left text lines + centre notice (mod fonts)
 src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
 src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
@@ -103,7 +108,8 @@ src/hooks/PlayerHitboxHook.* wave-hitbox: global player scale (augment::player) 
                              the getObjectRect(w, h) overload, gated on PlayerObject + m_isDart
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
-scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods / fontcharset
+scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods / fontcharset /
+                             fontgen.py (Windows `py -3` + Pillow; Geode CLI's font "outline" is a no-op)
 refs/                        reference mod sources (gitignored; MANIFEST.md lists pins)
 ```
 

@@ -64,3 +64,5 @@ build-*/
 /cmake-build-*/
 # Reference mod sources (scripts/fetch-refs.ps1)
 /refs/
+# Baked UI fonts (scripts/fontgen.py, run by build.ps1)
+/resources/fonts/gen/

@@ -3,52 +3,123 @@
 #include "../core/AugmentManager.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/ui/NineSlice.hpp>
+
+#include <algorithm>
+#include <cmath>
 
 using namespace geode::prelude;
 
 namespace augment {
 
 namespace {
-    // Card geometry for a three-card draft, sized for the Korean descriptions:
-    // the longest wraps to ~6 lines at kDescScale. Three cards + padding =
-    // 492 pt, inside GD's 569 pt width.
+    // Card geometry (sd points) for a three-card draft. The card is drawn at
+    // full size and scaled down as a whole when four cards have to fit.
     constexpr float kCardWidth = 140.f;
-    constexpr float kCardHeight = 180.f;
+    constexpr float kCardHeight = 210.f;
     constexpr float kCardGap = 12.f;
-    constexpr float kPopupPadding = 24.f;
-    constexpr float kTitleSpace = 30.f;
-    constexpr float kCardInset = 8.f;
-    constexpr float kNameScale = 0.55f;
-    constexpr float kDescScale = 0.55f;
+    constexpr float kPopupPadding = 16.f;
+    constexpr float kTitleSpace = 36.f;
     // Four cards (draft-count) at full width would need 644 pt, so they are
     // narrowed to fit. Leaves a margin inside the 569 pt screen.
     constexpr float kMaxPopupWidth = 540.f;
 
-    // Everything drawn inside a card, so a narrower card can shrink its
-    // contents by the same ratio instead of overflowing.
-    struct CardLayout {
-        float width = kCardWidth;
-        float scale = 1.f;
+    // GD button look: white rim, then GJ_button_01 (black ring + flat green).
+    constexpr float kRim = 2.f;
+    constexpr float kRimRadius = 8.f;                   // just outside GJ_button_01's ~6 pt corners
+    constexpr float kRing = 2.5f;                       // GJ_button_01's black ring at sd
+    constexpr ccColor3B kBodyGreen = { 122, 222, 45 };  // GJ_button_01's fill
+    constexpr float kInset = 10.f;
 
-        float nameScale() const { return kNameScale * scale; }
-        float descScale() const { return kDescScale * scale; }
-        // Wrap width is in font units, i.e. pre-scale.
-        float textWidth() const { return (width - 2 * kCardInset) / this->descScale(); }
-    };
+    // Vertical slots, measured down from the card's top edge.
+    constexpr float kNameY = 18.f;
+    constexpr float kNameScale = 0.6f;
+    constexpr float kImageTop = 34.f;
+    constexpr float kImageWidth = 120.f;
+    constexpr float kImageHeight = 70.f;
+    constexpr float kImageBorder = 2.f;
+    constexpr float kImageRadius = 4.5f;
+    // Description block is centred between the image box and the footer band,
+    // with this much breathing room above and below.
+    constexpr float kDescMargin = 5.f;
+    constexpr float kDescScale = 0.5f;
+    constexpr float kDescMinScale = 0.35f;
+    constexpr float kFooterHeight = 20.f;
+    constexpr float kFooterRadius = 4.f;
+    constexpr float kFooterScale = 0.5f;
+    constexpr float kTitleScale = 1.f;
 
-    CardLayout layoutFor(size_t count) {
-        CardLayout layout;
+    // square02b_001's corner radius at scale 1 (measured: ~36 of 320 uhd px).
+    constexpr float kSquareRadius = 9.f;
+
+    // Reveal: cards start stacked at the row centre, small and slightly
+    // fanned, and ease out to their slots one after another.
+    constexpr float kRevealDuration = 0.45f;
+    constexpr float kRevealStagger = 0.08f;
+    constexpr float kRevealFromScale = 0.25f;
+    constexpr float kRevealFanDegrees = 10.f;
+
+    float cardScaleFor(size_t count) {
         float n = static_cast<float>(count);
         float avail = kMaxPopupWidth - 2 * kPopupPadding - (n - 1) * kCardGap;
-        if (n * layout.width <= avail) return layout;
+        return std::min(1.f, avail / (n * kCardWidth));
+    }
 
-        layout.width = avail / n;
-        // Shrinking the type by the same ratio keeps the wrap width (in font
-        // units) about the same, so the line count barely moves while every
-        // line gets shorter — the text block ends up smaller, not taller, and
-        // the card keeps its full height.
-        layout.scale = layout.width / kCardWidth;
-        return layout;
+    float easeBackOut(float t) {
+        constexpr float s = 1.3f;  // overshoot; cocos' default 1.70158 is too bouncy for cards
+        t -= 1.f;
+        return t * t * ((s + 1.f) * t + s) + 1.f;
+    }
+
+    // square02b_001 is a plain white rounded square; the slices are scaled so
+    // the corner radius comes out as asked, whatever the box size.
+    NineSlice* roundedBox(CCSize size, ccColor3B color, float radius, GLubyte opacity = 255) {
+        float const scale = radius / kSquareRadius;
+        auto box = NineSlice::create("square02b_001.png");
+        box->setScale(scale);
+        box->setContentSize(size / scale);
+        box->setColor(color);
+        box->setOpacity(opacity);
+        return box;
+    }
+
+    // Word-wrap by measuring words with throwaway labels. CCLabelBMFont's
+    // width argument never wrapped our fonts in game (Pretendard or the baked
+    // ImcreSoojin, 2026-09-17), so the label gets explicit newlines instead.
+    // `maxWidth` is in label units (pre-scale). Existing newlines are kept.
+    std::string wrapText(std::string const& text, char const* font, float maxWidth) {
+        auto measure = [&](std::string const& s) {
+            auto probe = CCLabelBMFont::create(s.c_str(), font);
+            return probe ? probe->getContentSize().width : 0.f;
+        };
+        std::string out;
+        size_t paraStart = 0;
+        while (paraStart <= text.size()) {
+            size_t paraEnd = text.find('\n', paraStart);
+            if (paraEnd == std::string::npos) paraEnd = text.size();
+            std::string line;
+            size_t wordStart = paraStart;
+            while (wordStart <= paraEnd) {
+                size_t wordEnd = text.find(' ', wordStart);
+                if (wordEnd == std::string::npos || wordEnd > paraEnd) wordEnd = paraEnd;
+                auto word = text.substr(wordStart, wordEnd - wordStart);
+                if (!word.empty()) {
+                    auto candidate = line.empty() ? word : line + " " + word;
+                    if (!line.empty() && measure(candidate) > maxWidth) {
+                        out += line + '\n';
+                        line = word;
+                    }
+                    else {
+                        line = candidate;
+                    }
+                }
+                wordStart = wordEnd + 1;
+            }
+            out += line;
+            if (paraEnd < text.size()) out += '\n';
+            paraStart = paraEnd + 1;
+        }
+        return out;
     }
 }
 
@@ -66,84 +137,197 @@ AugmentDraftPopup* AugmentDraftPopup::create(std::vector<AugmentDef const*> choi
 bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallback onPick) {
     m_choices = std::move(choices);
     m_onPick = std::move(onPick);
+    m_cardScale = cardScaleFor(m_choices.size());
 
-    auto const layout = layoutFor(m_choices.size());
     auto const n = static_cast<float>(m_choices.size());
-    float width = n * layout.width + (n - 1) * kCardGap + kPopupPadding * 2;
-    float height = kCardHeight + kTitleSpace + kPopupPadding;
+    float const cardW = kCardWidth * m_cardScale;
+    float const cardH = kCardHeight * m_cardScale;
+    float const width = n * cardW + (n - 1) * kCardGap + kPopupPadding * 2;
+    float const height = cardH + kTitleSpace + kPopupPadding;
     if (!Popup::init(width, height)) {
         log::error("Popup::init failed");
         return false;
     }
 
-    log::info(
-        "Draft popup: {} cards, {:.0f}x{:.0f} each, popup {:.0f}x{:.0f}",
-        m_choices.size(), layout.width, kCardHeight, width, height
-    );
+    // The cards float over the dimmed level instead of sitting in a brown
+    // box, so hide the popup's own background and darken the overlay.
+    m_bgSprite->setVisible(false);
+    this->setOpacity(160);
+    this->setTitle("증강 선택", fonts::Name, kTitleScale);
 
-    this->setTitle("증강 선택", fonts::Name, 0.7f);
-
-    // No way out but picking a card: drop the close button (Popup adds it to
-    // m_buttonMenu, and we're about to lay that menu out as a card row).
+    // No way out but picking a card: drop the close button.
     m_closeBtn->removeFromParentAndCleanup(true);
     m_closeBtn = nullptr;
 
+    // Row of cards under the title, positioned by hand (the reveal needs
+    // fixed slots, and a layout would re-place them).
+    float const rowY = (m_size.height - kTitleSpace) / 2;
+    float const rowLeft = (m_size.width - (n * cardW + (n - 1) * kCardGap)) / 2;
     auto& mgr = AugmentManager::get();
     for (size_t i = 0; i < m_choices.size(); i++) {
         auto const& def = *m_choices[i];
-        auto card = this->createCard(def, mgr.levelOf(def.id));
-        auto item = CCMenuItemSpriteExtra::create(card, this, menu_selector(AugmentDraftPopup::onCard));
+
+        // holder: the item's fixed footprint. visual: the full-size card,
+        // scaled to fit, which the reveal animates inside the holder.
+        auto holder = CCNode::create();
+        holder->setContentSize({ cardW, cardH });
+        auto visual = this->createCard(def, mgr.levelOf(def.id));
+        visual->setScale(m_cardScale);
+        visual->setPosition({ cardW / 2, cardH / 2 });
+        holder->addChild(visual);
+
+        auto item = CCMenuItemSpriteExtra::create(holder, this, menu_selector(AugmentDraftPopup::onCard));
+        item->m_scaleMultiplier = 1.05f;
         item->setTag(static_cast<int>(i));
         item->setID(fmt::format("card-{}", i));
+        float const itemX = rowLeft + cardW / 2 + static_cast<float>(i) * (cardW + kCardGap);
+        item->setPosition({ itemX, rowY });
         m_buttonMenu->addChild(item);
+
+        RevealCard rc;
+        rc.visual = visual;
+        rc.to = ccp(cardW / 2, cardH / 2);
+        rc.from = ccp(m_size.width / 2 - itemX + cardW / 2, cardH / 2);
+        rc.fromRotation = (static_cast<float>(i) - (n - 1) / 2) * -kRevealFanDegrees;
+        m_reveal.push_back(rc);
     }
 
-    m_buttonMenu->setLayout(
-        RowLayout::create()
-            ->setGap(kCardGap)
-            ->setAutoScale(false)
-            ->setAxisAlignment(AxisAlignment::Center)
-            ->setCrossAxisAlignment(AxisAlignment::Center)
-    );
-    // Push the row down a bit so it sits under the title.
-    m_buttonMenu->setContentHeight(m_size.height - kTitleSpace);
-    m_buttonMenu->updateLayout();
-
+    // Cards are not pickable until they have landed.
+    m_buttonMenu->setEnabled(false);
+    m_revealing = true;
+    m_revealStart = std::chrono::steady_clock::now();
+    this->stepReveal();
     return true;
 }
 
 CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
-    // Stateless: every card in one popup sees the same choice count.
-    auto const l = layoutFor(m_choices.size());
+    auto card = CCNode::create();
+    card->setContentSize({ kCardWidth, kCardHeight });
+    card->setAnchorPoint({ 0.5f, 0.5f });
+    auto const centre = CCPoint{ kCardWidth / 2, kCardHeight / 2 };
+    auto const fromTop = [](float dy) { return CCPoint{ kCardWidth / 2, kCardHeight - dy }; };
+    float const inner = kCardWidth - 2 * kInset;
 
-    auto bg = CCScale9Sprite::create("GJ_square02.png");
-    bg->setContentSize({ l.width, kCardHeight });
+    // White rim (full-size slices: its corner radius must cover the body's).
+    auto rim = roundedBox({ kCardWidth + 2 * kRim, kCardHeight + 2 * kRim }, ccWHITE, kRimRadius);
+    rim->setPosition(centre);
+    card->addChild(rim, 0);
+
+    // Body: GD's green button, black ring and highlight included.
+    auto body = NineSlice::create("GJ_button_01.png");
+    body->setContentSize({ kCardWidth, kCardHeight });
+    body->setPosition(centre);
+    card->addChild(body, 1);
+
+    // Footer band: the darker strip along the bottom of GD's big buttons.
+    auto band = roundedBox({ kCardWidth - 2 * kRing, kFooterHeight }, ccBLACK, kFooterRadius, 70);
+    band->setPosition({ kCardWidth / 2, kRing + kFooterHeight / 2 });
+    card->addChild(band, 2);
 
     auto name = CCLabelBMFont::create(def.name.c_str(), fonts::Name);
-    name->setExtraKerning(fonts::NameKerning);
-    name->limitLabelWidth(l.width - 2 * kCardInset, l.nameScale(), 0.2f);
-    bg->addChildAtPosition(name, Anchor::Top, { 0.f, -18.f * l.scale });
+    name->limitLabelWidth(inner, kNameScale, 0.3f);
+    name->setPosition(fromTop(kNameY));
+    card->addChild(name, 3);
 
-    // Level line stays GD-style (digits only, so goldFont is fine).
-    int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
-    std::string levelText = currentLevel == 0
-        ? fmt::format("NEW  Lv {}", nextLevel)
-        : fmt::format("Lv {} -> {}", currentLevel, nextLevel);
-    auto level = CCLabelBMFont::create(levelText.c_str(), "goldFont.fnt");
-    level->setScale(0.45f * l.scale);
-    bg->addChildAtPosition(level, Anchor::Top, { 0.f, -38.f * l.scale });
-
-    // Width is in font units (pre-scale). CCLabelBMFont wraps at spaces, which
-    // Korean has between words; the explicit newlines in the text also break.
-    auto desc = CCLabelBMFont::create(
-        def.describe(nextLevel).c_str(), fonts::Text,
-        l.textWidth(), kCCTextAlignmentCenter
+    // Image slot: black border around a white panel, empty until the art
+    // exists. The inner radius is the outer one minus the border so the
+    // border looks the same thickness around the corners.
+    auto const imageCentre = fromTop(kImageTop + kImageHeight / 2);
+    auto imageFrame = roundedBox({ kImageWidth, kImageHeight }, ccBLACK, kImageRadius);
+    imageFrame->setPosition(imageCentre);
+    card->addChild(imageFrame, 2);
+    auto imageFill = roundedBox(
+        { kImageWidth - 2 * kImageBorder, kImageHeight - 2 * kImageBorder }, ccWHITE,
+        kImageRadius - kImageBorder
     );
-    desc->setScale(l.descScale());
-    desc->setAnchorPoint({ 0.5f, 1.f });
-    bg->addChildAtPosition(desc, Anchor::Top, { 0.f, -54.f * l.scale });
+    imageFill->setPosition(imageCentre);
+    card->addChild(imageFill, 3);
 
-    return bg;
+    // Description: wrapped here (see wrapText) at the card's inner width and
+    // shrunk in steps until it fits between the image box and the footer,
+    // then centred in that gap.
+    int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
+    float const slotTop = kImageTop + kImageHeight + kDescMargin;
+    float const slotBottom = kCardHeight - kRing - kFooterHeight - kDescMargin;
+    float const slot = slotBottom - slotTop;
+    float descScale = kDescScale;
+    CCLabelBMFont* desc = nullptr;
+    for (;;) {
+        auto wrapped = wrapText(def.describe(nextLevel), fonts::Text, inner / descScale);
+        desc = CCLabelBMFont::create(
+            wrapped.c_str(), fonts::Text, kCCLabelAutomaticWidth, kCCTextAlignmentCenter
+        );
+        if (desc->getContentSize().height * descScale <= slot || descScale <= kDescMinScale + 1e-3f) break;
+        descScale -= 0.05f;
+    }
+    if (desc->getContentSize().height * descScale > slot) {
+        log::warn(
+            "Draft card '{}' description still overflows at scale {:.2f} ({:.0f} > {:.0f} pt)",
+            def.id, descScale, desc->getContentSize().height * descScale, slot
+        );
+    }
+    desc->setScale(descScale);
+    desc->setAnchorPoint({ 0.5f, 0.5f });
+    desc->setPosition(fromTop((slotTop + slotBottom) / 2));
+    card->addChild(desc, 3);
+
+    // Footer: level change on the left, level pips on the right.
+    std::string levelText = currentLevel == 0
+        ? "NEW"
+        : fmt::format("Lv {} → {}", currentLevel, nextLevel);
+    auto level = CCLabelBMFont::create(levelText.c_str(), fonts::Text);
+    level->setScale(kFooterScale);
+    level->setAnchorPoint({ 0.f, 0.5f });
+    level->setPosition({ kInset, band->getPositionY() });
+    card->addChild(level, 3);
+
+    // Level pips show the level held *now* (all empty on a new augment). Two
+    // labels because a label has one colour: gold held, grey remaining. Both
+    // hug the right edge.
+    std::string filled, empty;
+    for (int i = 0; i < currentLevel; i++) filled += "★";
+    for (int i = currentLevel; i < def.maxLevel; i++) empty += "☆";
+    auto emptyPips = CCLabelBMFont::create(empty.c_str(), fonts::Text);
+    emptyPips->setScale(kFooterScale);
+    emptyPips->setColor({ 150, 150, 150 });
+    emptyPips->setAnchorPoint({ 1.f, 0.5f });
+    emptyPips->setPosition({ kCardWidth - kInset, band->getPositionY() });
+    card->addChild(emptyPips, 3);
+    auto filledPips = CCLabelBMFont::create(filled.c_str(), fonts::Text);
+    filledPips->setScale(kFooterScale);
+    filledPips->setColor({ 255, 215, 60 });
+    filledPips->setAnchorPoint({ 1.f, 0.5f });
+    filledPips->setPosition({
+        kCardWidth - kInset - emptyPips->getContentSize().width * kFooterScale,
+        band->getPositionY()
+    });
+    card->addChild(filledPips, 3);
+    return card;
+}
+
+void AugmentDraftPopup::visit() {
+    if (m_revealing) this->stepReveal();
+    Popup::visit();
+}
+
+void AugmentDraftPopup::stepReveal() {
+    using namespace std::chrono;
+    float const elapsed = duration<float>(steady_clock::now() - m_revealStart).count();
+    bool done = true;
+    for (size_t i = 0; i < m_reveal.size(); i++) {
+        auto& rc = m_reveal[i];
+        float t = (elapsed - static_cast<float>(i) * kRevealStagger) / kRevealDuration;
+        t = std::clamp(t, 0.f, 1.f);
+        if (t < 1.f) done = false;
+        float const e = easeBackOut(t);
+        rc.visual->setPosition(rc.from + (rc.to - rc.from) * e);
+        rc.visual->setScale(m_cardScale * (kRevealFromScale + (1.f - kRevealFromScale) * e));
+        rc.visual->setRotation(rc.fromRotation * (1.f - e));
+    }
+    if (done) {
+        m_revealing = false;
+        m_buttonMenu->setEnabled(true);
+    }
 }
 
 void AugmentDraftPopup::onCard(CCObject* sender) {

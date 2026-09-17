@@ -91,7 +91,7 @@ Extras qolmod handles (`HitboxNode.cpp:159-243`): slopes via `m_slopeDirection`,
 rotated boxes via `m_orientedBox->m_corners`. Sort `m_objects` by x once and
 `lower_bound` per frame — there can be 10k+ objects.
 
-## Shrink the *player* collision — built 2026-09-17, untested (from ref qolmod `HitboxMultiplier.cpp:103-131`; ours in `src/hooks/PlayerHitboxHook.cpp`, namespace `augment::player`)
+## Shrink the *player* collision — verified 2026-09-17 (from ref qolmod `HitboxMultiplier.cpp:103-131`; ours in `src/hooks/PlayerHitboxHook.cpp`, namespace `augment::player`)
 
 A different overload from the one below: the player's rects come from
 `getObjectRect(width, height)`, whose arguments are size *factors*
@@ -185,7 +185,7 @@ $execute {
 ## Read settings / react to changes — verified (`AugmentManager.cpp:48-52`) / (from ref CBF `main.cpp:707-737`)
 
 ```cpp
-auto n = Mod::get()->getSettingValue<int64_t>("draft-threshold");   // int settings are int64_t
+auto n = Mod::get()->getSettingValue<int64_t>("debug-threshold");   // int settings are int64_t
 $on_mod(Loaded) {
     listenForSettingChanges<bool>("some-flag", +[](bool v) { … });
 }
@@ -227,30 +227,75 @@ Ours is a node on the PlayLayer. qolmod attaches its labels to `m_uiLayer`
 (`refs/qolmod/src/Labels/Hooks.cpp:9`), which is the screen-space layer GD
 itself uses for the pause button — use that if the HUD ever drifts with the camera.
 
-## Korean text / custom font — verified at build 2026-09-17 (`src/ui/Fonts.hpp`, `mod.json`, `scripts/fontcharset.ps1`)
+## Korean text / custom font — verified in game 2026-09-17 (`src/ui/Fonts.hpp`, `mod.json`, `scripts/fontcharset.ps1`, `scripts/fontgen.py`)
 
 ```json
-"resources": { "fonts": {
-    "AugName": { "path": "resources/fonts/Pretendard-SemiBold.ttf", "size": 96, "charset": "32-126,8226,…" }
-} }
+"resources": {
+    "fonts": { "AugDebug": { "path": "resources/fonts/Pretendard-Regular.ttf", "size": 64, "charset": "32-126,8226,…" } },
+    "files": [ "resources/fonts/gen/*.fnt", "resources/fonts/gen/*.png" ]
+}
 ```
 ```cpp
 // src/ui/Fonts.hpp
-constexpr char const* Name = "AugName.fnt"_spr;
+constexpr char const* Name  = "AugName.fnt"_spr;   // ImcreSoojin 24 sd, white + black outline + shadow (baked)
+constexpr char const* Text  = "AugText.fnt"_spr;   // ImcreSoojin 16 sd, same look
+constexpr char const* Debug = "AugDebug.fnt"_spr;  // Pretendard 16 sd, plain (Geode-generated)
 // anywhere
 auto label = CCLabelBMFont::create("결계인가?", fonts::Name);   // UTF-8 literal, file saved as UTF-8
-label->setExtraKerning(-1);                                     // RobTop addition, unit unverified
+label->setColor({ 255, 215, 60 });                              // tints the white; the outline stays black
 auto wrapped = CCLabelBMFont::create(text, fonts::Text, widthInFontUnits / scale, kCCTextAlignmentCenter);
 wrapped->setScale(scale);
-popup->setTitle("증강 선택", fonts::Name, 0.7f);
+wrapped->setWidth(widthInFontUnits / smallerScale);             // re-wraps; getContentSize() updates
+popup->setTitle("증강 선택", fonts::Name, 0.8f);
 ```
-- `size` is the UHD pixel size (sd = size / 4). 96 ≈ goldFont, 64 ≈ chatFont.
+- Geode fonts: `size` is the UHD pixel size (sd = size / 4). 96 ≈ goldFont, 64 ≈ chatFont.
+  Its `outline` key does nothing (CLI 3.9.0), so outlined fonts are baked by
+  `scripts/fontgen.py` (`FONTS` table: name / size / outline / shadow in UHD px)
+  into `resources/fonts/gen/` (gitignored) and shipped as plain files.
+  `build.ps1` runs it; it's a no-op when the ttf/charset/params are unchanged
+  (`--force` to redo). Needs `py -3 -m pip install pillow fonttools`.
 - Never put Korean in a `bigFont` / `goldFont` / `chatFont` label (draws nothing).
-- New Korean literal in `src/` → just build; `build.ps1` regenerates the charset.
-  Text that is *not* a literal (read from a file, typed by the user) needs the
-  full Hangul range instead.
-- Wrapping: CCLabelBMFont breaks at spaces and newlines only, so Korean text
-  needs spaces between words (it has them) — width is in unscaled font units.
+- New Korean literal in `src/` → just build; `build.ps1` regenerates the charset
+  and re-bakes the fonts. Text that is *not* a literal (read from a file, typed
+  by the user) needs the full Hangul range instead.
+- Wrapping: **the `width` argument / `setWidth()` never wrapped either mod
+  font in game** (verified 2026-09-17). Use `wrapText(text, font, maxWidth)`
+  from `AugmentDraftPopup.cpp`: it measures words with throwaway labels and
+  inserts newlines (Korean text has spaces between words; explicit `\n` is
+  kept); then `create(wrapped, font, kCCLabelAutomaticWidth, kCCTextAlignmentCenter)`.
+  `maxWidth` is in label units, i.e. divide the point width by the scale.
+- Fit-to-slot: re-wrap at `inner / scale`, lower `scale` a step while
+  `getContentSize().height * scale > slot` (`AugmentDraftPopup::createCard`).
+
+## GD-style card / button panel — verified in game 2026-09-17 (`src/ui/AugmentDraftPopup.cpp`)
+
+```cpp
+// square02b_001 is a plain white rounded square, corner radius ~9 pt at scale 1;
+// scale the slices to get the radius you want, then size in unscaled units.
+NineSlice* roundedBox(CCSize size, ccColor3B color, float radius, GLubyte opacity = 255) {
+    float const scale = radius / 9.f;
+    auto box = NineSlice::create("square02b_001.png");
+    box->setScale(scale); box->setContentSize(size / scale);
+    box->setColor(color); box->setOpacity(opacity);
+    return box;
+}
+auto rim  = roundedBox({ w + 4, h + 4 }, ccWHITE, 8.f);          // white rim, 2 pt
+auto body = NineSlice::create("GJ_button_01.png");               // GD's green button: black ring + flat (122,222,45) fill
+body->setContentSize({ w, h });                                  // default insets = a third of the 40 pt texture
+auto band = roundedBox({ w - 5, 20 }, ccBLACK, 4.f, 70);         // darker footer strip
+auto frame = roundedBox({ 120, 70 }, ccBLACK, 4.5f);             // bordered panel: outer box …
+auto panel = roundedBox({ 116, 66 }, ccWHITE, 4.5f - 2.f);       // … + inner box, radius minus border
+```
+- Both sprites are files in `Resources/` (sd/hd/uhd), not sheet frames, so
+  `NineSlice::create(file)` is right; `square02b_001` is what the loader's own
+  mod list uses for tinted panels (`loader/src/ui/mods/list/ModItem.cpp:97`).
+- A bordered panel = black box + inner box 2× border smaller with radius
+  reduced by the border, so the border stays even around the corners.
+- Animating inside a `CCMenuItemSpriteExtra` without moving its touch area:
+  wrap the visual in a fixed-size holder node (`setContentSize`), make the
+  holder the item's sprite, and move/scale/rotate the visual.
+- Popup with floating content: `m_bgSprite->setVisible(false)` + `setOpacity(160)`
+  on the popup (it is the dimming `CCLayerColor`), title via `setTitle`.
 
 ## Cross-DLL casts — verified 2026-09-16
 

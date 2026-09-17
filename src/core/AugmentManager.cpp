@@ -24,13 +24,24 @@ void AugmentManager::startRun(GJGameLevel* level) {
     m_levelName = std::string(level->m_levelName);
     m_deaths = 0;
     m_draftsTaken = 0;
+    m_gaugeDrafts = 0;
     m_bestPercent = 0.f;
     m_gauge = 0.f;
-    m_pendingDraft = false;
+    // Every run opens with a free draft; PlayLayer::startGame shows it. Not
+    // gauge-earned, so it leaves the threshold ramp alone.
+    m_pendingDraft = true;
     m_levels.clear();
     m_slowMoEnabled = true;
 
-    log::info("Run started on '{}' (id {})", m_levelName, m_levelID);
+    log::info("Run started on '{}' (id {}), opening draft queued", m_levelName, m_levelID);
+}
+
+float AugmentManager::debugFillGauge() {
+    if (!m_active) return 0.f;
+    float missing = std::max(0.f, this->gaugeThreshold() - m_gauge);
+    m_gauge += missing;
+    log::info("Debug fill: +{:.0f}, gauge {:.0f}/{:.0f}", missing, m_gauge, this->gaugeThreshold());
+    return missing;
 }
 
 void AugmentManager::endRun() {
@@ -45,33 +56,46 @@ void AugmentManager::endRun() {
     m_pendingDraft = false;
 }
 
-float AugmentManager::minCharge() const {
-    return static_cast<float>(Mod::get()->getSettingValue<int64_t>("min-charge"));
+bool AugmentManager::debugMode() {
+    return Mod::get()->getSettingValue<bool>("debug-mode");
 }
 
 float AugmentManager::gaugeThreshold() const {
-    return std::max(1.f, static_cast<float>(Mod::get()->getSettingValue<int64_t>("draft-threshold")));
+    if (debugMode()) {
+        return std::max(1.f, static_cast<float>(Mod::get()->getSettingValue<int64_t>("debug-threshold")));
+    }
+    return tune::GaugeThresholdStart + tune::GaugeThresholdStep * m_gaugeDrafts;
 }
 
-void AugmentManager::onDeath(float percent) {
-    if (!m_active) return;
+float AugmentManager::onDeath(float percent) {
+    if (!m_active) return 0.f;
 
     m_deaths++;
-    m_bestPercent = std::max(m_bestPercent, percent);
 
-    float charge = std::max(this->minCharge(), percent);
-    m_gauge += charge;
+    // No floor: dying at 3 % is worth 3, so farming early deaths never pays.
+    // New ground is paid twice (at mult 1): the bonuses over a whole run sum
+    // to at most 100 * mult, so this rewards progress and nothing else.
+    float bonus = 0.f;
+    if (percent > m_bestPercent) {
+        bonus = (percent - m_bestPercent) * tune::NewBestBonusMult;
+        m_bestPercent = percent;
+    }
+    m_gauge += percent + bonus;
 
-    // One draft per death at most; leftover charge carries over.
-    if (m_gauge >= this->gaugeThreshold() && !this->rollDraft(1).empty()) {
-        m_gauge -= this->gaugeThreshold();
+    // One draft per death at most; leftover charge carries over and the next
+    // draft costs more.
+    float threshold = this->gaugeThreshold();
+    if (m_gauge >= threshold && !this->rollDraft(1).empty()) {
+        m_gauge -= threshold;
+        m_gaugeDrafts++;
         m_pendingDraft = true;
     }
     log::info(
-        "Death #{} at {:.1f}% -> +{:.0f} charge, gauge {:.0f}/{:.0f}{}",
-        m_deaths, percent, charge, m_gauge, this->gaugeThreshold(),
+        "Death #{} at {:.1f}% -> +{:.0f} (+{:.0f} new best), gauge {:.0f}/{:.0f}{}",
+        m_deaths, percent, percent, bonus, m_gauge, this->gaugeThreshold(),
         m_pendingDraft ? " (draft pending)" : ""
     );
+    return bonus;
 }
 
 int AugmentManager::levelOf(std::string const& id) const {

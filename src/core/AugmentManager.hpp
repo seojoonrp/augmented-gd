@@ -26,12 +26,21 @@ public:
 
     // --- draft gauge ---
     // Called once per attempt when player 1 dies. Charges the gauge by the
-    // percent reached (at least `min-charge`); a full gauge queues a draft.
-    void onDeath(float percent);
+    // percent reached plus a bonus for any new best; a full gauge queues a
+    // draft. Returns the new-best bonus (0 when the best did not move) so the
+    // caller can show it.
+    float onDeath(float percent);
     bool hasPendingDraft() const { return m_pendingDraft; }
     void clearPendingDraft() { m_pendingDraft = false; }
     float gauge() const { return m_gauge; }
+    // Cost of the next draft: rises with every draft the gauge has paid for,
+    // or the fixed `debug-threshold` setting in debug mode.
     float gaugeThreshold() const;
+    // The `debug-mode` setting: number keys grant augments, fixed threshold.
+    static bool debugMode();
+    // Debug: tops the gauge up to the threshold so the next death drafts.
+    // Returns the charge added.
+    float debugFillGauge();
     int deaths() const { return m_deaths; }
     int draftsTaken() const { return m_draftsTaken; }
     float bestPercent() const { return m_bestPercent; }
@@ -77,14 +86,15 @@ public:
 private:
     AugmentManager() = default;
 
-    float minCharge() const;
-
     bool m_active = false;
     int m_levelID = 0;
     std::string m_levelName;
 
     int m_deaths = 0;
     int m_draftsTaken = 0;
+    // Drafts the gauge paid for; the free one at run start is not among them
+    // and so does not raise the threshold.
+    int m_gaugeDrafts = 0;
     float m_bestPercent = 0.f;
     float m_gauge = 0.f;
     bool m_pendingDraft = false;

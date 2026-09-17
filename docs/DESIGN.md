@@ -17,16 +17,38 @@ cleared. Dying keeps your augments; clearing ends the run.
   index does not accept AI-written mods. Private use is unaffected; any index
   submission is the user's call.
 
-## Draft gauge (decided 2026-09-16)
+## Draft gauge (redesigned 2026-09-17)
 
-Each death charges the gauge by `max(min-charge, percent reached)`. When it
-reaches `draft-threshold`, a draft is queued; leftover charge carries over.
-At most one draft per death. Both numbers are mod settings (defaults 10 / 100;
-use ~30 for fast test loops).
+Every run opens with a **free draft**: `startRun` queues it and the
+`PlayLayer::startGame` hook shows it once the level is on screen (the user
+rejected showing it on the level-info screen, 2026-09-17). After that, each
+death charges the gauge:
 
-Rationale: pure death-count rewards nothing for progress; pure new-best stalls
-exactly when the player is stuck. This guarantees drafts when stuck and speeds
-them up when progressing. Future tuning idea: raise the threshold per draft.
+```
+charge = percent                                   (no floor)
+       + (percent - best) * NewBestBonusMult       (only on a new best, mult 1.0)
+threshold = GaugeThresholdStart + GaugeThresholdStep * gaugeDrafts   (40, +10 each)
+```
+
+When the gauge reaches the threshold a draft is queued for the next from-0
+reset; leftover charge carries over; at most one draft per death. Only
+gauge-earned drafts raise the threshold (the opening draft does not). Numbers
+live in `tune::` (`AugmentDef.hpp`) and are tuned by test; the HUD shows
+`NEW BEST +X` when the bonus fires.
+
+Rationale (2026-09-17): the old flat floor (`max(10, percent)`) made
+"die at 0 % ten times" the fastest route to a draft. Without the floor a 3 %
+death is worth 3, so farming never pays, while being stuck at 60 % still pays
+60 per death. The new-best bonus rewards GD's core achievement (new ground is
+paid twice), and its total over a run is bounded by `100 * mult`, so it cannot
+be farmed either. The rising threshold stops late-run draft floods (stuck at
+80 % used to mean a draft every two deaths). Rejected: a decaying floor
+(the floor was dropped instead).
+
+**Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
+augments, key 0 tops the gauge up to the threshold (the draft still happens
+on the next death), and `debug-threshold` replaces the ramp with a fixed
+cost so one number can be tuned in the settings UI without rebuilding.
 
 ## Draft
 
@@ -50,9 +72,9 @@ level. The id is the "코드" column and is what the hooks key on.
 | `foresight` | 사륜안 | 1 | 히트박스를 보여줍니다. | – | working. GD colours: blue solid, red hazard, green interactive, yellow player. |
 | `unmirror` | 멀미약 | 1 | 레벨 내 모든 미러포탈을 제거합니다. | – | working. Also neutralises portals already loaded when drafted. |
 | `hazard-hitbox` | 위협제거 | 5 | 위험 요소(빨간 히트박스)의 크기가 5% 감소합니다. | 위험 요소의 크기가 5% 더 감소합니다. | built, in-game test pending. Hazard / AnimatedHazard hitboxes shrink around their centre to 1 − 0.05·level (95…75 %); solids, slopes, player untouched. |
-| `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | built 2026-09-17, in-game test pending. Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
-| `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | built 2026-09-17, in-game test pending. Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
-| `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | built 2026-09-17, in-game test pending. `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
+| `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
+| `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | working (verified 2026-09-17). Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
+| `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
@@ -62,11 +84,21 @@ table order.
 ## Text & fonts (decided 2026-09-17)
 
 In-game augment text is Korean; logs, notices and the HUD's non-name words
-stay English. GD's fonts have no Hangul, so the mod ships Pretendard
-(OFL, `resources/fonts/`): SemiBold for names / notices / the popup title,
-Regular for descriptions and HUD lines. Geode converts them to bitmap fonts
-at build time with a charset generated from the sources
-(`scripts/fontcharset.ps1`), see `docs/GD-INTERNALS.md` "Fonts".
+stay English. GD's fonts have no Hangul, so the mod ships its own
+(`resources/fonts/`). Player-facing UI (draft cards, popup title, centre
+notices) uses 아임크리수진 (`ImcreSoojin.ttf`) rendered GD-style — white
+glyphs, black outline, drop shadow — baked by `scripts/fontgen.py`. Debug
+readouts (the HUD lines) stay in plain Pretendard Regular, generated by Geode.
+Both get their charset from the sources (`scripts/fontcharset.ps1`); see
+`docs/GD-INTERNALS.md` "Fonts".
+
+## Draft card look (decided 2026-09-17)
+
+GD button styling: white rim, green body with black ring, darker footer band;
+top to bottom — name, image box (empty frame until art exists), description,
+footer with `NEW` / `Lv a → b` on the left and level pips (gold ★ reached,
+grey ☆ remaining) on the right. Cards fan out from the centre when the draft
+opens and can't be picked until they land.
 
 ## HUD
 
@@ -78,7 +110,7 @@ PLACED, SLOW-MO ON/OFF…).
 
 ## Not decided yet
 
-- Real draft trigger tuning (numbers above are placeholders).
+- Draft gauge numbers (40 / +10 / bonus ×1.0) are first guesses; tune by test.
 - Whether augmented clears should be recorded as GD clears.
 - Remaining augments and systems: candidates, difficulty tiers, rejected ideas
   and build order are in `ROADMAP.md` (2026-09-16).

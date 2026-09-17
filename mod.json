@@ -16,43 +16,18 @@
 	},
 	"resources": {
 		"fonts": {
-			"AugName": {
-				"path": "resources/fonts/Pretendard-SemiBold.ttf",
-				"size": 96,
-				"charset": "32-126,8226,44032-44033,44036,44048,44053,44060,44144,44172,44208,44228,44284,44544,44553,44592,44648,45208,45225,45236,45432,45580,45720,45733,45768,45796,45804,45817,45908,46020,46121,46160,46300,46304,46321,46412,47000,47084,47112,47141,47196-47197,47452,47484,47549,47560-47561,47588,47680,47732,47784,47924,48120,48149,48152,48264,48296,48372,48512,48652,48708,48744,49324,49345,49436,49440,49548-49549,49688,49828,49845,49884,49900,50473,50504,50557,50612,50640,50668,50752,50836,50857,50920,50948,51004,51012,51020,51032,51060,51064,51068,51076,51080,51109,51204,51228,51453,51469,51613,51648,52237,52397,52404,52488,52852,52964,53356,53364,53440,53448,53468-53469,53552,53596,53664,53944,54252,54532,54540,54616,54620,54624,54633,54644,54744,54801,54840,54872,54876,54924,54952,54980,55176"
-			},
-			"AugText": {
+			"AugDebug": {
 				"path": "resources/fonts/Pretendard-Regular.ttf",
 				"size": 64,
-				"charset": "32-126,8226,44032-44033,44036,44048,44053,44060,44144,44172,44208,44228,44284,44544,44553,44592,44648,45208,45225,45236,45432,45580,45720,45733,45768,45796,45804,45817,45908,46020,46121,46160,46300,46304,46321,46412,47000,47084,47112,47141,47196-47197,47452,47484,47549,47560-47561,47588,47680,47732,47784,47924,48120,48149,48152,48264,48296,48372,48512,48652,48708,48744,49324,49345,49436,49440,49548-49549,49688,49828,49845,49884,49900,50473,50504,50557,50612,50640,50668,50752,50836,50857,50920,50948,51004,51012,51020,51032,51060,51064,51068,51076,51080,51109,51204,51228,51453,51469,51613,51648,52237,52397,52404,52488,52852,52964,53356,53364,53440,53448,53468-53469,53552,53596,53664,53944,54252,54532,54540,54616,54620,54624,54633,54644,54744,54801,54840,54872,54876,54924,54952,54980,55176"
+				"charset": "32-126,8226,8594,9733-9734,44032-44033,44036,44048,44053,44060,44144,44172,44208,44228,44284,44544,44553,44592,44648,45208,45225,45236,45432,45580,45720,45733,45768,45796,45804,45817,45908,46020,46121,46160,46300,46304,46321,46412,47000,47084,47112,47141,47196-47197,47452,47484,47549,47560-47561,47588,47680,47732,47784,47924,48120,48149,48152,48264,48296,48372,48512,48652,48708,48744,49324,49345,49436,49440,49548-49549,49688,49828,49845,49884,49900,50473,50504,50557,50612,50640,50668,50752,50836,50857,50920,50948,51004,51012,51020,51032,51060,51064,51068,51076,51080,51109,51204,51228,51453,51469,51613,51648,52237,52397,52404,52488,52852,52964,53356,53364,53440,53448,53468-53469,53552,53596,53664,53944,54252,54532,54540,54616,54620,54624,54633,54644,54744,54801,54840,54872,54876,54924,54952,54980,55176"
 			}
-		}
+		},
+		"files": [
+			"resources/fonts/gen/*.fnt",
+			"resources/fonts/gen/*.png"
+		]
 	},
 	"settings": {
-		"min-charge": {
-			"type": "int",
-			"name": "Minimum charge per death",
-			"description": "Each death charges the draft gauge by the percent you reached, but never less than this.",
-			"default": 10,
-			"min": 1,
-			"max": 100,
-			"control": {
-				"arrows": true,
-				"slider": false
-			}
-		},
-		"draft-threshold": {
-			"type": "int",
-			"name": "Draft gauge threshold",
-			"description": "Gauge charge needed to earn one augment draft. Leftover charge carries over.",
-			"default": 100,
-			"min": 10,
-			"max": 1000,
-			"control": {
-				"arrows": true,
-				"slider": false
-			}
-		},
 		"keybind-slowmo": {
 			"type": "keybind",
 			"name": "Toggle Slow-Mo",
@@ -61,12 +36,6 @@
 			"category": "gameplay",
 			"priority": -5
 		},
-		"debug-augment-keys": {
-			"type": "bool",
-			"name": "Debug: number keys grant augments",
-			"description": "During a run, keys 1-9 add one level of the matching augment (table order: shield, slow-mo, startpos, foresight, unmirror, hazard-hitbox, wave-hitbox, nerve, draft-count). Testing aid.",
-			"default": true
-		},
 		"keybind-checkpoint": {
 			"type": "keybind",
 			"name": "Place Checkpoint",
@@ -74,6 +43,25 @@
 			"default": "Z",
 			"category": "gameplay",
 			"priority": -5
+		},
+		"debug-mode": {
+			"type": "bool",
+			"name": "Debug mode",
+			"description": "Testing aid. Keys 1-9 grant one level of the matching augment (table order: shield, slow-mo, startpos, foresight, unmirror, hazard-hitbox, wave-hitbox, nerve, draft-count), key 0 fills the draft gauge (the draft still happens on death), and the draft threshold below replaces the normal rising cost.",
+			"default": false
+		},
+		"debug-threshold": {
+			"type": "int",
+			"name": "Debug: fixed draft threshold",
+			"description": "Debug mode only. Gauge charge needed per draft, the same for every draft (normally 40, +10 per draft taken).",
+			"default": 40,
+			"min": 1,
+			"max": 1000,
+			"enable-if": "debug-mode",
+			"control": {
+				"arrows": true,
+				"slider": false
+			}
 		}
 	}
 }

@@ -117,7 +117,7 @@ GD keeps three collision shapes per `GameObject`, read from different places:
   reference `m_objectRect` (`[returned ref is NOT m_objectRect]` marker), does
   nothing reset `m_objectRadius` during an attempt.
 
-## Player collision shape (wave-hitbox) — built 2026-09-17, in-game test pending
+## Player collision shape (wave-hitbox) — verified in game 2026-09-17
 
 The player is a `GameObject` but its rects come from the **other** overload,
 `GameObject::getObjectRect(float width, float height)` (`win 0x1976c0`,
@@ -127,7 +127,8 @@ and the inner one with `getObjectRect(0.3f, 0.3f)`
 (`refs/qolmod/src/Hacks/Level/Hitboxes/HitboxNode.cpp:417-425`).
 
 So the player hitbox **is** reachable: hook that overload, multiply both
-arguments, let GD build the rect. qolmod's HitboxMultiplier does exactly this
+arguments, let GD build the rect — confirmed in our own build (wave-hitbox
+works, user 2026-09-17). qolmod's HitboxMultiplier does exactly this
 (`refs/qolmod/src/Hacks/Level/HitboxMultiplier.cpp:103-131`) and registers
 `SafeModeTrigger::Attempt` for it, i.e. it changes real collision, not just the
 drawing. This supersedes the older "player rect is inlined, rejected" note in
@@ -272,7 +273,7 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
   (`refs/devtools/src/backend.cpp:504`), CustomKeybinds node-scoped
   (`refs/custom-keybinds/src/UILayer.cpp:47-102, 321-329`).
 
-## Fonts & Korean text — verified at build 2026-09-17 (in-game render pending)
+## Fonts & Korean text — verified in game 2026-09-17 (Geode-generated and baked-outline fonts)
 
 - GD's `bigFont` / `goldFont` / `chatFont` (`Resources/*.fnt`) carry
   `32-126,8226` only: a Korean string in them draws nothing. `CCLabelBMFont`
@@ -300,11 +301,56 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
   (`src/ui/Fonts.hpp`). `Popup::setTitle(title, font, scale)` takes the font too.
 - Letter spacing: `CCLabelBMFont::setExtraKerning(int)` is a RobTop addition
   (`Geode/cocos/label_nodes/CCLabelBMFont.h:327`, `CC_SYNTHESIZE_NV`). Whether
-  GD applies it per glyph and in which unit is **(unverified)**; we set -1 on
-  name labels — if spacing looks wrong in game, that is the knob.
+  GD applies it per glyph and in which unit is **(unverified)**; no longer used
+  (the baked fonts carry their own spacing).
+- **`outline` is a no-op in Geode CLI 3.9.0.** `mod_file.rs` deserialises
+  `BitmapFont { path, charset, size, outline, color }`, but in
+  `src/util/bmfont.rs` the SDF outline code is commented out and
+  `generate_char` writes a flat `color` + alpha glyph (read from the v3.9.0 tag
+  on GitHub). Only `color` works. Outlined GD-style text therefore comes from
+  `scripts/fontgen.py` (Pillow `stroke_width` / `stroke_fill` + an offset black
+  copy for the shadow), which writes the same file set Geode would
+  (`<Name>.fnt/.png`, `-hd`, `-uhd`, page `file="<Name>.png"`) and ships it via
+  `resources.files` — the CLI copies `files` into the same
+  `resources/<mod.id>/` folder as generated fonts (`package.rs:234-237`), so
+  `"AugName.fnt"_spr` resolves identically.
+- BMFont semantics cocos relies on (`CCLabelBMFont::createFontChars`): glyph
+  quad at `(pen + xoffset, lineTop - yoffset)`, then `pen += xadvance`;
+  `lineHeight` is the only line metric used (`base` ignored). With an outline
+  baked into the glyph the ring extends `outline` px past the ink on every
+  side, so `xadvance` must grow by `outline` or the next glyph's black ring
+  paints over this glyph's white (Hangul in ImcreSoojin has zero side bearings).
+  Whitespace: Pillow's `getbbox(ch, stroke_width=n)` is non-empty for a space
+  (the stroke pads it) — check the rendered alpha and emit `width=0`.
+- ImcreSoojin (`resources/fonts/ImcreSoojin.ttf`, "아임크리수진"): 17 363
+  glyphs, all 11 172 Hangul syllables, ★ ☆ → present, • (U+2022) absent.
+  hhea ascent 910 / descent 250 per 1000 em → lineHeight 1.16 em.
+- **The `width` argument does not wrap mod fonts** (verified in game
+  2026-09-17, user-confirmed for both the Geode-generated Pretendard fnt and
+  the baked ImcreSoojin fnt): `CCLabelBMFont::create(text, fnt, width, align)`
+  and `setWidth()` left every description on one line. Whether GD's own fonts
+  wrap with it is untested; RobTop's `updateLabel` is in the GD binary, so the
+  reason isn't readable. Verified workaround: `AugmentDraftPopup.cpp`
+  `wrapText()` measures words with throwaway labels (`getContentSize().width`
+  comes from the advances and is correct) and inserts `\n`; a label created
+  with `kCCLabelAutomaticWidth` honours newlines.
+- `CCNode::getPosition()` in Geode's cocos headers resolves ambiguously when
+  assigned into a `CCPoint` with `=` (clang: "operand types CCPoint and void");
+  use `getPositionX()/Y()` or keep the point you set.
 - Pretendard (OFL) is installed per-user at
   `%LOCALAPPDATA%\Microsoft\Windows\Fonts\Pretendard-*.ttf`; static TTFs, so no
   variable-font question. License text is shipped in `resources/fonts/`.
+
+## Director pause vs. animation — verified in game 2026-09-17 (reveal plays while paused)
+
+`CCDirector::pause()` (what `AugmentManager::pauseGameForDraft` calls) makes
+`drawScene` skip `m_pScheduler->update()`, and `CCActionManager` is driven by
+the scheduler, so **no cocos action runs while a draft is open** — including
+`FLAlertLayer::show()`'s elastic pop-in (hence `m_noElasticity = true`) and
+`CCMenuItemSpriteExtra`'s press bounce. `visit()` / `draw()` still run every
+frame (the animation interval is restored to the real one), so a node can
+animate itself from an overridden `visit()` with `std::chrono::steady_clock`
+(`AugmentDraftPopup::stepReveal`).
 
 ## Misc
 

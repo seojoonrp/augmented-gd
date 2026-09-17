@@ -24,11 +24,4 @@ float scale();
 // and are left alone.
 bool isTarget(GameObject* obj);
 
-// Diagnostic counters since the last take (logged once per attempt).
-struct Stats {
-    int rects = 0;
-    int boxes = 0;
-};
-Stats takeStats();
-
 } // namespace augment::hazard

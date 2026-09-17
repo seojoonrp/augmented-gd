@@ -3,8 +3,7 @@
 //
 // Pattern from qolmod's AccurateHitboxes (refs/qolmod/src/Hacks/Level/
 // AccurateHitboxes.cpp): hook updateOrientedBox(), rewrite the corners, then
-// computeAxes() + orderCorners(). Whether getObjectRect() is the only path
-// that fills m_objectRect is (unverified) — the counters below tell.
+// computeAxes() + orderCorners(). Verified in game 2026-09-16.
 
 #include "HazardHitboxHook.hpp"
 
@@ -16,9 +15,6 @@ using namespace geode::prelude;
 namespace {
 
 float g_scale = 1.f;
-augment::hazard::Stats g_stats;
-// The first few shrinks after every scale change are logged in detail.
-int g_logBudget = 0;
 
 void shrinkRect(CCRect& r, float s) {
     float w = r.size.width * s, h = r.size.height * s;
@@ -35,7 +31,6 @@ namespace augment::hazard {
 void setScale(float scale) {
     if (std::abs(g_scale - scale) < 0.001f) return;
     g_scale = scale;
-    g_logBudget = 4;
     log::info("HazardHitbox: hazard hitbox scale -> {:.2f}", scale);
 }
 
@@ -45,12 +40,6 @@ bool isTarget(GameObject* obj) {
     return obj
         && (obj->m_objectType == GameObjectType::Hazard
             || obj->m_objectType == GameObjectType::AnimatedHazard);
-}
-
-Stats takeStats() {
-    auto s = g_stats;
-    g_stats = {};
-    return s;
 }
 
 } // namespace augment::hazard
@@ -66,18 +55,7 @@ class $modify(AugGameObject, GameObject) {
         // which updateOrientedBox() below has already shrunk.
         if (m_shouldUseOuterOb && m_orientedBox) return rect;
 
-        CCRect before = m_objectRect;
         shrinkRect(m_objectRect, g_scale);
-        g_stats.rects++;
-        if (g_logBudget > 0) {
-            g_logBudget--;
-            log::info(
-                "HazardHitbox: rect of object id {} {:.1f}x{:.1f} -> {:.1f}x{:.1f}{}",
-                m_objectID, before.size.width, before.size.height,
-                m_objectRect.size.width, m_objectRect.size.height,
-                &rect == &m_objectRect ? "" : " [returned ref is NOT m_objectRect]"
-            );
-        }
         return rect;
     }
 
@@ -91,10 +69,5 @@ class $modify(AugGameObject, GameObject) {
         for (auto& corner : box->m_corners) corner = c + (corner - c) * g_scale;
         box->computeAxes();
         box->orderCorners();
-        g_stats.boxes++;
-        if (g_logBudget > 0) {
-            g_logBudget--;
-            log::info("HazardHitbox: oriented box of object id {} (rotation {:.0f}) shrunk", m_objectID, this->getRotation());
-        }
     }
 };

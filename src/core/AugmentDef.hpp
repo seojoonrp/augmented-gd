@@ -60,6 +60,13 @@ namespace tune {
     // Cards per draft, with and without draft-count.
     constexpr int DefaultDraftCards = 3;
     constexpr int DraftCountCards = 4;
+    // Draft gauge: a death charges by the percent reached, plus every percent
+    // of new best times NewBestBonusMult. A draft costs GaugeThresholdStart
+    // and each gauge-earned draft raises the next cost by GaugeThresholdStep
+    // (the `debug-threshold` setting overrides the ramp in debug mode).
+    constexpr float GaugeThresholdStart = 40.f;
+    constexpr float GaugeThresholdStep = 10.f;
+    constexpr float NewBestBonusMult = 1.f;
 }
 
 } // namespace augment

@@ -22,10 +22,4 @@ namespace augment::player {
 void setWaveScale(float scale);
 float waveScale();
 
-// Diagnostic counter since the last take (logged once per attempt).
-struct Stats {
-    int rects = 0;
-};
-Stats takeStats();
-
 } // namespace augment::player

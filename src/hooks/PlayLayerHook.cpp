@@ -105,7 +105,6 @@ class $modify(AugPlayLayer, PlayLayer) {
         // hazard-hitbox: the hazard scale every object currently in the level carries
         // (radii are multiplied in place, so a change is applied as a ratio).
         float hazardApplied = 1.f;
-        int hazardRadiiAtLoad = 0;
     };
 
     bool isRunLevel() {
@@ -182,7 +181,6 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (s < 1.f && hazard::isTarget(object)) {
             if (object->m_objectRadius > 0.f) {
                 object->m_objectRadius *= s;
-                m_fields->hazardRadiiAtLoad++;
             }
             object->m_isObjectRectDirty = true;
             object->m_isOrientedBoxDirty = true;
@@ -287,7 +285,10 @@ class $modify(AugPlayLayer, PlayLayer) {
 
             if (player == m_player1 && !f->deathCounted) {
                 f->deathCounted = true;
-                mgr.onDeath(this->getCurrentPercent());
+                float bonus = mgr.onDeath(this->getCurrentPercent());
+                if (bonus > 0.f && f->hud) {
+                    f->hud->notice(fmt::format("NEW BEST  +{:.0f}", bonus), { 255, 220, 90 });
+                }
 
                 // Checkpoint: any unused placement means we come back to the
                 // newest one. Our own refs decide, not GD's array: GD drops a
@@ -311,16 +312,6 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto f = m_fields.self();
 
         this->applyHitboxScales();
-        if (hazard::scale() < 1.f) {
-            auto st = hazard::takeStats();
-            log::info(
-                "HazardHitbox: shrunk {} rects, {} oriented boxes since the last reset ({} circular hazards scaled at load)",
-                st.rects, st.boxes, f->hazardRadiiAtLoad
-            );
-        }
-        if (auto st = player::takeStats(); st.rects > 0) {
-            log::info("WaveHitbox: shrunk {} player rects since the last reset", st.rects);
-        }
 
         bool fromCheckpoint = f->respawnPending && !f->checkpoints.empty() && this->isRunAttempt();
         if (f->respawnPending && !fromCheckpoint) {
@@ -417,6 +408,22 @@ class $modify(AugPlayLayer, PlayLayer) {
             "Checkpoint: consumed (GD array {} -> {}{})",
             before, this->gdCheckpointCount(), this->gdLastCheckpoint() == target ? ", still on top!" : ""
         );
+    }
+
+    // The level is on screen and about to move: the place for the opening
+    // draft (queued by startRun) or one left pending from an earlier visit.
+    // The reset inside init skips drafts because the scene is not running
+    // yet, so this is the first chance after the fade-in. (unverified: GD
+    // is assumed to call startGame once per level load; the pending flag
+    // makes a second call harmless.)
+    void startGame() {
+        PlayLayer::startGame();
+        auto& mgr = AugmentManager::get();
+        log::info("startGame: run level {}, draft pending {}", this->isRunLevel(), mgr.hasPendingDraft());
+        if (this->isRunLevel() && mgr.hasPendingDraft()) {
+            mgr.clearPendingDraft();
+            this->showDraft();
+        }
     }
 
     void levelComplete() {
@@ -667,6 +674,20 @@ class $modify(AugPlayLayer, PlayLayer) {
         return true;
     }
 
+    // Debug aid: key 0 tops the gauge up so the next death drafts.
+    bool debugFillGauge() {
+        if (!this->isRunLevel()) {
+            log::info("Debug fill ignored: not a run level");
+            return false;
+        }
+        float added = AugmentManager::get().debugFillGauge();
+        this->refreshHud();
+        if (auto hud = m_fields->hud) {
+            hud->notice(fmt::format("GAUGE FULL +{:.0f} (DEBUG)", added), { 200, 160, 255 });
+        }
+        return true;
+    }
+
     // ---------------------------------------------------------------- hud
 
     void refreshHud() {
@@ -825,12 +846,16 @@ $on_mod(Loaded) {
         if (keybindMatches("keybind-slowmo", KEY_X, pressed)) return routeHotkey(Hotkey::SlowMo, "raw");
         if (keybindMatches("keybind-checkpoint", KEY_Z, pressed)) return routeHotkey(Hotkey::Checkpoint, "raw");
 
-        // Debug: 1..9 grant augments (table order). Never while a draft is up.
-        if (data.key >= KEY_One && data.key <= KEY_Nine && data.modifiers == KeyboardModifier::None
-            && Mod::get()->getSettingValue<bool>("debug-augment-keys")
+        // Debug: 1..9 grant augments (table order), 0 fills the gauge. Never
+        // while a draft is up.
+        if (data.key >= KEY_Zero && data.key <= KEY_Nine && data.modifiers == KeyboardModifier::None
+            && AugmentManager::debugMode()
             && !AugmentManager::get().isGamePausedForDraft()) {
             if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
-                if (pl->debugGrantAugment(data.key - KEY_One)) return ListenerResult::Stop;
+                bool handled = data.key == KEY_Zero
+                    ? pl->debugFillGauge()
+                    : pl->debugGrantAugment(data.key - KEY_One);
+                if (handled) return ListenerResult::Stop;
             }
         }
         return ListenerResult::Propagate;

@@ -4,14 +4,17 @@
 
 #include <Geode/ui/Popup.hpp>
 
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
 
 namespace augment {
 
-// Modal "pick one of three" popup. Has no close button and ignores Esc/back:
-// the only way out is to pick a card.
+// Modal "pick one of N" popup. Has no close button and ignores Esc/back:
+// the only way out is to pick a card. The cards fan out from the centre when
+// the popup opens; the reveal is driven from visit() with a real clock
+// because the director is paused during a draft, which freezes cocos actions.
 class AugmentDraftPopup : public geode::Popup {
 public:
     using PickCallback = std::function<void(std::string const& augmentID)>;
@@ -25,12 +28,27 @@ protected:
 
     void keyBackClicked() override {}
     void onClose(cocos2d::CCObject*) override {}
+    void visit() override;
 
+    // The card's visual (full-size, scaled to fit); the menu item wrapping it
+    // keeps the final position and size so the touch area never moves.
     cocos2d::CCNode* createCard(AugmentDef const& def, int currentLevel);
     void onCard(cocos2d::CCObject* sender);
+    void stepReveal();
+
+    struct RevealCard {
+        cocos2d::CCNode* visual = nullptr;
+        cocos2d::CCPoint from;  // menu-row centre, in the item's coordinates
+        cocos2d::CCPoint to;    // resting position, in the item's coordinates
+        float fromRotation = 0.f;
+    };
 
     std::vector<AugmentDef const*> m_choices;
     PickCallback m_onPick;
+    std::vector<RevealCard> m_reveal;
+    std::chrono::steady_clock::time_point m_revealStart;
+    bool m_revealing = false;
+    float m_cardScale = 1.f;
 };
 
 } // namespace augment

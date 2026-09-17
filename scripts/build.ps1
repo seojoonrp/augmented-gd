@@ -27,6 +27,11 @@ if ($Clean -and (Test-Path build)) {
 # resources.fonts); Geode regenerates the fonts when it changes.
 & "$PSScriptRoot\fontcharset.ps1"
 
+# Bake the outlined UI fonts (ImcreSoojin) from that charset. Needs the
+# Windows Python with Pillow: py -3 -m pip install pillow fonttools
+py -3 "$PSScriptRoot\fontgen.py"
+if ($LASTEXITCODE -ne 0) { throw "fontgen.py failed with exit code $LASTEXITCODE" }
+
 # geode writes warnings to stderr; under "Stop" PS 5.1 would abort on them.
 $ErrorActionPreference = "Continue"
 geode build --ninja
