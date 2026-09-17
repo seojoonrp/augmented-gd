@@ -80,14 +80,22 @@ class $modify(AugPlayLayer, PlayLayer) {
             KeybindSettingPressedEventV3(Mod::get(), "keybind-slowmo"),
             [](Keybind const&, bool down, bool repeat, double) {
                 if (!down || repeat) return ListenerResult::Propagate;
-                return hotkeys::route(Hotkey::SlowMo, "setting") ? ListenerResult::Stop : ListenerResult::Propagate;
+                return hotkeys::route(Hotkey::SlowMo, true, "setting") ? ListenerResult::Stop : ListenerResult::Propagate;
             }
         );
         this->addEventListener(
             KeybindSettingPressedEventV3(Mod::get(), "keybind-checkpoint"),
             [](Keybind const&, bool down, bool repeat, double) {
                 if (!down || repeat) return ListenerResult::Propagate;
-                return hotkeys::route(Hotkey::Checkpoint, "setting") ? ListenerResult::Stop : ListenerResult::Propagate;
+                return hotkeys::route(Hotkey::Checkpoint, true, "setting") ? ListenerResult::Stop : ListenerResult::Propagate;
+            }
+        );
+        // Brake is a held key: the release is routed too.
+        this->addEventListener(
+            KeybindSettingPressedEventV3(Mod::get(), "keybind-brake"),
+            [](Keybind const&, bool down, bool repeat, double) {
+                if (repeat) return ListenerResult::Propagate;
+                return hotkeys::route(Hotkey::Brake, down, "setting") ? ListenerResult::Stop : ListenerResult::Propagate;
             }
         );
         log::info("Hotkey setting listeners attached to PlayLayer (run level: {})", this->isRunLevel());
@@ -165,7 +173,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     void levelComplete() {
         PlayLayer::levelComplete();
-        scales::setTime(1.f);
+        scales::resetTime();
         if (auto s = this->session(); s && s->runAttempt()) {
             AugmentManager::get().endRun();
         }

@@ -71,14 +71,15 @@ Decisions
   `Augment` interface, `DraftSession`, `Scales`, `input/Hotkeys.cpp`; move
   shield, slow-mo, foresight, unmirror, draft-count — and HitboxScales
   (hazard+wave+nerve) too, since it only needs `onGranted` fan-out.
-- [x] **2b. Stateful augments** (2026-09-17, built; regression pending): startpos (checkpoint
+- [x] **2b. Stateful augments** (2026-09-17, verified in game): startpos (checkpoint
   array sync; drops `hotkeys::legacyRoute`), cat (restore). HUD slots then
   come entirely from the session and `refreshHud` moves into it.
 - [x] **3. Docs** (2026-09-17): STATUS = current state only, log →
   `SESSIONS.md`; `HARNESS-PLAN.md` → `HARNESS.md`; our-source cites by
   file + symbol; CLAUDE.md code map; CI decision.
-- [~] **4. Follow-ups that change behaviour**: Unmirror via `toggleFlipped`
-  hook and the HUD refresh throttle done 2026-09-17 (untested). Not done, on
+- [x] **4. Follow-ups that change behaviour**: Unmirror via `toggleFlipped`
+  hook and the HUD refresh throttle done and verified 2026-09-17 (unmirror on
+  a portal-free level only). Not done, on
   purpose: run persistence is a feature (ROADMAP T2, now a one-function
   serialisation of `RunState`), enum ids are optional.
 
@@ -103,3 +104,5 @@ Decisions
 - 2026-09-17: 2a verified by the user. Steps 2b, 3 and the two step-4 items done
   in one go (user: "나머지 그냥 한번에 다 해줘"); see SESSIONS.md for the details.
   `PlayLayerHook.cpp` is now 170 lines with nothing augment-specific in it.
+- 2026-09-17: 2b + 4 verified by the user ("다 잘 되는듯"). Plan closed; the
+  optional items (run persistence, enum ids) live in ROADMAP.

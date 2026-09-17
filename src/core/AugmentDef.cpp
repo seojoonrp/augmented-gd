@@ -27,7 +27,7 @@ std::string const& AugmentDef::describe(int level) const {
 }
 
 // Text is the design table (docs/DESIGN.md) with its numbers taken from
-// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th).
+// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th, Shift+2 the 11th).
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
         { ids::Shield, "결계인가?", 3,
@@ -63,6 +63,10 @@ std::vector<AugmentDef> const& allAugments() {
                 + std::to_string(tune::CatBaseCount) + "개를 랜덤으로 제거합니다.",
             "고양이가 매번 장애물을 " + countKo(tune::CatCountStep) + " 더 제거하고,\n제거 쿨타임이 "
                 + num(tune::CatIntervalStep) + "초 감소합니다." },
+        { ids::Brake, "브레이크", 3,
+            "C를 누르고 있으면 게임 속도가 " + pct(tune::BrakeCut) + "% 감소합니다.\n어템마다 최대 "
+                + num(tune::BrakeSecondsPerLevel) + "초씩 사용할 수 있습니다.",
+            "[브레이크]를 어템마다 " + num(tune::BrakeSecondsPerLevel) + "초 더 사용할 수 있습니다." },
     };
     return pool;
 }

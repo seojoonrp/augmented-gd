@@ -96,13 +96,16 @@ src/game/                Geode glue
   LevelSession.*         one PlayLayer of a run level: the Augment objects, HUD + progress marks, objectsByX(),
                          death-once, debug grants, refreshHud (10 Hz); fans lifecycle events out in table order
   DraftSession.*         draft::showNext / isOpen / abandon — popup, director pause, cursor, chaining
-  Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters)
+  Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters);
+                         time = base (slow-mo) with an override layer (brake)
 src/augments/            one file per augment behind Augment.hpp (all hooks default to no-op):
   Augment.hpp            onLevelInit (before PlayLayer::init) / onLevelReady / onObjectAdded / onBeforeReset→resume? /
-                         onAttemptStart(fromCheckpoint) / onHit→swallow / onDeath / onFrame / onPause /
-                         onGranted(id, lv) (every augment hears every grant) / onHotkey / hudState(id) / onQuit
+                         onAttemptStart(fromCheckpoint) / onCheckpointPlaced→snapshot / onCheckpointRespawn→restore /
+                         onHit→swallow / onDeath / onFrame / onPause /
+                         onGranted(id, lv) (every augment hears every grant) / onHotkey(key, down) / hudState(id) / onQuit
   Augments.*             factories + makeAllAugments() (table order)
   Shield SlowMo StartPos Foresight Unmirror(+toggleFlipped hook) HitboxScales(hazard+wave+nerve) DraftCount Cat
+                         Brake (held C, scales::setTimeOverride over SlowMo's base speed)
 src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-frame dedup → session->onHotkey),
                          raw KeyboardInputEvent listener at priority -1, debug number keys
 src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (AUG button),

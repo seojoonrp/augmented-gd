@@ -54,6 +54,17 @@ inline float catInterval(int catLevel) {
     return std::max(tune::CatMinInterval, tune::CatBaseInterval - tune::CatIntervalStep * static_cast<float>(catLevel - 1));
 }
 
+// Game speed while the brake is held; independent of slow-mo.
+inline float brakeScale() {
+    return 1.f - tune::BrakeCut;
+}
+
+// Real seconds of braking per attempt; 0 when unowned.
+inline float brakeBudget(int brakeLevel) {
+    if (brakeLevel <= 0) return 0.f;
+    return tune::BrakeSecondsPerLevel * static_cast<float>(brakeLevel);
+}
+
 inline std::size_t draftCardCount(bool hasDraftCount) {
     return static_cast<std::size_t>(hasDraftCount ? tune::DraftCountCards : tune::DefaultDraftCards);
 }

@@ -8,6 +8,10 @@
 
 namespace augment::scales {
 
+// Time has two layers: the base (slow-mo) and an override that wins while
+// set (brake). g_time is the effective product the hook reads.
+inline float g_timeBase = 1.f;
+inline float g_timeOverride = 0.f;   // 0 = none
 inline float g_time = 1.f;
 inline float g_hazard = 1.f;
 inline float g_wave = 1.f;
@@ -17,8 +21,12 @@ inline float hazard() { return g_hazard; }
 inline float wave() { return g_wave; }
 
 // Scales the scheduler's dt (physics, actions, our timers) and matches the
-// FMOD master pitch so the music stays in sync.
+// FMOD master pitch so the music stays in sync. setTime is the base speed
+// (slow-mo); setTimeOverride replaces it while non-zero (brake), 0 clears.
 void setTime(float scale);
+void setTimeOverride(float scale);
+// Both time layers back to normal speed.
+void resetTime();
 // 1.0 = untouched.
 void setHazard(float scale);
 void setWave(float scale);

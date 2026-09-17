@@ -65,6 +65,10 @@ Side effect on this machine: death-tracker (hook priority `First`) sees
   `GJBaseGameLayer::update(float)` (`win 0x237850`) instead of the scheduler,
   so menus/popups keep normal speed (`refs/qolmod/src/Hacks/Speedhack/Hooks.cpp:75-83`).
   **(from refs, unverified here)**
+- Two mod features drive the scale (slow-mo base, brake override), so
+  `Scales.cpp` keeps them as separate layers and applies the effective value
+  once (`scales::setTime` / `scales::setTimeOverride`); the pitch and the
+  `Game speed ->` log fire only when the effective value changes.
 - Click Between Frames (installed) computes physics steps from
   `CCDirector::m_fActualDeltaTime` / `m_fDeltaTime`; qolmod multiplies both by
   the speed factor when CBF is loaded (`Hooks.cpp:38-45`). We don't — if
@@ -194,12 +198,12 @@ covers portals spawned later too. **(from refs, unverified here)**
 
 ## Checkpoints in normal mode
 
-Approach (implemented; placement + single respawn **verified in game 2026-09-16**,
-multi-respawn model unverified): `markCheckpoint()` / `resetLevel()` wrapped in a
-temporary `m_isPracticeMode = true`. Our own `std::vector<Ref<CheckpointObject>>`
-is the source of truth; before a checkpoint reset GD's `m_checkpointArray` is
-rebuilt from it if it diverged, and `m_currentCheckpoint` is pointed at the
-target. See `StartPos.cpp::onBeforeReset` (sync + practice flag) / `onAttemptStart` (consume); `PlayLayerHook.cpp::resetLevel` only calls the original between them.
+Approach (implemented; placement + single respawn **verified in game 2026-09-16**;
+the "newest only, one respawn" model **verified in game 2026-09-17**): `markCheckpoint()` /
+`resetLevel()` wrapped in a temporary `m_isPracticeMode = true`. Our own
+`Ref<CheckpointObject>` (the newest placement) is the source of truth; before a
+checkpoint reset GD's `m_checkpointArray` is rebuilt as just that entry if its last
+entry differs, and `m_currentCheckpoint` is pointed at the target. See `StartPos.cpp::onBeforeReset` (sync + practice flag) / `onAttemptStart` (consume); `PlayLayerHook.cpp::resetLevel` only calls the original between them.
 
 Facts read from Geode's inline implementations (= reverse-engineered GD code,
 `build/_deps/bindings-src/bindings/2.2081/inline/`), 2026-09-16:
@@ -290,6 +294,14 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
   `KeyboardInputEvent().listen(fn, -1)` from `$on_mod(Loaded)` that runs ahead
   of the loader's listener. Return `Stop` only when the press was acted on so
   an idle X/Z still reaches CustomKeybinds. **Verified in game 2026-09-16.**
+- Held keys: `KeyboardInputData::Action` is `Press` / `Release` / `Repeat`
+  (`utils/Keyboard.hpp`), and `KeybindSettingPressedEventV3` passes
+  `(keybind, down, repeat, timestamp)`, so both paths deliver the release.
+  `hotkeys::route` takes `down`; releases skip the draft-open guard so a key
+  let go over the popup is not lost (brake). Focus loss arrives as
+  `pauseGame(true)` with no release event **(assumed, unverified)** — the brake
+  drops its held state in `onPause`. Press + release routing itself is
+  **verified in game 2026-09-17** (brake).
 - `mod.json` keybind settings: `"default"` string or array, `"priority"` int
   (lower dispatched first), `"category"`; read with
   `Mod::get()->getSettingValue<std::vector<Keybind>>("key")`.

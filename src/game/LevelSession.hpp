@@ -68,13 +68,15 @@ public:
     void onQuit();
     // True when an augment turns this reset into a respawn (same attempt).
     bool onBeforeReset();
+    // A checkpoint respawn also fans out onCheckpointRespawn afterwards.
     void onAttemptStart(bool fromCheckpoint);
+    void onCheckpointPlaced();
     bool onHit(PlayerObject* player);
     void onDeath();
     void onFrame(float dt);
     void onPause();
     void onGranted(std::string const& id, int level);
-    bool onHotkey(Hotkey which);
+    bool onHotkey(Hotkey which, bool down);
     Augment* find(std::string const& id) const;
 
     // --- death bookkeeping (destroyPlayer can fire more than once per attempt) ---

@@ -18,6 +18,7 @@ std::vector<std::unique_ptr<Augment>> makeAllAugments() {
     all.push_back(makeHitboxScales());
     all.push_back(makeDraftCount());
     all.push_back(makeCat());
+    all.push_back(makeBrake());
     return all;
 }
 

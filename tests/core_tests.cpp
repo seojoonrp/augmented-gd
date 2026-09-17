@@ -42,7 +42,7 @@ RunState freshRun() {
 
 void testTable() {
     auto const& defs = allAugments();
-    CHECK(defs.size() == 10);
+    CHECK(defs.size() == 11);
     std::set<std::string> ids;
     for (auto const& d : defs) {
         CHECK(!d.id.empty());
@@ -72,6 +72,9 @@ void testTable() {
     CHECK(contains(findAugment(ids::Cat)->initialDesc, "장애물 5개"));
     CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "한 개 더"));
     CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "0.5초 감소"));
+    CHECK(contains(findAugment(ids::Brake)->initialDesc, "60% 감소"));
+    CHECK(contains(findAugment(ids::Brake)->initialDesc, "최대 7초씩"));
+    CHECK(contains(findAugment(ids::Brake)->levelUpDesc, "7초 더"));
 
     // describe(): initial for level 1, level-up text after, initial again
     // when there is no level-up text.
@@ -113,6 +116,11 @@ void testFormulas() {
 
     CHECK(formula::draftCardCount(false) == 3);
     CHECK(formula::draftCardCount(true) == 4);
+
+    CHECK_NEAR(formula::brakeScale(), 0.4f);
+    CHECK_NEAR(formula::brakeBudget(0), 0.f);
+    CHECK_NEAR(formula::brakeBudget(1), 7.f);
+    CHECK_NEAR(formula::brakeBudget(3), 21.f);
 }
 
 // ---------------------------------------------------------------- run lifecycle

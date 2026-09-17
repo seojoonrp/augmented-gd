@@ -21,6 +21,7 @@ namespace ids {
     constexpr char const* Nerve        = "nerve";
     constexpr char const* DraftCount   = "draft-count";
     constexpr char const* Cat          = "cat";
+    constexpr char const* Brake        = "brake";
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
@@ -78,6 +79,11 @@ namespace tune {
     constexpr float GaugeThresholdStart = 40.f;
     constexpr float GaugeThresholdStep = 10.f;
     constexpr float NewBestBonusMult = 1.f;
+    // Brake: game speed 1 - BrakeCut while the key is held (slow-mo is
+    // ignored, the cut is absolute), for BrakeSecondsPerLevel * level real
+    // seconds per attempt.
+    constexpr float BrakeCut = 0.6f;
+    constexpr float BrakeSecondsPerLevel = 7.f;
 }
 
 } // namespace augment

@@ -32,10 +32,11 @@ namespace augment::hotkeys {
 
 namespace {
 
-// One physical press can reach route() through both input paths in the
-// same frame; the second one is dropped (and answered like the first).
-unsigned g_lastFrame[HotkeyCount] = { ~0u, ~0u };
-bool g_lastHandled[HotkeyCount] = { false, false };
+// One physical press (or release) can reach route() through both input
+// paths in the same frame; the second one is dropped (and answered like the
+// first). Indexed [hotkey][down].
+unsigned g_lastFrame[HotkeyCount][2] = {};
+bool g_lastHandled[HotkeyCount][2] = {};
 
 // getSettingValue does the typeinfo cast for us; an empty result means the
 // setting couldn't be resolved, so fall back to the mod.json default.
@@ -47,28 +48,31 @@ bool keybindMatches(char const* settingKey, enumKeyCodes fallback, Keybind const
 
 } // namespace
 
-bool route(Hotkey which, char const* source) {
-    if (draft::isOpen()) {
-        log::info("Hotkey {} via {} ignored: draft open", hotkeyName(which), source);
+bool route(Hotkey which, bool down, char const* source) {
+    char const* action = down ? "press" : "release";
+    if (down && draft::isOpen()) {
+        log::info("Hotkey {} {} via {} ignored: draft open", hotkeyName(which), action, source);
         return false;
     }
     auto session = AugmentManager::get().session();
     if (!session) {
-        log::info("Hotkey {} via {} ignored: no run level", hotkeyName(which), source);
+        log::info("Hotkey {} {} via {} ignored: no run level", hotkeyName(which), action, source);
         return false;
     }
 
+    // getTotalFrames starts at 0, so the "never" sentinel is ~0u.
     unsigned frame = CCDirector::sharedDirector()->getTotalFrames();
     int i = static_cast<int>(which);
-    if (g_lastFrame[i] == frame) {
-        log::info("Hotkey {} via {} duplicate in frame {}, ignored", hotkeyName(which), source, frame);
-        return g_lastHandled[i];
+    int d = down ? 1 : 0;
+    if (g_lastFrame[i][d] == frame + 1) {
+        log::info("Hotkey {} {} via {} duplicate in frame {}, ignored", hotkeyName(which), action, source, frame);
+        return g_lastHandled[i][d];
     }
-    log::info("Hotkey {} via {} (frame {})", hotkeyName(which), source, frame);
+    log::info("Hotkey {} {} via {} (frame {})", hotkeyName(which), action, source, frame);
 
-    bool handled = session->onHotkey(which);
-    g_lastFrame[i] = frame;
-    g_lastHandled[i] = handled;
+    bool handled = session->onHotkey(which, down);
+    g_lastFrame[i][d] = frame + 1;
+    g_lastHandled[i][d] = handled;
     return handled;
 }
 
@@ -77,20 +81,26 @@ bool route(Hotkey which, char const* source) {
 $on_mod(Loaded) {
     using namespace augment;
     KeyboardInputEvent().listen([](KeyboardInputData& data) {
-        if (data.action != KeyboardInputData::Action::Press) return ListenerResult::Propagate;
+        // Repeats are neither a press nor a release for us.
+        if (data.action == KeyboardInputData::Action::Repeat) return ListenerResult::Propagate;
+        bool down = data.action == KeyboardInputData::Action::Press;
         // Text fields get their keys untouched.
         if (CCIMEDispatcher::sharedDispatcher()->hasDelegate()) return ListenerResult::Propagate;
 
         Keybind pressed(data.key, data.modifiers);
         if (hotkeys::keybindMatches("keybind-slowmo", KEY_X, pressed)) {
-            return hotkeys::route(Hotkey::SlowMo, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+            return hotkeys::route(Hotkey::SlowMo, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
         }
         if (hotkeys::keybindMatches("keybind-checkpoint", KEY_Z, pressed)) {
-            return hotkeys::route(Hotkey::Checkpoint, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+            return hotkeys::route(Hotkey::Checkpoint, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
         }
+        if (hotkeys::keybindMatches("keybind-brake", KEY_C, pressed)) {
+            return hotkeys::route(Hotkey::Brake, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+        }
+        if (!down) return ListenerResult::Propagate;
 
         // Debug: 1..9 grant augments (table order), Shift+1..9 the 10th
-        // onwards, 0 fills the gauge. Never while a draft is up.
+        // onwards (Shift+1 cat, Shift+2 brake), 0 fills the gauge. Never while a draft is up.
         bool shift = data.modifiers == KeyboardModifier::Shift;
         if (data.key >= KEY_Zero && data.key <= KEY_Nine && (data.modifiers == KeyboardModifier::None || shift)
             && AugmentManager::debugMode() && !draft::isOpen()) {

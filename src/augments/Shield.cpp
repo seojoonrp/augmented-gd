@@ -24,6 +24,14 @@ public:
         if (!fromCheckpoint) m_used = 0;
     }
 
+    // A checkpoint remembers the charges left when it was placed; the
+    // respawn brings them back (the hit that killed us is undone with it).
+    void onCheckpointPlaced(LevelSession&) override { m_savedUsed = m_used; }
+    void onCheckpointRespawn(LevelSession& s) override {
+        m_used = m_savedUsed;
+        log::info("Shield: restored from checkpoint, {} left", s.levelOf(ids::Shield) - m_used);
+    }
+
     bool onHit(LevelSession& s, PlayerObject*) override {
         // Still inside the noclip window -> ignore the hit entirely.
         if (m_noclipTimer > 0.f) return true;
@@ -52,6 +60,7 @@ public:
 
 private:
     int m_used = 0;
+    int m_savedUsed = 0;
     float m_noclipTimer = 0.f;
 };
 

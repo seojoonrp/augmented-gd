@@ -18,6 +18,7 @@ std::unique_ptr<Augment> makeUnmirror();
 std::unique_ptr<Augment> makeHitboxScales();   // hazard-hitbox + wave-hitbox + nerve
 std::unique_ptr<Augment> makeDraftCount();
 std::unique_ptr<Augment> makeCat();
+std::unique_ptr<Augment> makeBrake();
 
 // Table order, so HUD rows and grant dispatch follow docs/DESIGN.md.
 std::vector<std::unique_ptr<Augment>> makeAllAugments();

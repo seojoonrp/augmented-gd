@@ -48,7 +48,7 @@ be farmed either. The rising threshold stops late-run draft floods (stuck at
 (the floor was dropped instead).
 
 **Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
-augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat), key 0 tops the gauge up to the threshold (the draft still happens
+augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat, Shift+2 = brake), key 0 tops the gauge up to the threshold (the draft still happens
 on the next death), and `debug-threshold` replaces the ramp with a fixed
 cost so one number can be tuned in the settings UI without rebuilding.
 
@@ -56,7 +56,7 @@ cost so one number can be tuned in the settings UI without rebuilding.
 
 Three random augments that are not yet maxed, shown on respawn. Picking is
 mandatory (no close button, back key ignored). Duplicate picks level the
-augment up. Pool is 10 augments, all implemented. Owning `draft-count` raises
+augment up. Pool is 11 augments, all implemented. Owning `draft-count` raises
 the card count to 4 from the next draft on; the popup then narrows the cards
 and scales their text by the same ratio so four still fit GD's 569 pt width.
 
@@ -68,9 +68,9 @@ level. The id is the "코드" column and is what the hooks key on.
 
 | id | name | max | initial | level-up | status |
 |---|---|---|---|---|---|
-| `shield` | 결계인가? | 3 | 매 어템마다 보호막이 지급됩니다. 보호막이 깨지면 1.5초간 노클립 상태로 전환됩니다. | 보호막 개수가 하나 늘어납니다. | working. Covers both players in dual. |
+| `shield` | 결계인가? | 3 | 매 어템마다 보호막이 지급됩니다. 보호막이 깨지면 1.5초간 노클립 상태로 전환됩니다. | 보호막 개수가 하나 늘어납니다. | working. Covers both players in dual. Charges left at checkpoint placement come back on the respawn (verified 2026-09-17). |
 | `slow-mo` | 나무늘보 | 3 | 게임 속도가 5% 감소합니다. X를 눌러 토글할 수 있습니다. | 게임 속도가 5% 더 감소합니다. | working. Speed = 1 − 0.05·level (95/90/85 %), game + music; toggle state persists within the run; pause menu at normal speed. |
-| `startpos` | 스타트포스 | 5 | 매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다. 해당 어템에 죽으면 체크포인트에서 부활합니다. | 체크포인트를 한 번 더 찍을 수 있습니다. | working. `level` placements per attempt (a life from 0 %); **each placed checkpoint is one respawn**, newest first; with none left the next death restarts from 0 and the budget refills. |
+| `startpos` | 스타트포스 | 5 | 매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다. 해당 어템에 죽으면 체크포인트에서 부활합니다. | 체크포인트를 한 번 더 찍을 수 있습니다. | working (v3 verified 2026-09-17). `level` placements per attempt (a life from 0 %), but **only the newest one is live**: placing again moves it; a death respawns there **once**, and the next death restarts from 0 unless a new one was placed in between (budget permitting). The older "each checkpoint is one respawn, newest first" chain was dropped as too loose (user, 2026-09-17). A checkpoint also **snapshots shield charges and brake seconds left** and the respawn restores them (`Augment::onCheckpointPlaced` / `onCheckpointRespawn`). |
 | `foresight` | 사륜안 | 1 | 히트박스를 보여줍니다. | – | working. GD colours: blue solid, red hazard, green interactive, yellow player. |
 | `unmirror` | 멀미약 | 1 | 레벨 내 모든 미러포탈을 제거합니다. | – | rewritten 2026-09-17 as a `GJBaseGameLayer::toggleFlipped` hook (refs pattern), untested: flips are refused while owned, drafting un-flips at once. |
 | `hazard-hitbox` | 위협제거 | 5 | 위험 요소(빨간 히트박스)의 크기가 5% 감소합니다. | 위험 요소의 크기가 5% 더 감소합니다. | built, in-game test pending. Hazard / AnimatedHazard hitboxes shrink around their centre to 1 − 0.05·level (95…75 %); solids, slopes, player untouched. |
@@ -78,11 +78,12 @@ level. The id is the "코드" column and is what the hooks key on.
 | `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | working (verified 2026-09-17). Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
 | `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
 | `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and fires a laser at each removed hazard; real cat art later. |
+| `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. `BRAKE EMPTY` notice when used up. Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
 behaviour in `src/augments/` (one file per augment, see `Augment.hpp`). Debug keys 1-9 grant augments in
-table order, Shift+1-9 continue from the 10th (cat).
+table order, Shift+1-9 continue from the 10th (Shift+1 cat, Shift+2 brake).
 
 ## Text & fonts (decided 2026-09-17)
 
@@ -113,7 +114,7 @@ percent font at its right end; while a gauge-earned draft waits it reads
 header (deaths, live %, best %) and then one **row per owned augment**, top
 to bottom: a framed placeholder box where the icon will go, the Korean name,
 and its English per-attempt state. GD's own progress bar gets rimmed dots:
-white at the run's best (moves with the player past it), green per placed
+white at the run's best (moves with the player past it), green at the live
 checkpoint (`ProgressMarks`). Decided with the user over four rounds on
 2026-09-17. The two hitbox lines
 show the scale *at the player's current position*, so they move as nerve ramps

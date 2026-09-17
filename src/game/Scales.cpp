@@ -8,7 +8,10 @@ using namespace geode::prelude;
 
 namespace augment::scales {
 
-void setTime(float scale) {
+namespace {
+
+void applyTime() {
+    float scale = g_timeOverride > 0.f ? g_timeOverride : g_timeBase;
     if (std::abs(g_time - scale) < 0.001f) return;
     g_time = scale;
 
@@ -18,6 +21,24 @@ void setTime(float scale) {
         master->setPitch(scale);
     }
     log::info("Game speed -> {:.2f}", scale);
+}
+
+} // namespace
+
+void setTime(float scale) {
+    g_timeBase = scale;
+    applyTime();
+}
+
+void setTimeOverride(float scale) {
+    g_timeOverride = scale;
+    applyTime();
+}
+
+void resetTime() {
+    g_timeBase = 1.f;
+    g_timeOverride = 0.f;
+    applyTime();
 }
 
 void setHazard(float scale) {
@@ -33,7 +54,7 @@ void setWave(float scale) {
 }
 
 void resetAll() {
-    setTime(1.f);
+    resetTime();
     setHazard(1.f);
     setWave(1.f);
 }

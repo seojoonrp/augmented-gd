@@ -30,8 +30,8 @@ public:
     void onPause(LevelSession&) override { scales::setTime(1.f); }
     void onQuit(LevelSession&) override { scales::setTime(1.f); }
 
-    bool onHotkey(LevelSession& s, Hotkey which) override {
-        if (which != Hotkey::SlowMo) return false;
+    bool onHotkey(LevelSession& s, Hotkey which, bool down) override {
+        if (which != Hotkey::SlowMo || !down) return false;
         auto& mgr = s.mgr();
         if (!s.runAttempt() || !mgr.has(ids::SlowMo)) {
             log::info("X ignored: runAttempt={} slowmoLv={}", s.runAttempt(), mgr.levelOf(ids::SlowMo));

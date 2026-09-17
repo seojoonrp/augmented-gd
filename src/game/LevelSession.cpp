@@ -132,6 +132,13 @@ bool LevelSession::onBeforeReset() {
 void LevelSession::onAttemptStart(bool fromCheckpoint) {
     m_deathCounted = false;
     for (auto& a : m_augments) a->onAttemptStart(*this, fromCheckpoint);
+    if (fromCheckpoint) {
+        for (auto& a : m_augments) a->onCheckpointRespawn(*this);
+    }
+}
+
+void LevelSession::onCheckpointPlaced() {
+    for (auto& a : m_augments) a->onCheckpointPlaced(*this);
 }
 
 bool LevelSession::onHit(PlayerObject* player) {
@@ -157,9 +164,9 @@ void LevelSession::onGranted(std::string const& id, int level) {
     for (auto& a : m_augments) a->onGranted(*this, id, level);
 }
 
-bool LevelSession::onHotkey(Hotkey which) {
+bool LevelSession::onHotkey(Hotkey which, bool down) {
     for (auto& a : m_augments) {
-        if (a->onHotkey(*this, which)) return true;
+        if (a->onHotkey(*this, which, down)) return true;
     }
     return false;
 }

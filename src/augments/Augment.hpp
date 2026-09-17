@@ -54,6 +54,12 @@ public:
     virtual bool onHit(LevelSession&, PlayerObject*) { return false; }
     // Player 1 really died (counted once per attempt), before GD's reset.
     virtual void onDeath(LevelSession&) {}
+    // A checkpoint was placed (startpos). Snapshot whatever per-attempt
+    // state should come back with the respawn (shield charges, brake time).
+    // Only the newest checkpoint is ever respawned at, so one slot suffices.
+    virtual void onCheckpointPlaced(LevelSession&) {}
+    // Right after onAttemptStart(fromCheckpoint = true): restore the snapshot.
+    virtual void onCheckpointRespawn(LevelSession&) {}
     // postUpdate, run levels only. dt is already time-scaled.
     virtual void onFrame(LevelSession&, float dt) {}
     // PlayLayer::pauseGame.
@@ -64,8 +70,9 @@ public:
     // level. Every augment hears every grant, so cross effects (nerve →
     // hitbox scales) need no wiring.
     virtual void onGranted(LevelSession&, std::string const& id, int level) {}
-    // A hotkey press. Return true when consumed.
-    virtual bool onHotkey(LevelSession&, Hotkey) { return false; }
+    // A hotkey press (`down`) or release. Return true when consumed; most
+    // augments act on the press only.
+    virtual bool onHotkey(LevelSession&, Hotkey, bool down) { return false; }
 
     // --- HUD ---
     // Per-attempt state text for the HUD row of `id` (English; the row's
