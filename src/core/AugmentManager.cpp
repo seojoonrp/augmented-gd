@@ -167,6 +167,19 @@ float AugmentManager::waveScale(float progress) const {
     return shrinkToScale(shrink * this->nerveBoost(progress));
 }
 
+int AugmentManager::catCount() const {
+    int lvl = this->levelOf(ids::Cat);
+    if (lvl <= 0) return 0;
+    return tune::CatBaseCount + tune::CatCountStep * (lvl - 1);
+}
+
+float AugmentManager::catInterval() const {
+    int lvl = this->levelOf(ids::Cat);
+    if (lvl <= 0) return 0.f;
+    // Keep a sane floor should maxLevel ever outgrow the step table.
+    return std::max(0.5f, tune::CatBaseInterval - tune::CatIntervalStep * (lvl - 1));
+}
+
 void AugmentManager::pauseGameForDraft() {
     if (m_directorPaused) return;
     auto director = CCDirector::get();

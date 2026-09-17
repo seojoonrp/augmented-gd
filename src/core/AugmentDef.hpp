@@ -17,6 +17,7 @@ namespace ids {
     constexpr char const* WaveHitbox   = "wave-hitbox";
     constexpr char const* Nerve        = "nerve";
     constexpr char const* DraftCount   = "draft-count";
+    constexpr char const* Cat          = "cat";
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
@@ -60,6 +61,12 @@ namespace tune {
     // Cards per draft, with and without draft-count.
     constexpr int DefaultDraftCards = 3;
     constexpr int DraftCountCards = 4;
+    // Cat at level n removes CatBaseCount + CatCountStep * (n - 1) hazards in
+    // view every CatBaseInterval - CatIntervalStep * (n - 1) seconds.
+    constexpr int CatBaseCount = 5;
+    constexpr int CatCountStep = 1;
+    constexpr float CatBaseInterval = 4.f;
+    constexpr float CatIntervalStep = 0.5f;
     // Draft gauge: a death charges by the percent reached, plus every percent
     // of new best times NewBestBonusMult. A draft costs GaugeThresholdStart
     // and each gauge-earned draft raises the next cost by GaugeThresholdStep

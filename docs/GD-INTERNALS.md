@@ -150,6 +150,36 @@ drawing. This supersedes the older "player rect is inlined, rejected" note in
   `updateOrientedBox()` to `PlayerObject` the way `HazardHitboxHook` does for
   hazards.
 
+## Removing an object at runtime (cat) — from Geode inline source + xdBot, unverified in game
+
+GD's own primitive is `GameObject::destroyObject()` (Geode inline,
+`bindings/2.2081/inline/GameObject.cpp:335`):
+`m_isDisabled = true; m_isDisabled2 = true; setOpacity(0);` — the sprite
+vanishes and the object is skipped by collision: xdBot's trajectory sim sets
+exactly those two flags on every object it wants the fake player to pass
+through around `GJBaseGameLayer::collisionCheckObjects`
+(`refs/xdbot/src/hacks/show_trajectory.cpp:322-350`). Related inlines:
+`disableObject()` = the same + `triggerActivated(0)`; `makeInvisible()` /
+`makeVisible()` toggle `m_isDisabled2` + `m_isInvisible` + opacity (so
+`m_isDisabled2` reads as "not part of the level right now").
+`GJBaseGameLayer::destroyObject(GameObject*)` (`win 0x216090`, the layer-level
+version with the break effect) is what qolmod calls on coins
+(`AutoCollectCoins.cpp:33`); untried here — could give a visual for the cat.
+
+- `GameObject::setOpacity` is virtual (`win 0x198800`), so opacity 0 is
+  expected to cover the detail/glow sprites; **(unverified)** whether the glow
+  batch sprite actually follows. `m_particle` is left alone (particles are
+  claimed from a pool via `claimParticle()`, hiding one could hit another
+  object).
+- Whether `GameObject::resetObject()` (`win 0x1906d0`) clears the flags on
+  reset is **(unverified)**; `PlayLayerHook.cpp::catRestore()` restores
+  flags + the recorded opacity itself before every `resetLevel`, and logs how
+  many were still disabled (0 there = GD reset them first, so the fallback
+  could go).
+- Oddity: inline `updateUnmodifiedPositions()` (`GameObject.cpp:192`) clears
+  `m_isDisabled` — either a misnamed field or an editor-only path; the cat
+  sets both flags like GD does, so one surviving is enough.
+
 ## Mirror portals
 
 `GameObjectType::InverseMirrorPortal (14)` / `NormalMirrorPortal (15)`.

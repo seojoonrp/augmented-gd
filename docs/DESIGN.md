@@ -48,7 +48,7 @@ be farmed either. The rising threshold stops late-run draft floods (stuck at
 (the floor was dropped instead).
 
 **Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
-augments, key 0 tops the gauge up to the threshold (the draft still happens
+augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat), key 0 tops the gauge up to the threshold (the draft still happens
 on the next death), and `debug-threshold` replaces the ramp with a fixed
 cost so one number can be tuned in the settings UI without rebuilding.
 
@@ -56,7 +56,7 @@ cost so one number can be tuned in the settings UI without rebuilding.
 
 Three random augments that are not yet maxed, shown on respawn. Picking is
 mandatory (no close button, back key ignored). Duplicate picks level the
-augment up. Pool is 9 augments, all implemented. Owning `draft-count` raises
+augment up. Pool is 10 augments, all implemented. Owning `draft-count` raises
 the card count to 4 from the next draft on; the popup then narrows the cards
 and scales their text by the same ratio so four still fit GD's 569 pt width.
 
@@ -77,11 +77,12 @@ level. The id is the "코드" column and is what the hooks key on.
 | `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
 | `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | working (verified 2026-09-17). Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
 | `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
+| `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. Cat UI/art comes later. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
 behaviour in `src/hooks/PlayLayerHook.cpp`. Debug keys 1-9 grant augments in
-table order.
+table order, Shift+1-9 continue from the 10th (cat).
 
 ## Text & fonts (decided 2026-09-17)
 

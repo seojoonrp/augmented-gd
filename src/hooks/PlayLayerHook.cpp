@@ -16,6 +16,9 @@
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/utils/Keyboard.hpp>
 
+#include <algorithm>
+#include <random>
+
 using namespace geode::prelude;
 using namespace augment;
 
@@ -97,10 +100,18 @@ class $modify(AugPlayLayer, PlayLayer) {
         unsigned lastHotkeyFrame[HotkeyCount] = { ~0u, ~0u };
         bool lastHotkeyHandled[HotkeyCount] = { false, false };
 
-        // Foresight: our own draw node + objects sorted by x for cheap
-        // "what's near the player" queries.
+        // Foresight: our own draw node. objectsByX = non-decoration objects
+        // sorted by x for cheap "what's near the player" queries (built on
+        // first use, shared with cat).
         cocos2d::CCDrawNode* hitboxNode = nullptr;
         std::vector<GameObject*> objectsByX;
+
+        // Cat: seconds since the last sweep, and what this attempt's sweeps
+        // removed (restored by hand on reset, so GD's own reset semantics
+        // don't matter). A removed object keeps the opacity it had.
+        float catTimer = 0.f;
+        struct CatRemoval { Ref<GameObject> obj; unsigned char opacity; };
+        std::vector<CatRemoval> catRemoved;
 
         // hazard-hitbox: the hazard scale every object currently in the level carries
         // (radii are multiplied in place, so a change is applied as a ratio).
@@ -321,6 +332,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         f->deathCounted = false;
         f->noclipTimer = 0.f;
         f->lastRespawn = nullptr;
+        this->catRestore();
 
         if (fromCheckpoint) {
             Ref<CheckpointObject> target = f->checkpoints.back();
@@ -459,10 +471,124 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
 
         if (mgr.has(ids::Foresight)) this->drawHitboxes();
+        if (mgr.has(ids::Cat)) this->catTick(dt);
 
         this->updateHitboxScales();
         this->applyTimeScale();
         this->refreshHud();
+    }
+
+    // Non-decoration objects sorted by x, built once per level.
+    std::vector<GameObject*>& objectsByX() {
+        auto f = m_fields.self();
+        if (f->objectsByX.empty() && m_objects) {
+            for (auto obj : CCArrayExt<GameObject*>(m_objects)) {
+                if (obj->m_objectType == GameObjectType::Decoration || obj->m_isDecoration) continue;
+                f->objectsByX.push_back(obj);
+            }
+            std::sort(f->objectsByX.begin(), f->objectsByX.end(), [](GameObject* a, GameObject* b) {
+                return a->getPositionX() < b->getPositionX();
+            });
+            log::info("Tracking {} non-decoration objects by x", f->objectsByX.size());
+        }
+        return f->objectsByX;
+    }
+
+    // ---------------------------------------------------------------- cat
+
+    // Every catInterval() seconds of play, remove catCount() random hazards
+    // that are on screen and ahead of the player. Removal is GD's own
+    // GameObject::destroyObject() (m_isDisabled + m_isDisabled2 + opacity 0,
+    // Geode inline source): collisionCheckObjects skips objects with either
+    // flag set (xdBot's trajectory sim relies on that), and opacity 0 takes
+    // the sprite with it. Undone in catRestore() on every reset.
+    void catTick(float dt) {
+        auto f = m_fields.self();
+        if (!this->isRunAttempt() || m_isPaused || !m_player1 || m_player1->m_isDead) return;
+
+        float interval = AugmentManager::get().catInterval();
+        if (interval <= 0.f) return;
+        f->catTimer += dt;
+        if (f->catTimer < interval) return;
+        f->catTimer = 0.f;
+        this->catSweep();
+    }
+
+    void catSweep() {
+        auto f = m_fields.self();
+        auto& mgr = AugmentManager::get();
+        int want = mgr.catCount();
+        if (want <= 0 || !m_objectLayer || !m_player1) return;
+
+        // "In view" = the object's screen position is inside the window (plus
+        // a margin), computed through the real node transform so camera zoom,
+        // offset and rotation all count. "Ahead" = further along in the
+        // object layer's x than the player (behind them in platformer mode
+        // when they are heading left).
+        constexpr float kMargin = 30.f;
+        auto win = CCDirector::get()->getWinSize();
+        CCRect screen{ -kMargin, -kMargin, win.width + 2 * kMargin, win.height + 2 * kMargin };
+        float px = m_player1->getPositionX();
+        bool aheadIsLeft = m_player1->m_isGoingLeft;
+
+        // Bound the scan by the screen's extent in object-layer x, whatever
+        // the camera does.
+        float lo = px, hi = px;
+        for (auto corner : { CCPoint{ screen.getMinX(), screen.getMinY() }, CCPoint{ screen.getMaxX(), screen.getMinY() },
+                             CCPoint{ screen.getMinX(), screen.getMaxY() }, CCPoint{ screen.getMaxX(), screen.getMaxY() } }) {
+            float x = m_objectLayer->convertToNodeSpace(corner).x;
+            lo = std::min(lo, x);
+            hi = std::max(hi, x);
+        }
+        if (aheadIsLeft) hi = px; else lo = px;
+
+        std::vector<GameObject*> candidates;
+        auto& objs = this->objectsByX();
+        auto it = std::lower_bound(objs.begin(), objs.end(), lo, [](GameObject* o, float x) {
+            return o->getPositionX() < x;
+        });
+        for (; it != objs.end() && (*it)->getPositionX() <= hi; ++it) {
+            auto obj = *it;
+            if (!hazard::isTarget(obj) || obj == m_anticheatSpike) continue;
+            if (obj->m_isDisabled || obj->m_isDisabled2) continue;
+            CCNode* parent = obj->getParent() ? obj->getParent() : m_objectLayer;
+            CCPoint onScreen = parent->convertToWorldSpace({ obj->getPositionX(), obj->getPositionY() });
+            if (!screen.containsPoint(onScreen)) continue;
+            candidates.push_back(obj);
+        }
+
+        static std::mt19937 rng{ std::random_device{}() };
+        std::shuffle(candidates.begin(), candidates.end(), rng);
+        int removed = 0;
+        for (auto obj : candidates) {
+            if (removed >= want) break;
+            f->catRemoved.push_back({ obj, obj->getOpacity() });
+            obj->destroyObject();
+            removed++;
+        }
+        log::info(
+            "Cat: removed {}/{} of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f}, {} removed this attempt)",
+            removed, want, candidates.size(), this->getCurrentPercent(), lo, hi, f->catRemoved.size()
+        );
+        if (removed > 0 && f->hud) f->hud->notice(fmt::format("CAT  -{}", removed), { 255, 180, 230 });
+    }
+
+    // Put back everything the cat took this attempt. Runs before GD's own
+    // reset so any per-object reset GD does still gets the last word.
+    void catRestore() {
+        auto f = m_fields.self();
+        f->catTimer = 0.f;
+        if (f->catRemoved.empty()) return;
+        int stillDisabled = 0;
+        for (auto& r : f->catRemoved) {
+            if (!r.obj) continue;
+            if (r.obj->m_isDisabled || r.obj->m_isDisabled2) stillDisabled++;
+            r.obj->m_isDisabled = false;
+            r.obj->m_isDisabled2 = false;
+            r.obj->setOpacity(r.opacity);
+        }
+        log::info("Cat: restored {} hazards ({} were still disabled)", f->catRemoved.size(), stillDisabled);
+        f->catRemoved.clear();
     }
 
     // Foresight. GD's own hitbox drawing is gated by an inlined
@@ -476,15 +602,6 @@ class $modify(AugPlayLayer, PlayLayer) {
             f->hitboxNode = CCDrawNode::create();
             f->hitboxNode->setID("foresight-hitboxes"_spr);
             m_objectLayer->addChild(f->hitboxNode, 1000);
-
-            for (auto obj : CCArrayExt<GameObject*>(m_objects)) {
-                if (obj->m_objectType == GameObjectType::Decoration || obj->m_isDecoration) continue;
-                f->objectsByX.push_back(obj);
-            }
-            std::sort(f->objectsByX.begin(), f->objectsByX.end(), [](GameObject* a, GameObject* b) {
-                return a->getPositionX() < b->getPositionX();
-            });
-            log::info("Foresight: tracking {} objects", f->objectsByX.size());
         }
 
         auto node = f->hitboxNode;
@@ -527,13 +644,16 @@ class $modify(AugPlayLayer, PlayLayer) {
         // Objects within roughly one screen ahead / a bit behind the player.
         float px = m_player1->getPositionX();
         float const lo = px - 240.f, hi = px + 720.f;
-        auto& objs = f->objectsByX;
+        auto& objs = this->objectsByX();
         auto it = std::lower_bound(objs.begin(), objs.end(), lo, [](GameObject* o, float x) {
             return o->getPositionX() < x;
         });
         for (; it != objs.end() && (*it)->getPositionX() <= hi; ++it) {
             auto obj = *it;
             if (!obj->isVisible() || obj->m_isHide) continue;
+            // Disabled = removed by the cat (or toggled off by the level); GD
+            // skips these in collision, so no box.
+            if (obj->m_isDisabled || obj->m_isDisabled2) continue;
             if (auto color = colorFor(obj->m_objectType)) drawObject(obj, *color);
         }
 
@@ -750,6 +870,13 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (mgr.has(ids::DraftCount)) {
             lines.push_back(fmt::format("{}: {} cards", augmentName(ids::DraftCount), mgr.draftCardCount()));
         }
+        if (int lvl = mgr.levelOf(ids::Cat)) {
+            lines.push_back(fmt::format(
+                "{} Lv{}: {} per {:.1f}s, next in {:.1f}s, removed {}",
+                augmentName(ids::Cat), lvl, mgr.catCount(), mgr.catInterval(),
+                std::max(0.f, mgr.catInterval() - f->catTimer), f->catRemoved.size()
+            ));
+        }
 
         f->hud->setLines(lines);
     }
@@ -865,15 +992,20 @@ $on_mod(Loaded) {
         if (keybindMatches("keybind-slowmo", KEY_X, pressed)) return routeHotkey(Hotkey::SlowMo, "raw");
         if (keybindMatches("keybind-checkpoint", KEY_Z, pressed)) return routeHotkey(Hotkey::Checkpoint, "raw");
 
-        // Debug: 1..9 grant augments (table order), 0 fills the gauge. Never
-        // while a draft is up.
-        if (data.key >= KEY_Zero && data.key <= KEY_Nine && data.modifiers == KeyboardModifier::None
+        // Debug: 1..9 grant augments (table order), Shift+1..9 the 10th
+        // onwards, 0 fills the gauge. Never while a draft is up.
+        bool shift = data.modifiers == KeyboardModifier::Shift;
+        if (data.key >= KEY_Zero && data.key <= KEY_Nine && (data.modifiers == KeyboardModifier::None || shift)
             && AugmentManager::debugMode()
             && !AugmentManager::get().isGamePausedForDraft()) {
             if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
-                bool handled = data.key == KEY_Zero
-                    ? pl->debugFillGauge()
-                    : pl->debugGrantAugment(data.key - KEY_One);
+                bool handled = false;
+                if (data.key == KEY_Zero) {
+                    if (!shift) handled = pl->debugFillGauge();
+                }
+                else {
+                    handled = pl->debugGrantAugment(data.key - KEY_One + (shift ? 9 : 0));
+                }
                 if (handled) return ListenerResult::Stop;
             }
         }

@@ -76,6 +76,9 @@ public:
     float hazardScale(float progress) const;
     // Applies while the player is in wave mode only; the hook checks that.
     float waveScale(float progress) const;
+    // --- cat: hazards removed per sweep and seconds between sweeps (0 when unowned) ---
+    int catCount() const;
+    float catInterval() const;
 
     // --- gameplay pause used while the draft popup is up ---
     // Pauses CCDirector without dropping the frame rate to 4 fps.
