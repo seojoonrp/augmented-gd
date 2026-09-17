@@ -223,9 +223,66 @@ IDs: `scripts\nodeids.ps1 LevelInfoLayer`. PauseLayer: hook `customSetup`, menu
 
 ## In-level HUD — verified 2026-09-16 (`src/ui/RunHud.*`)
 
-Ours is a node on the PlayLayer. qolmod attaches its labels to `m_uiLayer`
-(`refs/qolmod/src/Labels/Hooks.cpp:9`), which is the screen-space layer GD
-itself uses for the pause button — use that if the HUD ever drifts with the camera.
+Ours is a node added to `m_uiLayer` (qolmod does the same for its labels,
+`refs/qolmod/src/Labels/Hooks.cpp:9`): screen space, never drifts with the
+camera. `CCLayerColor::create(color, w, h)` is the cheapest filled rect
+(positions by its bottom-left; layers ignore the anchor point); resize with
+`setContentSize`. Pool labels/rows and compare strings before `setString`
+when refreshing every frame.
+
+## Decorate GD's progress bar — verified in game 2026-09-17 (`src/ui/ProgressMarks.*`, `PlayLayerHook.cpp` `attachToProgressBar`)
+
+`m_progressBar` does not exist yet when `PlayLayer::init` returns on online
+levels; hook `setupHasCompleted` too and attach once (`GD-INTERNALS.md`
+"Progress bar" has the geometry).
+
+```cpp
+void attachToProgressBar(char const* where) {
+    auto f = m_fields.self();
+    if (!f->hud || f->marks) return;          // once
+    if (!m_progressBar) { log::info("ProgressBar not there yet at {}", where); return; }
+    f->hud->attachGauge(m_progressBar, m_progressFill, m_percentageLabel);
+    f->marks = ProgressMarks::create(m_progressBar, m_progressFill);   // bar->addChild(this, 10)
+}
+bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+    if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
+    // ...
+    this->attachToProgressBar("init");        // works for local levels
+    return true;
+}
+void setupHasCompleted() {
+    PlayLayer::setupHasCompleted();           // online levels: bar is created in here
+    if (this->isRunLevel()) this->attachToProgressBar("setupHasCompleted");
+}
+```
+
+Track geometry from the fill, never from constants:
+```cpp
+bool fillIsChild = fill && fill->getParent() == bar;
+float inset = fillIsChild ? fill->getPositionX() : 2.f;
+float fillH = fillIsChild ? fill->getContentSize().height : 8.f;
+float fillBottom = fillIsChild ? fill->getPositionY() - fill->getAnchorPoint().y * fillH : (bar.height - fillH) / 2;
+float x = inset + (bar.width - 2 * inset) * percent / 100.f;
+```
+
+## Twin of a GD node (same look, mirrored position) — verified in game 2026-09-17 (`src/ui/RunHud.cpp` `attachGauge`)
+
+Copy the frame and transform instead of loading a texture by name (the
+standalone `GJ_progressBar_001.png` file is not the in-level bar):
+
+```cpp
+auto twin = CCSprite::createWithSpriteFrame(bar->displayFrame());
+twin->setScaleX(bar->getScaleX()); twin->setScaleY(bar->getScaleY());
+twin->setAnchorPoint(bar->getAnchorPoint()); twin->setColor(bar->getColor());
+twin->setPosition(CCPoint(bar->getPositionX(), winSize.height - bar->getPositionY()));  // bottom edge
+// CCPoint(...) not { ... }: `pos = { x, y }` is ambiguous with Geode's cocos headers.
+auto label = CCLabelBMFont::create("", percentLabel->getFntFile());   // GD's percent font
+label->setScale(percentLabel->getScale());
+```
+
+A per-frame eased value lives in an `update(float)` override after
+`scheduleUpdate()` — it runs on the scheduler, so it freezes with the
+director during drafts and slows with slow-mo, which is fine for a HUD.
 
 ## Korean text / custom font — verified in game 2026-09-17 (`src/ui/Fonts.hpp`, `mod.json`, `scripts/fontcharset.ps1`, `scripts/fontgen.py`)
 

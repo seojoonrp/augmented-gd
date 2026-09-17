@@ -382,6 +382,31 @@ frame (the animation interval is restored to the real one), so a node can
 animate itself from an overridden `visit()` with `std::chrono::steady_clock`
 (`AugmentDraftPopup::stepReveal`).
 
+## Progress bar — verified in game 2026-09-17
+
+`PlayLayer::m_progressBar` (and `m_progressFill`) are **null after
+`PlayLayer::init` for online levels**: `init` gets `dontCreateObjects = true`
+and GD builds the bar, percent label and the other top nodes in
+`PlayLayer::setupHasCompleted()` (`win 0x3a66d0`), once loading finishes.
+node-ids handles it the same way (`refs/node-ids/src/PlayLayer.cpp:69-110`).
+Anything that decorates the bar must attach from a `setupHasCompleted` hook
+(ours: `AugPlayLayer::attachToProgressBar`). Also: the standalone file
+`GJ_progressBar_001.png` is 340x20 solid white, not what the in-level bar
+looks like, so a twin bar copies `m_progressBar->displayFrame()` + scale.
+
+Measured on this machine (log 2026-09-17, 569x320 window, default settings):
+- `m_progressBar`: child of PlayLayer (screen space, same coordinates as
+  `m_uiLayer` children), 210x16, scale 1, anchor (0.5, 0.5), at (284.5, 312).
+  Its only child is `m_progressFill`: `CCSprite`, z -1, anchor (0, 0), at
+  (2, 4), height 8, width = progress (0.02 at 0 %), colour (210, 255, 50).
+  So the track is x in [2, 208], y in [4, 12] in bar units.
+- `m_percentageLabel`: `CCLabelBMFont` child of PlayLayer, right of the bar;
+  `getFntFile()` (Geode inline) gives its font for a twin label.
+- A mirrored copy at `y = winHeight - y` lands at the bottom edge with the
+  same margin (what the draft gauge does).
+- `CCLayerColor` children inside a `CCSprite` and a `CCDrawNode` with
+  `drawDot` both render fine there **(dots unverified in game yet)**.
+
 ## Misc
 
 - Node IDs on `LevelInfoLayer` (node-ids): `left-side-menu`, `right-side-menu`, `back-menu`.

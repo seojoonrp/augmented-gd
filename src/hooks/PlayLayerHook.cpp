@@ -6,7 +6,9 @@
 
 #include "../core/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
+#include "../ui/CatNode.hpp"
 #include "../ui/RunHud.hpp"
+#include "../ui/ProgressMarks.hpp"
 #include "HazardHitboxHook.hpp"
 #include "PlayerHitboxHook.hpp"
 
@@ -88,12 +90,17 @@ class $modify(AugPlayLayer, PlayLayer) {
         // first; GD's m_checkpointArray is kept in step with it at reset time.
         int checkpointsPlaced = 0;
         std::vector<Ref<CheckpointObject>> checkpoints;
+        // Percent at which each entry of `checkpoints` was placed (same
+        // order); only feeds the progress-bar ticks.
+        std::vector<float> checkpointPercents;
         bool respawnPending = false;
         // The checkpoint used by the last respawn. GD may still point at it
         // this attempt, so it stays alive until the next reset.
         Ref<CheckpointObject> lastRespawn;
 
         RunHud* hud = nullptr;
+        // Best / checkpoint marks on GD's progress bar (child of the bar).
+        Ref<ProgressMarks> marks;
 
         // One physical press can reach onHotkey through two input paths in
         // the same frame; the second one is dropped.
@@ -112,6 +119,8 @@ class $modify(AugPlayLayer, PlayLayer) {
         float catTimer = 0.f;
         struct CatRemoval { Ref<GameObject> obj; unsigned char opacity; };
         std::vector<CatRemoval> catRemoved;
+        // The on-screen cat (square + lasers), created once the cat is owned.
+        CatNode* cat = nullptr;
 
         // hazard-hitbox: the hazard scale every object currently in the level carries
         // (radii are multiplied in place, so a change is applied as a ratio).
@@ -120,6 +129,26 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     bool isRunLevel() {
         return m_level && AugmentManager::get().isRunFor(m_level->m_levelID.value());
+    }
+
+    // GD creates m_progressBar in setupHasCompleted for online levels (init
+    // passes dontCreateObjects), so this runs from both and does its work
+    // the first time the bar exists.
+    void attachToProgressBar(char const* where) {
+        auto f = m_fields.self();
+        if (!f->hud || f->marks) return;
+        if (!m_progressBar) {
+            log::info("ProgressBar not there yet at {}", where);
+            return;
+        }
+        f->hud->attachGauge(m_progressBar, m_progressFill, m_percentageLabel);
+        f->marks = ProgressMarks::create(m_progressBar, m_progressFill);
+        log::info("Attached gauge + marks to the progress bar at {}", where);
+    }
+
+    void setupHasCompleted() {
+        PlayLayer::setupHasCompleted();
+        if (this->isRunLevel()) this->attachToProgressBar("setupHasCompleted");
     }
 
     // wave-hitbox only bites while a player is in wave mode; in dual either
@@ -153,6 +182,7 @@ class $modify(AugPlayLayer, PlayLayer) {
             m_fields->hud = RunHud::create();
             CCNode* parent = m_uiLayer ? static_cast<CCNode*>(m_uiLayer) : this;
             parent->addChild(m_fields->hud, 1000);
+            this->attachToProgressBar("init");
             this->refreshHud();
         }
 
@@ -337,6 +367,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (fromCheckpoint) {
             Ref<CheckpointObject> target = f->checkpoints.back();
             f->checkpoints.pop_back();
+            if (!f->checkpointPercents.empty()) f->checkpointPercents.pop_back();
 
             // Borrow the practice-mode respawn path for exactly this reset.
             // GD respawns at m_currentCheckpoint / the last array entry, so
@@ -360,6 +391,7 @@ class $modify(AugPlayLayer, PlayLayer) {
             f->shieldsUsed = 0;
             f->checkpointsPlaced = 0;
             f->checkpoints.clear();
+            f->checkpointPercents.clear();
             // Same as qolmod's StartposSwitcher: a null current checkpoint
             // makes GD start from the start position.
             m_currentCheckpoint = nullptr;
@@ -504,6 +536,11 @@ class $modify(AugPlayLayer, PlayLayer) {
     // the sprite with it. Undone in catRestore() on every reset.
     void catTick(float dt) {
         auto f = m_fields.self();
+        if (!f->cat && m_uiLayer) {
+            f->cat = CatNode::create();
+            m_uiLayer->addChild(f->cat, 999);
+            log::info("Cat: node added to the UI layer");
+        }
         if (!this->isRunAttempt() || m_isPaused || !m_player1 || m_player1->m_isDead) return;
 
         float interval = AugmentManager::get().catInterval();
@@ -560,12 +597,15 @@ class $modify(AugPlayLayer, PlayLayer) {
         static std::mt19937 rng{ std::random_device{}() };
         std::shuffle(candidates.begin(), candidates.end(), rng);
         int removed = 0;
+        std::vector<GameObject*> hit;
         for (auto obj : candidates) {
             if (removed >= want) break;
             f->catRemoved.push_back({ obj, obj->getOpacity() });
+            hit.push_back(obj);
             obj->destroyObject();
             removed++;
         }
+        if (f->cat) f->cat->fireAt(hit);
         log::info(
             "Cat: removed {}/{} of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f}, {} removed this attempt)",
             removed, want, candidates.size(), this->getCurrentPercent(), lo, hi, f->catRemoved.size()
@@ -748,6 +788,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (cp) {
             f->checkpointsPlaced++;
             f->checkpoints.push_back(cp);
+            f->checkpointPercents.push_back(this->getCurrentPercent());
             log::info(
                 "Checkpoint placed ({}/{}), {} ready, GD array {}",
                 f->checkpointsPlaced, lvl, f->checkpoints.size(), this->gdCheckpointCount()
@@ -815,70 +856,71 @@ class $modify(AugPlayLayer, PlayLayer) {
         if (!f->hud) return;
         auto& mgr = AugmentManager::get();
 
-        std::vector<std::string> lines;
         float now = this->getCurrentPercent();
-        lines.push_back(fmt::format(
-            "DRAFT {:.0f}/{:.0f}   deaths {}   now {:.1f}%   best {:.1f}%",
-            mgr.gauge(), mgr.gaugeThreshold(), mgr.deaths(), now, std::max(now, mgr.bestPercent())
-        ));
+        float best = std::max(now, mgr.bestPercent());
+        // A gauge-earned draft that is still waiting shows as a full bar; the
+        // free opening draft does not (the gauge really is at 0 then).
+        float threshold = mgr.gaugeThreshold();
+        f->hud->setGauge(mgr.pendingGaugeDrafts() > 0 ? threshold : mgr.gauge(), threshold);
+        f->hud->setHeader(fmt::format("deaths {}   now {:.1f}%   best {:.1f}%", mgr.deaths(), now, best));
+        if (f->marks) {
+            f->marks->setBest(best);
+            f->marks->setCheckpoints(f->checkpointPercents);
+        }
 
         // Augment names are the Korean display names; the rest stays English
         // (the HUD is a debug readout).
+        std::vector<RunHud::Slot> slots;
+        auto slot = [&](char const* id, std::string state) {
+            slots.push_back({ augmentName(id), std::move(state) });
+        };
         if (int lvl = mgr.levelOf(ids::Shield)) {
             if (f->noclipTimer > 0.f) {
-                lines.push_back(fmt::format("{} Lv{}: NOCLIP {:.1f}s", augmentName(ids::Shield), lvl, f->noclipTimer));
+                slot(ids::Shield, fmt::format("Lv{}  NOCLIP {:.1f}s", lvl, f->noclipTimer));
             }
             else {
-                lines.push_back(fmt::format("{} Lv{}: {}/{}", augmentName(ids::Shield), lvl, lvl - f->shieldsUsed, lvl));
+                slot(ids::Shield, fmt::format("Lv{}  {}/{}", lvl, lvl - f->shieldsUsed, lvl));
             }
         }
         if (int lvl = mgr.levelOf(ids::SlowMo)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: {} ({:.0f}%)  [X]",
-                augmentName(ids::SlowMo), lvl, mgr.slowMoEnabled() ? "ON" : "OFF", mgr.slowMoScale() * 100.f
+            slot(ids::SlowMo, fmt::format(
+                "Lv{}  {} ({:.0f}%)  [X]", lvl, mgr.slowMoEnabled() ? "ON" : "OFF", mgr.slowMoScale() * 100.f
             ));
         }
         if (int lvl = mgr.levelOf(ids::StartPos)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: {}/{} placed, {} ready  [Z]",
-                augmentName(ids::StartPos), lvl, f->checkpointsPlaced, lvl, f->checkpoints.size()
+            slot(ids::StartPos, fmt::format(
+                "Lv{}  {}/{} placed, {} ready  [Z]", lvl, f->checkpointsPlaced, lvl, f->checkpoints.size()
             ));
         }
-        if (mgr.has(ids::Foresight)) lines.push_back(augmentName(ids::Foresight));
-        if (mgr.has(ids::Unmirror)) lines.push_back(augmentName(ids::Unmirror));
+        if (mgr.has(ids::Foresight)) slot(ids::Foresight, "");
+        if (mgr.has(ids::Unmirror)) slot(ids::Unmirror, "");
         // Both hitbox shrinks are read at the player's current position,
         // because nerve grows them as the level goes on.
         float progress = now / 100.f;
         if (int lvl = mgr.levelOf(ids::HazardHitbox)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: hazards {:.0f}%",
-                augmentName(ids::HazardHitbox), lvl, mgr.hazardScale(progress) * 100.f
-            ));
+            slot(ids::HazardHitbox, fmt::format("Lv{}  hazards {:.0f}%", lvl, mgr.hazardScale(progress) * 100.f));
         }
         if (int lvl = mgr.levelOf(ids::WaveHitbox)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: player {:.0f}% in wave{}",
-                augmentName(ids::WaveHitbox), lvl, mgr.waveScale(progress) * 100.f,
+            slot(ids::WaveHitbox, fmt::format(
+                "Lv{}  player {:.0f}% in wave{}", lvl, mgr.waveScale(progress) * 100.f,
                 this->playerInWave() ? "  ACTIVE" : ""
             ));
         }
         if (int lvl = mgr.levelOf(ids::Nerve)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: shrink x{:.2f}", augmentName(ids::Nerve), lvl, mgr.nerveBoost(progress)
-            ));
+            slot(ids::Nerve, fmt::format("Lv{}  shrink x{:.2f}", lvl, mgr.nerveBoost(progress)));
         }
         if (mgr.has(ids::DraftCount)) {
-            lines.push_back(fmt::format("{}: {} cards", augmentName(ids::DraftCount), mgr.draftCardCount()));
+            slot(ids::DraftCount, fmt::format("{} cards", mgr.draftCardCount()));
         }
         if (int lvl = mgr.levelOf(ids::Cat)) {
-            lines.push_back(fmt::format(
-                "{} Lv{}: {} per {:.1f}s, next in {:.1f}s, removed {}",
-                augmentName(ids::Cat), lvl, mgr.catCount(), mgr.catInterval(),
+            slot(ids::Cat, fmt::format(
+                "Lv{}  {} per {:.1f}s, next in {:.1f}s, removed {}",
+                lvl, mgr.catCount(), mgr.catInterval(),
                 std::max(0.f, mgr.catInterval() - f->catTimer), f->catRemoved.size()
             ));
         }
 
-        f->hud->setLines(lines);
+        f->hud->setSlots(slots);
     }
 
     // ---------------------------------------------------------------- draft

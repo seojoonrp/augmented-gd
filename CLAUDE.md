@@ -93,7 +93,12 @@ src/ui/AugmentDraftPopup.*   geode::Popup, bg hidden, GD-button-style cards (140
                              description fit-to-slot / footer pips), no close, mandatory pick; whole card
                              scaled when draft-count makes it 4; fan-out reveal driven from visit()
                              (director is paused -> cocos actions don't run)
-src/ui/RunHud.*              top-left text lines + centre notice (mod fonts)
+src/ui/RunHud.*              draft gauge = GD's progress bar mirrored to the bottom edge (attached from
+                             setupHasCompleted, see GD-INTERNALS) + left augment rows (icon box placeholder,
+                             name, state) + centre notice (mod fonts)
+src/ui/ProgressMarks.*       best / checkpoint dots drawn on GD's progress bar (child of it)
+src/ui/CatNode.*             cat placeholder square bottom-right of m_uiLayer + per-frame lasers to the
+                             hazards it just removed (screen space, fade 0.45 s)
 src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
 src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              checkpoint, slow-mo (CCScheduler hook + FMOD pitch),

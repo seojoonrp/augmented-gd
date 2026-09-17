@@ -77,7 +77,7 @@ level. The id is the "코드" column and is what the hooks key on.
 | `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
 | `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | working (verified 2026-09-17). Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
 | `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
-| `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. Cat UI/art comes later. |
+| `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and fires a laser at each removed hazard; real cat art later. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
@@ -103,10 +103,19 @@ footer with `NEW` / `Lv a → b` on the left and level pips (gold ★ reached,
 grey ☆ remaining) on the right. Cards fan out from the centre when the draft
 opens and can't be picked until they land.
 
-## HUD
+## HUD (v2, 2026-09-17)
 
-Top-left: gauge, deaths, live %, best %, then one line per owned augment
-(Korean name, English state) with its per-attempt state. The two hitbox lines
+Kept small so it stays out of the way. The **draft gauge** is a twin of
+GD's progress bar mirrored to the bottom edge (same sprite and scale, fill
+in the draft cards' green, eased) with `charge/cost` (e.g. `23/40`) in GD's
+percent font at its right end; while a gauge-earned draft waits it reads
+`40/40` — the free opening draft does not fill it. At the far left, a grey
+header (deaths, live %, best %) and then one **row per owned augment**, top
+to bottom: a framed placeholder box where the icon will go, the Korean name,
+and its English per-attempt state. GD's own progress bar gets rimmed dots:
+white at the run's best (moves with the player past it), green per placed
+checkpoint (`ProgressMarks`). Decided with the user over four rounds on
+2026-09-17. The two hitbox lines
 show the scale *at the player's current position*, so they move as nerve ramps
 up; 웨이브브레이커 adds `ACTIVE` while a player is in wave. Centre notices for events (SHIELD BROKEN, CHECKPOINT
 PLACED, SLOW-MO ON/OFF…).

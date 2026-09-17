@@ -34,7 +34,13 @@ public:
     // once; the popup chains them, taking one per clearPendingDraft().
     int pendingDrafts() const { return m_pendingDrafts; }
     bool hasPendingDraft() const { return m_pendingDrafts > 0; }
-    void clearPendingDraft() { if (m_pendingDrafts > 0) m_pendingDrafts--; }
+    void clearPendingDraft() {
+        if (m_pendingDrafts > 0) m_pendingDrafts--;
+        if (m_pendingGaugeDrafts > m_pendingDrafts) m_pendingGaugeDrafts = m_pendingDrafts;
+    }
+    // Pending drafts the gauge paid for (the free opening draft is not one).
+    // While any is waiting the HUD shows the gauge as full.
+    int pendingGaugeDrafts() const { return m_pendingGaugeDrafts; }
     float gauge() const { return m_gauge; }
     // Cost of the next draft: rises with every draft the gauge has paid for,
     // or the fixed `debug-threshold` setting in debug mode.
@@ -104,6 +110,7 @@ private:
     float m_bestPercent = 0.f;
     float m_gauge = 0.f;
     int m_pendingDrafts = 0;
+    int m_pendingGaugeDrafts = 0;
 
     std::map<std::string, int> m_levels;
     bool m_slowMoEnabled = true;

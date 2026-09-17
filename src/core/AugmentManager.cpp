@@ -30,6 +30,7 @@ void AugmentManager::startRun(GJGameLevel* level) {
     // Every run opens with a free draft; PlayLayer::startGame shows it. Not
     // gauge-earned, so it leaves the threshold ramp alone.
     m_pendingDrafts = 1;
+    m_pendingGaugeDrafts = 0;
     m_levels.clear();
     m_slowMoEnabled = true;
 
@@ -54,6 +55,7 @@ void AugmentManager::endRun() {
     );
     m_active = false;
     m_pendingDrafts = 0;
+    m_pendingGaugeDrafts = 0;
 }
 
 bool AugmentManager::debugMode() {
@@ -89,6 +91,7 @@ float AugmentManager::onDeath(float percent) {
         m_gauge -= this->gaugeThreshold();
         m_gaugeDrafts++;
         m_pendingDrafts++;
+        m_pendingGaugeDrafts++;
         earned++;
     }
     log::info(
