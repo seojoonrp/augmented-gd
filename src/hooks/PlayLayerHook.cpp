@@ -1,12 +1,14 @@
 // PlayLayer integration: death counting / draft popup, and the per-attempt
-// mechanics of every augment (shield, slow-mo, startpos, foresight, unmirror,
-// hazard-hitbox — whose GameObject hooks live in HazardHitboxHook.cpp).
-// wave-hitbox, nerve and draft-count are stubs: drafted and recorded, no effect.
+// mechanics of every augment. The two hitbox augments keep their GameObject
+// hooks elsewhere — hazard-hitbox in HazardHitboxHook.cpp, wave-hitbox in
+// PlayerHitboxHook.cpp — and this file owns the scales they read, because
+// nerve makes both depend on how far into the level the player is.
 
 #include "../core/AugmentManager.hpp"
 #include "../ui/AugmentDraftPopup.hpp"
 #include "../ui/RunHud.hpp"
 #include "HazardHitboxHook.hpp"
+#include "PlayerHitboxHook.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -35,6 +37,11 @@ void setGameSpeed(float scale) {
     }
     log::info("Game speed -> {:.2f}", scale);
 }
+
+// nerve moves the hazard scale continuously, but re-applying it walks every
+// object in the level, so the per-frame update only does that once the scale
+// has drifted this far from what the objects currently carry.
+constexpr float kHazardReapplyStep = 0.01f;
 
 enum class Hotkey { SlowMo = 0, Checkpoint = 1 };
 constexpr int HotkeyCount = 2;
@@ -105,6 +112,12 @@ class $modify(AugPlayLayer, PlayLayer) {
         return m_level && AugmentManager::get().isRunFor(m_level->m_levelID.value());
     }
 
+    // wave-hitbox only bites while a player is in wave mode; in dual either
+    // player being in wave is enough for the HUD to call it active.
+    bool playerInWave() {
+        return (m_player1 && m_player1->m_isDart) || (m_player2 && m_player2->m_isDart);
+    }
+
     // Normal-mode only: practice/test attempts don't count and get no augments.
     bool isRunAttempt() {
         return this->isRunLevel() && !m_isPracticeMode && !m_isTestMode;
@@ -115,10 +128,12 @@ class $modify(AugPlayLayer, PlayLayer) {
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         // hazard-hitbox shrinks hitboxes as objects first compute them, so the scale
         // has to be in place before PlayLayer::init creates the first object.
+        // A level always starts at 0 %, so nerve contributes nothing yet.
         {
             auto& mgr = AugmentManager::get();
             bool run = level && mgr.isRunFor(level->m_levelID.value());
-            hazard::setScale(run ? mgr.hazardScale() : 1.f);
+            hazard::setScale(run ? mgr.hazardScale(0.f) : 1.f);
+            player::setWaveScale(run ? mgr.waveScale(0.f) : 1.f);
             m_fields->hazardApplied = hazard::scale();
         }
 
@@ -174,12 +189,26 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
     }
 
-    // hazard-hitbox: publish the run's current hazard scale and bring every object
-    // already in the level in line with it. Cheap when nothing changed, so it
-    // runs on every reset (also covers "run ended, still playing" -> 1.0).
-    void applyHazardScale() {
+    // 0..1. What nerve scales both hitbox shrinks by.
+    float progressFraction() {
+        return this->getCurrentPercent() / 100.f;
+    }
+
+    // hazard-hitbox / wave-hitbox: publish both scales for where the player is
+    // right now and bring every object already in the level in line with the
+    // hazard one. Cheap when nothing changed, so it runs on every reset (also
+    // covers "run ended, still playing" -> 1.0).
+    void applyHitboxScales() {
         auto f = m_fields.self();
-        float want = this->isRunLevel() ? AugmentManager::get().hazardScale() : 1.f;
+        auto& mgr = AugmentManager::get();
+        bool run = this->isRunLevel();
+        float progress = this->progressFraction();
+
+        // The player's scale is a single global the hook reads per call, so it
+        // can follow the nerve boost exactly.
+        player::setWaveScale(run ? mgr.waveScale(progress) : 1.f);
+
+        float want = run ? mgr.hazardScale(progress) : 1.f;
         hazard::setScale(want);
         if (std::abs(want - f->hazardApplied) < 0.001f) return;
 
@@ -199,6 +228,21 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
         f->hazardApplied = want;
         log::info("HazardHitbox: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
+    }
+
+    // Per frame. Only pays the full re-apply once the nerve boost has moved the
+    // hazard scale by kHazardReapplyStep.
+    void updateHitboxScales() {
+        auto& mgr = AugmentManager::get();
+        bool run = this->isRunLevel();
+        float progress = this->progressFraction();
+
+        player::setWaveScale(run ? mgr.waveScale(progress) : 1.f);
+
+        float want = run ? mgr.hazardScale(progress) : 1.f;
+        if (std::abs(want - m_fields->hazardApplied) >= kHazardReapplyStep) {
+            this->applyHitboxScales();
+        }
     }
 
     // Called when Unmirror is drafted while the level is already loaded.
@@ -266,13 +310,16 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto& mgr = AugmentManager::get();
         auto f = m_fields.self();
 
-        this->applyHazardScale();
+        this->applyHitboxScales();
         if (hazard::scale() < 1.f) {
             auto st = hazard::takeStats();
             log::info(
                 "HazardHitbox: shrunk {} rects, {} oriented boxes since the last reset ({} circular hazards scaled at load)",
                 st.rects, st.boxes, f->hazardRadiiAtLoad
             );
+        }
+        if (auto st = player::takeStats(); st.rects > 0) {
+            log::info("WaveHitbox: shrunk {} player rects since the last reset", st.rects);
         }
 
         bool fromCheckpoint = f->respawnPending && !f->checkpoints.empty() && this->isRunAttempt();
@@ -317,6 +364,7 @@ class $modify(AugPlayLayer, PlayLayer) {
             PlayLayer::resetLevel();
         }
 
+        this->applyHitboxScales();
         this->refreshHud();
 
         // A checkpoint respawn is still the same attempt: the draft waits for
@@ -384,6 +432,7 @@ class $modify(AugPlayLayer, PlayLayer) {
         // hazard scale leak into the editor or the next level.
         setGameSpeed(1.f);
         hazard::setScale(1.f);
+        player::setWaveScale(1.f);
         AugmentManager::get().resumeGameAfterDraft();
         PlayLayer::onQuit();
     }
@@ -404,6 +453,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         if (mgr.has(ids::Foresight)) this->drawHitboxes();
 
+        this->updateHitboxScales();
         this->applyTimeScale();
         this->refreshHud();
     }
@@ -609,7 +659,9 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         if (def.id == ids::Unmirror) this->applyUnmirrorNow();
         if (def.id == ids::SlowMo) this->applyTimeScale();
-        if (def.id == ids::HazardHitbox) this->applyHazardScale();
+        if (def.id == ids::HazardHitbox || def.id == ids::WaveHitbox || def.id == ids::Nerve) {
+            this->applyHitboxScales();
+        }
         this->refreshHud();
         if (f->hud) f->hud->notice(fmt::format("+{} Lv{} (DEBUG)", def.name, lvl), { 200, 160, 255 });
         return true;
@@ -653,17 +705,29 @@ class $modify(AugPlayLayer, PlayLayer) {
         }
         if (mgr.has(ids::Foresight)) lines.push_back(augmentName(ids::Foresight));
         if (mgr.has(ids::Unmirror)) lines.push_back(augmentName(ids::Unmirror));
+        // Both hitbox shrinks are read at the player's current position,
+        // because nerve grows them as the level goes on.
+        float progress = now / 100.f;
         if (int lvl = mgr.levelOf(ids::HazardHitbox)) {
             lines.push_back(fmt::format(
-                "{} Lv{}: hazards {:.0f}%", augmentName(ids::HazardHitbox), lvl, mgr.hazardScale() * 100.f
+                "{} Lv{}: hazards {:.0f}%",
+                augmentName(ids::HazardHitbox), lvl, mgr.hazardScale(progress) * 100.f
             ));
         }
-        // Stubs: show that they were picked, nothing else to report.
-        for (auto const& def : allAugments()) {
-            if (!def.stub) continue;
-            if (int lvl = mgr.levelOf(def.id)) {
-                lines.push_back(fmt::format("{} Lv{} (stub)", def.name, lvl));
-            }
+        if (int lvl = mgr.levelOf(ids::WaveHitbox)) {
+            lines.push_back(fmt::format(
+                "{} Lv{}: player {:.0f}% in wave{}",
+                augmentName(ids::WaveHitbox), lvl, mgr.waveScale(progress) * 100.f,
+                this->playerInWave() ? "  ACTIVE" : ""
+            ));
+        }
+        if (int lvl = mgr.levelOf(ids::Nerve)) {
+            lines.push_back(fmt::format(
+                "{} Lv{}: shrink x{:.2f}", augmentName(ids::Nerve), lvl, mgr.nerveBoost(progress)
+            ));
+        }
+        if (mgr.has(ids::DraftCount)) {
+            lines.push_back(fmt::format("{}: {} cards", augmentName(ids::DraftCount), mgr.draftCardCount()));
         }
 
         f->hud->setLines(lines);
@@ -673,7 +737,7 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     void showDraft() {
         auto& mgr = AugmentManager::get();
-        auto choices = mgr.rollDraft(3);
+        auto choices = mgr.rollDraft(mgr.draftCardCount());
         if (choices.empty()) return;
 
         // Callback intentionally captures nothing: the PlayLayer may be gone
@@ -687,7 +751,9 @@ class $modify(AugPlayLayer, PlayLayer) {
 
             if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
                 if (id == ids::Unmirror) pl->applyUnmirrorNow();
-                if (id == ids::HazardHitbox) pl->applyHazardScale();
+                if (id == ids::HazardHitbox || id == ids::WaveHitbox || id == ids::Nerve) {
+                    pl->applyHitboxScales();
+                }
                 pl->refreshHud();
             }
         });

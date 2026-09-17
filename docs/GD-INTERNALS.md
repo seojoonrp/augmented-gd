@@ -117,6 +117,38 @@ GD keeps three collision shapes per `GameObject`, read from different places:
   reference `m_objectRect` (`[returned ref is NOT m_objectRect]` marker), does
   nothing reset `m_objectRadius` during an attempt.
 
+## Player collision shape (wave-hitbox) — built 2026-09-17, in-game test pending
+
+The player is a `GameObject` but its rects come from the **other** overload,
+`GameObject::getObjectRect(float width, float height)` (`win 0x1976c0`,
+hookable, returns by value). Both arguments are *size factors*, not sizes:
+qolmod reads the outer box with `getObjectRect(m_vehicleSize, m_vehicleSize)`
+and the inner one with `getObjectRect(0.3f, 0.3f)`
+(`refs/qolmod/src/Hacks/Level/Hitboxes/HitboxNode.cpp:417-425`).
+
+So the player hitbox **is** reachable: hook that overload, multiply both
+arguments, let GD build the rect. qolmod's HitboxMultiplier does exactly this
+(`refs/qolmod/src/Hacks/Level/HitboxMultiplier.cpp:103-131`) and registers
+`SafeModeTrigger::Attempt` for it, i.e. it changes real collision, not just the
+drawing. This supersedes the older "player rect is inlined, rejected" note in
+`ROADMAP.md` (`tiny`). Ours: `src/hooks/PlayerHitboxHook.cpp`, gated on
+`typeinfo_cast<PlayerObject*>(this)` and `m_isDart`.
+
+- `PlayerObject::m_isDart` is the wave flag (start mode 4 —
+  `refs/cleanstartpos/src/CreateStartPos.cpp:49`, CBF `main.cpp:422`). It is per
+  `PlayerObject`, so in dual each half is checked on its own.
+- `PlayerObject` does **not** override either `getObjectRect`, so one
+  `$modify(GameObject)` covers it.
+- **Not covered (unverified):** the player's oriented box. GD compares
+  `obj->m_orientedBox->overlaps(player->m_orientedBox)` when the *hazard* is
+  rotated off the 90-degree grid, and where the player OBB gets its size is
+  unknown — probably the no-argument `getObjectRect()`, which this hook does not
+  touch. Grid-aligned spikes (the common wave hazard) use the AABB, so the
+  augment should still bite; if it visibly does nothing against *rotated*
+  hazards only, that is this gap, and the fix is to extend
+  `updateOrientedBox()` to `PlayerObject` the way `HazardHitboxHook` does for
+  hazards.
+
 ## Mirror portals
 
 `GameObjectType::InverseMirrorPortal (14)` / `NormalMirrorPortal (15)`.

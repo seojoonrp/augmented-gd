@@ -39,7 +39,7 @@ Augment design space (every candidate falls in one):
 | M2 | Gauge, draft popup, mandatory pick, HUD | done, verified |
 | M3 | First 5 augments | 3 verified (Shield, Slow-Mo, Foresight); Checkpoint and Unmirror unverified |
 | **M4** | **Unblock input** (hotkeys, or a no-key fallback) | **blocked** — see `GD-INTERNALS.md` |
-| M5 | Pool to ~12 with Tier-1 augments | next |
+| M5 | Pool to ~12 with Tier-1 augments | next (pool is at 9, all implemented since 2026-09-17) |
 | M6 | Draft depth: rarity, curses, prerequisites, reroll | after M5 |
 | M7 | Run persistence, run summary, safe mode → release candidate | — |
 | M8 | Tier-2/3 augments (new GD hooks) | — |
@@ -110,7 +110,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 | `ghost` | Ghost | 3 | forgiveness | Hold a key for up to 1.5/2.5/3.5 s of noclip per attempt. | T1 once keys work (`noclipTimer` infra). |
 | `bullettime` | Bullet Time | 2 | time | Hold a key → 40 % speed, 3/6 s budget per attempt. | T1 once keys work. |
 | `checkpoint` | Checkpoint (existing) | 3 | forgiveness | — | Blocked on the Z key. |
-| `tiny` | Tiny | 1 | forgiveness | Player hitbox −20 %. | `checkCollisions(PlayerObject*, float, bool)` is hookable, but the player rect comes from `getObjectRect(float, float)` by value (`m_vehicleSize` / `0.3f`) at call sites we can't see. Stays **rejected** until a reference mod shows the path. *Hazard*-side shrinking is a different, hookable path — see hazard-hitbox / ex-Blunt (built 2026-09-16, T2, `HazardHitboxHook.cpp`). |
+| `tiny` | Tiny | 1 | forgiveness | Player hitbox −20 %. | **No longer blocked (2026-09-17)** — it is now T2. `GameObject::getObjectRect(float, float)` (`win 0x1976c0`) is itself hookable and its two arguments are size factors, so scaling them scales what GD collides with; qolmod's HitboxMultiplier is the precedent and `wave-hitbox` (`PlayerHitboxHook.cpp`) is our build of it. `tiny` would be the same hook without the `m_isDart` gate. |
 | `trajectory` | Trajectory | 1 | info | Predicted path line. | Needs a physics simulation. Rejected for now. |
 
 ### Rejected (keep the reasons)
@@ -119,7 +119,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 |---|---|
 | Speed-portal changes | breaks music sync (DESIGN). |
 | Input buffering / coyote time | too deep (DESIGN). |
-| Player hitbox shrink | inlined rect (above). Hazard hitboxes are shrinkable (hazard-hitbox). |
+| ~~Player hitbox shrink~~ | **Un-rejected 2026-09-17**: `getObjectRect(float, float)` is hookable and its arguments are size factors (qolmod HitboxMultiplier). Built as `wave-hitbox`. |
 | Warp / later StartPos | starting past 0 % is not a clear; breaks the run model. (`setStartPosObject` is `win inline` anyway.) |
 | Auto-jump, instant complete, auto coins | plays for you. |
 | Disable fade / pulse / flash triggers | `GJEffectManager` too deep. |

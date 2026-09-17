@@ -82,11 +82,12 @@ resources/fonts/             Pretendard SemiBold/Regular TTF (OFL) -> Geode buil
 CMakeLists.txt               forces clang on Windows, then standard Geode setup
 src/main.cpp                 entry (load log only)
 src/core/AugmentDef.*        static augment table: ids::*, Korean names, initial / level-up
-                             descriptions, maxLevel, stub flag, tune::* (steps, nerve mult)
+                             descriptions, maxLevel, tune::* (steps, nerve mult, draft cards)
 src/core/AugmentManager.*    run state singleton: run lifecycle, gauge, augment levels,
                              slow-mo toggle, director pause/resume for drafts, cursor state
 src/ui/Fonts.hpp             "AugName.fnt"_spr / "AugText.fnt"_spr + name kerning
-src/ui/AugmentDraftPopup.*   geode::Popup with 3 cards (140x180), no close, mandatory pick
+src/ui/AugmentDraftPopup.*   geode::Popup with 3 cards (140x180), no close, mandatory pick;
+                             layoutFor() narrows + rescales cards when draft-count makes it 4
 src/ui/RunHud.*              top-left text lines + centre notice (mod fonts)
 src/hooks/LevelInfoHook.cpp  AUG button → Start / Preview / Continue / Restart
 src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
@@ -94,9 +95,12 @@ src/hooks/PlayLayerHook.cpp  everything in-level: death counting, shield/noclip,
                              foresight (own CCDrawNode), unmirror, HUD refresh,
                              draft popup on resetLevel, hotkeys (node-scoped keybind
                              listeners in init + raw listener in $on_mod(Loaded)),
-                             hazard scale publish / radius scaling (init, addObject, applyHazardScale)
+                             both hitbox scales published per frame (applyHitboxScales /
+                             updateHitboxScales — nerve makes them depend on level progress)
 src/hooks/HazardHitboxHook.* hazard-hitbox: global hazard scale (augment::hazard) + GameObject hooks
                              (getObjectRect AABB in place, updateOrientedBox OBB corners)
+src/hooks/PlayerHitboxHook.* wave-hitbox: global player scale (augment::player) + GameObject hook on
+                             the getObjectRect(w, h) overload, gated on PlayerObject + m_isDart
 docs/                        STATUS / GD-INTERNALS / DESIGN / RECIPES / HARNESS-PLAN (keep current)
 docs/refs/                   INDEX (problem → ref file:line) + one page per reference mod
 scripts/                     build / logs / fetch-refs / bro / refgrep / nodeids / mods / fontcharset

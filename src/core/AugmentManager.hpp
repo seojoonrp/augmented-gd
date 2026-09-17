@@ -40,9 +40,10 @@ public:
     int levelOf(std::string const& id) const;
     bool has(std::string const& id) const { return this->levelOf(id) > 0; }
     std::map<std::string, int> const& augments() const { return m_levels; }
-    // Up to `count` random augments that are not yet maxed. Stub augments
-    // are drafted like any other; only their level is recorded.
-    std::vector<AugmentDef const*> rollDraft(size_t count = 3) const;
+    // Up to `count` random augments that are not yet maxed.
+    std::vector<AugmentDef const*> rollDraft(size_t count) const;
+    // Cards the next draft shows: 3, or DraftCountCards once draft-count is owned.
+    size_t draftCardCount() const;
     // Picking an augment increments its level (or adds it at level 1).
     void applyPick(std::string const& id);
     // Same level bump without counting a draft (debug keys). Returns the new
@@ -54,8 +55,15 @@ public:
     void toggleSlowMo() { m_slowMoEnabled = !m_slowMoEnabled; }
     // 1.0 when the run has no slow-mo; otherwise the level's speed scale.
     float slowMoScale() const;
-    // 1.0 when the run has no hazard-hitbox; otherwise the level's hazard hitbox scale.
-    float hazardScale() const;
+    // --- hitbox shrinks (hazard-hitbox / wave-hitbox, boosted by nerve) ---
+    // `progress` is the current level percent / 100, clamped to 0..1. Nerve
+    // grows both shrinks the further into the level the player is, so every
+    // caller has to say where the player is right now; pass 0 outside a run.
+    // 1.0 means "untouched"; the result never goes below tune::MinHitboxScale.
+    float nerveBoost(float progress) const;
+    float hazardScale(float progress) const;
+    // Applies while the player is in wave mode only; the hook checks that.
+    float waveScale(float progress) const;
 
     // --- gameplay pause used while the draft popup is up ---
     // Pauses CCDirector without dropping the frame rate to 4 fps.

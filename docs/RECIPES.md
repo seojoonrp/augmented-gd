@@ -91,6 +91,25 @@ Extras qolmod handles (`HitboxNode.cpp:159-243`): slopes via `m_slopeDirection`,
 rotated boxes via `m_orientedBox->m_corners`. Sort `m_objects` by x once and
 `lower_bound` per frame — there can be 10k+ objects.
 
+## Shrink the *player* collision — built 2026-09-17, untested (from ref qolmod `HitboxMultiplier.cpp:103-131`; ours in `src/hooks/PlayerHitboxHook.cpp`, namespace `augment::player`)
+
+A different overload from the one below: the player's rects come from
+`getObjectRect(width, height)`, whose arguments are size *factors*
+(`m_vehicleSize`, `0.3f`). Scale the arguments, let GD build the rect.
+
+```cpp
+class $modify(AugPlayerRect, GameObject) {
+    CCRect getObjectRect(float width, float height) {     // win 0x1976c0
+        if (g_scale >= 1.f) return GameObject::getObjectRect(width, height);  // hot: bail first
+        auto player = typeinfo_cast<PlayerObject*>(this);
+        if (!player || !player->m_isDart) return GameObject::getObjectRect(width, height);
+        return GameObject::getObjectRect(width * g_scale, height * g_scale);
+    }
+};
+// m_isDart = wave mode, per PlayerObject (dual: each half checked separately).
+// Does NOT cover the player's oriented box (rotated hazards) - see GD-INTERNALS.
+```
+
 ## Shrink / reshape an object's collision — verified 2026-09-16 (from ref qolmod `AccurateHitboxes.cpp:122-163`; ours in `src/hooks/HazardHitboxHook.cpp`, namespace `augment::hazard`)
 
 ```cpp

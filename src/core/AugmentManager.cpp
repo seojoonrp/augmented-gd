@@ -3,6 +3,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 
+#include <iterator>
 #include <algorithm>
 #include <random>
 
@@ -112,8 +113,34 @@ float AugmentManager::slowMoScale() const {
     return 1.f - tune::SlowMoStep * this->levelOf(ids::SlowMo);
 }
 
-float AugmentManager::hazardScale() const {
-    return 1.f - tune::HazardStep * this->levelOf(ids::HazardHitbox);
+size_t AugmentManager::draftCardCount() const {
+    return static_cast<size_t>(
+        this->has(ids::DraftCount) ? tune::DraftCountCards : tune::DefaultDraftCards
+    );
+}
+
+float AugmentManager::nerveBoost(float progress) const {
+    int lvl = this->levelOf(ids::Nerve);
+    if (lvl <= 0) return 1.f;
+    // NerveMult has one entry per nerve level; clamp in case maxLevel grows
+    // before the table does.
+    int idx = std::clamp(lvl, 1, static_cast<int>(std::size(tune::NerveMult))) - 1;
+    return 1.f + tune::NerveMult[idx] * std::clamp(progress, 0.f, 1.f);
+}
+
+// shrink is "how much is cut off", so 0 = untouched.
+static float shrinkToScale(float shrink) {
+    return std::clamp(1.f - shrink, tune::MinHitboxScale, 1.f);
+}
+
+float AugmentManager::hazardScale(float progress) const {
+    float shrink = tune::HazardStep * this->levelOf(ids::HazardHitbox);
+    return shrinkToScale(shrink * this->nerveBoost(progress));
+}
+
+float AugmentManager::waveScale(float progress) const {
+    float shrink = tune::WaveStep * this->levelOf(ids::WaveHitbox);
+    return shrinkToScale(shrink * this->nerveBoost(progress));
 }
 
 void AugmentManager::pauseGameForDraft() {

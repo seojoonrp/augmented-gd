@@ -14,7 +14,6 @@ namespace ids {
     constexpr char const* Foresight    = "foresight";
     constexpr char const* Unmirror     = "unmirror";
     constexpr char const* HazardHitbox = "hazard-hitbox";
-    // Stubs: in the table and draftable, but no hook reacts to them yet.
     constexpr char const* WaveHitbox   = "wave-hitbox";
     constexpr char const* Nerve        = "nerve";
     constexpr char const* DraftCount   = "draft-count";
@@ -33,8 +32,6 @@ struct AugmentDef {
     // Shown when drafting level 2+ (same text for every level-up). Empty
     // when maxLevel == 1.
     std::string levelUpDesc;
-    // true: picking records the level but nothing in the game changes.
-    bool stub = false;
 
     std::string const& describe(int level) const;
 };
@@ -50,14 +47,18 @@ namespace tune {
     constexpr float NoclipSeconds = 1.5f;
     // Game speed at slow-mo level n: 1 - SlowMoStep * n.
     constexpr float SlowMoStep = 0.05f;
-    // Hazard hitbox scale at hazard-hitbox level n: 1 - HazardStep * n.
+    // Hazard hitbox shrink at hazard-hitbox level n: HazardStep * n.
     constexpr float HazardStep = 0.05f;
-    // (stub) Player hitbox scale in wave mode at wave-hitbox level n: 1 - WaveStep * n.
+    // Player hitbox shrink while in wave mode at wave-hitbox level n: WaveStep * n.
     constexpr float WaveStep = 0.10f;
-    // (stub) Nerve level 1..2: the two hitbox shrinks grow to
-    // shrink * (1 + NerveMult[level - 1] * progress), progress in 0..1.
+    // Nerve level 1..2: both shrinks grow to shrink * (1 + NerveMult[level - 1]
+    // * progress), progress = current level percent / 100.
     constexpr float NerveMult[2] = { 1.f, 1.5f };
-    // (stub) Cards per draft once draft-count is owned.
+    // Floor for either hitbox scale. wave-hitbox Lv5 boosted by nerve Lv2 at
+    // 100 % would otherwise shrink the box past nothing (0.5 * 2.5 = 1.25).
+    constexpr float MinHitboxScale = 0.2f;
+    // Cards per draft, with and without draft-count.
+    constexpr int DefaultDraftCards = 3;
     constexpr int DraftCountCards = 4;
 }
 
