@@ -29,7 +29,7 @@ void AugmentManager::startRun(GJGameLevel* level) {
     m_gauge = 0.f;
     // Every run opens with a free draft; PlayLayer::startGame shows it. Not
     // gauge-earned, so it leaves the threshold ramp alone.
-    m_pendingDraft = true;
+    m_pendingDrafts = 1;
     m_levels.clear();
     m_slowMoEnabled = true;
 
@@ -53,7 +53,7 @@ void AugmentManager::endRun() {
         m_levelName, m_deaths, m_draftsTaken, m_levels.size()
     );
     m_active = false;
-    m_pendingDraft = false;
+    m_pendingDrafts = 0;
 }
 
 bool AugmentManager::debugMode() {
@@ -82,18 +82,18 @@ float AugmentManager::onDeath(float percent) {
     }
     m_gauge += percent + bonus;
 
-    // One draft per death at most; leftover charge carries over and the next
-    // draft costs more.
-    float threshold = this->gaugeThreshold();
-    if (m_gauge >= threshold && !this->rollDraft(1).empty()) {
-        m_gauge -= threshold;
+    // A big new best can pay for several drafts at once; each one raises
+    // the cost of the next. Leftover charge carries over.
+    int earned = 0;
+    while (m_gauge >= this->gaugeThreshold() && !this->rollDraft(1).empty()) {
+        m_gauge -= this->gaugeThreshold();
         m_gaugeDrafts++;
-        m_pendingDraft = true;
+        m_pendingDrafts++;
+        earned++;
     }
     log::info(
-        "Death #{} at {:.1f}% -> +{:.0f} (+{:.0f} new best), gauge {:.0f}/{:.0f}{}",
-        m_deaths, percent, percent, bonus, m_gauge, this->gaugeThreshold(),
-        m_pendingDraft ? " (draft pending)" : ""
+        "Death #{} at {:.1f}% -> +{:.0f} (+{:.0f} new best), gauge {:.0f}/{:.0f}, {} draft(s) earned, {} pending",
+        m_deaths, percent, percent, bonus, m_gauge, this->gaugeThreshold(), earned, m_pendingDrafts
     );
     return bonus;
 }

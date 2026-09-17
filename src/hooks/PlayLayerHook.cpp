@@ -756,10 +756,18 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     // ---------------------------------------------------------------- draft
 
+    // Shows one draft; when more are pending after the pick (a big new best
+    // can earn several at once) the next popup opens right away and the game
+    // stays paused in between.
     void showDraft() {
         auto& mgr = AugmentManager::get();
         auto choices = mgr.rollDraft(mgr.draftCardCount());
-        if (choices.empty()) return;
+        if (choices.empty()) {
+            log::info("Draft: nothing left to draft, {} pending dropped", mgr.pendingDrafts());
+            while (mgr.hasPendingDraft()) mgr.clearPendingDraft();
+            return;
+        }
+        log::info("Draft: showing {} cards, {} more pending", choices.size(), mgr.pendingDrafts());
 
         // Callback intentionally captures nothing: the PlayLayer may be gone
         // by the time it runs, so it only talks to the singleton and looks the
@@ -767,16 +775,23 @@ class $modify(AugPlayLayer, PlayLayer) {
         auto popup = AugmentDraftPopup::create(choices, [](std::string const& id) {
             auto& mgr = AugmentManager::get();
             mgr.applyPick(id);
-            mgr.resumeGameAfterDraft();
-            if (mgr.cursorWasHidden()) CCEGLView::get()->showCursor(false);
 
-            if (auto pl = static_cast<AugPlayLayer*>(PlayLayer::get())) {
+            auto pl = static_cast<AugPlayLayer*>(PlayLayer::get());
+            if (pl) {
                 if (id == ids::Unmirror) pl->applyUnmirrorNow();
                 if (id == ids::HazardHitbox || id == ids::WaveHitbox || id == ids::Nerve) {
                     pl->applyHitboxScales();
                 }
                 pl->refreshHud();
             }
+
+            if (pl && mgr.hasPendingDraft()) {
+                mgr.clearPendingDraft();
+                pl->showDraft();
+                return;
+            }
+            mgr.resumeGameAfterDraft();
+            if (mgr.cursorWasHidden()) CCEGLView::get()->showCursor(false);
         });
         if (!popup) return;
 
@@ -784,6 +799,10 @@ class $modify(AugPlayLayer, PlayLayer) {
         // the pop-in animation would never finish. Skip it.
         popup->m_noElasticity = true;
         popup->show();
+
+        // Already paused for a previous draft in this chain: the cursor state
+        // saved then is the one to restore, so don't overwrite it.
+        if (mgr.isGamePausedForDraft()) return;
 
         // GD hides the cursor in levels; the draft needs it.
         auto view = CCEGLView::get();

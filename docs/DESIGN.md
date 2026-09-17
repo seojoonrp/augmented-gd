@@ -30,9 +30,11 @@ charge = percent                                   (no floor)
 threshold = GaugeThresholdStart + GaugeThresholdStep * gaugeDrafts   (40, +10 each)
 ```
 
-When the gauge reaches the threshold a draft is queued for the next from-0
-reset; leftover charge carries over; at most one draft per death. Only
-gauge-earned drafts raise the threshold (the opening draft does not). Numbers
+Each time the gauge reaches the threshold a draft is queued for the next
+from-0 reset and the threshold rises; a big new best can queue several at
+once, and the popups then chain (pick → next popup, game stays paused).
+Leftover charge carries over. Only gauge-earned drafts raise the threshold
+(the opening draft does not). Numbers
 live in `tune::` (`AugmentDef.hpp`) and are tuned by test; the HUD shows
 `NEW BEST +X` when the bonus fires.
 

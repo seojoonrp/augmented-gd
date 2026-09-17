@@ -30,8 +30,11 @@ public:
     // draft. Returns the new-best bonus (0 when the best did not move) so the
     // caller can show it.
     float onDeath(float percent);
-    bool hasPendingDraft() const { return m_pendingDraft; }
-    void clearPendingDraft() { m_pendingDraft = false; }
+    // Drafts earned but not yet shown. A big new best can earn several at
+    // once; the popup chains them, taking one per clearPendingDraft().
+    int pendingDrafts() const { return m_pendingDrafts; }
+    bool hasPendingDraft() const { return m_pendingDrafts > 0; }
+    void clearPendingDraft() { if (m_pendingDrafts > 0) m_pendingDrafts--; }
     float gauge() const { return m_gauge; }
     // Cost of the next draft: rises with every draft the gauge has paid for,
     // or the fixed `debug-threshold` setting in debug mode.
@@ -97,7 +100,7 @@ private:
     int m_gaugeDrafts = 0;
     float m_bestPercent = 0.f;
     float m_gauge = 0.f;
-    bool m_pendingDraft = false;
+    int m_pendingDrafts = 0;
 
     std::map<std::string, int> m_levels;
     bool m_slowMoEnabled = true;
