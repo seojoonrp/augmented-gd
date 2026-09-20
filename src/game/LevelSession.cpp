@@ -45,6 +45,12 @@ void LevelSession::notice(std::string const& text, ccColor3B color) {
     if (m_hud) m_hud->notice(text, color);
 }
 
+void LevelSession::rewardDeath(CCPoint at, float before, float cost, DeathResult const& r) {
+    if (!m_hud) return;
+    m_hud->playDeathReward(at, before, r.charge - r.bonus, r.bonus, cost);
+    this->refreshHud(true);
+}
+
 ProgressMarks* LevelSession::marks() const {
     return m_marks;
 }
@@ -73,10 +79,9 @@ void LevelSession::refreshHud(bool force) {
 
     float now = this->percent();
     float best = std::max(now, mgr.bestPercent());
-    // A gauge-earned draft that is still waiting shows as a full bar; the
-    // free opening draft does not (the gauge really is at 0 then).
-    float threshold = mgr.gaugeThreshold();
-    m_hud->setGauge(mgr.pendingGaugeDrafts() > 0 ? threshold : mgr.gauge(), threshold);
+    // A gauge-earned draft that is still waiting shows as a full bar with
+    // DRAFT!; the free opening draft does not (the gauge really is at 0 then).
+    m_hud->setGauge(mgr.gauge(), mgr.gaugeThreshold(), mgr.pendingGaugeDrafts() > 0);
     m_hud->setHeader(fmt::format("deaths {}   now {:.1f}%   best {:.1f}%", mgr.deaths(), now, best));
     if (m_marks) m_marks->setBest(best);
 
@@ -130,7 +135,13 @@ bool LevelSession::onBeforeReset() {
 }
 
 void LevelSession::onAttemptStart(bool fromCheckpoint) {
+    if (m_deathCounted) {
+        auto since = std::chrono::duration<float>(std::chrono::steady_clock::now() - m_deathAt).count();
+        log::info("Attempt start {:.2f} s after the death", since);
+    }
     m_deathCounted = false;
+    // The reward sequence belongs to the attempt that died.
+    if (m_hud) m_hud->settleGauge();
     for (auto& a : m_augments) a->onAttemptStart(*this, fromCheckpoint);
     if (fromCheckpoint) {
         for (auto& a : m_augments) a->onCheckpointRespawn(*this);
@@ -181,6 +192,7 @@ Augment* LevelSession::find(std::string const& id) const {
 bool LevelSession::countDeath() {
     if (m_deathCounted) return false;
     m_deathCounted = true;
+    m_deathAt = std::chrono::steady_clock::now();
     return true;
 }
 

@@ -25,8 +25,8 @@ rejected showing it on the level-info screen, 2026-09-17). After that, each
 death charges the gauge:
 
 ```
-charge = percent                                   (no floor)
-       + (percent - best) * NewBestBonusMult       (only on a new best, mult 1.0)
+charge = percent                                             (no floor)
+       + (floor(percent) - floor(best)) * NewBestBonusMult   (only when > 0, mult 1.0)
 threshold = GaugeThresholdStart + GaugeThresholdStep * gaugeDrafts   (40, +10 each)
 ```
 
@@ -35,8 +35,13 @@ from-0 reset and the threshold rises; a big new best can queue several at
 once, and the popups then chain (pick → next popup, game stays paused).
 Leftover charge carries over. Only gauge-earned drafts raise the threshold
 (the opening draft does not). Numbers
-live in `tune::` (`AugmentDef.hpp`) and are tuned by test; the HUD shows
-`NEW BEST +X` when the bonus fires.
+live in `tune::` (`AugmentDef.hpp`) and are tuned by test. A new best counts
+in whole percents (4.1 → 4.4 is none; the user found `NEW BEST +0` annoying,
+2026-09-20) while the best itself keeps its decimals for the HUD and the dot.
+When the bonus fires the HUD shows `NEW BEST` and a gold `+X` beside the dead
+icon (`RunHud::playDeathReward`); while a gauge-earned draft waits the gauge
+readout says `DRAFT!` instead of numbers (the cost has already risen, so
+`50/50` would show the *next* cost).
 
 Rationale (2026-09-17): the old flat floor (`max(10, percent)`) made
 "die at 0 % ten times" the fastest route to a draft. Without the floor a 3 %
@@ -74,8 +79,8 @@ level. The id is the "코드" column and is what the hooks key on.
 | `foresight` | 사륜안 | 1 | 히트박스를 보여줍니다. | – | working. GD colours: blue solid, red hazard, green interactive, yellow player. |
 | `unmirror` | 멀미약 | 1 | 레벨 내 모든 미러포탈을 제거합니다. | – | rewritten 2026-09-17 as a `GJBaseGameLayer::toggleFlipped` hook (refs pattern), untested: flips are refused while owned, drafting un-flips at once. |
 | `hazard-hitbox` | 위협제거 | 5 | 위험 요소(빨간 히트박스)의 크기가 5% 감소합니다. | 위험 요소의 크기가 5% 더 감소합니다. | built, in-game test pending. Hazard / AnimatedHazard hitboxes shrink around their centre to 1 − 0.05·level (95…75 %); solids, slopes, player untouched. |
-| `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
-| `nerve` | 청심환 | 2 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | X% 도달 시 두 능력의 효과가 각각 1.5X% 증가합니다. | working (verified 2026-09-17). Both *shrinks* × (1 + k·progress), k = 1.0 at Lv1 / 1.5 at Lv2 (2X was judged too strong, 2026-09-17); progress = current percent / 100. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve Lv2 would otherwise blow past. |
+| `wave-hitbox` | 웨이브브레이커 | 5 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart`; checked per `PlayerObject`, so in dual only the half that is in wave shrinks. The wave icon and trail thickness shrink by the same factor (node scale `m_vehicleSize × scale`, 2026-09-20, unverified in game). Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
+| `nerve` | 청심환 | 1 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | — | working (verified 2026-09-17). Both *shrinks* × (1 + progress), progress = current percent / 100. Was 2 levels (k = 1.5 at Lv2); fixed to a single level 2026-09-20. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve at 100 % would otherwise hit exactly (shrink 1.0). |
 | `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
 | `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and fires a laser at each removed hazard; real cat art later. |
 | `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. `BRAKE EMPTY` notice when used up. Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |

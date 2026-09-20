@@ -47,9 +47,10 @@ public:
     std::string const& levelName() const { return m_state.levelName(); }
 
     // --- draft gauge ---
-    // Called once per attempt when player 1 dies. Returns the new-best bonus
-    // (0 when the best did not move) so the caller can show it.
-    float onDeath(float percent);
+    // Called once per attempt when player 1 dies. Returns what the death
+    // charged (`charge` includes the new-best `bonus`) so the caller can
+    // show it.
+    DeathResult onDeath(float percent);
     int pendingDrafts() const { return m_state.pendingDrafts(); }
     bool hasPendingDraft() const { return m_state.hasPendingDraft(); }
     void clearPendingDraft() { m_state.takePendingDraft(); }

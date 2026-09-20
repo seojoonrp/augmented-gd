@@ -41,7 +41,13 @@ Windows (linked from `libcocos2d.dll`); an entry marked `win inline` is not.
   spike call and noclipped calls leave it `false`. **(from refs)**
 - `levelComplete()` fires on clear. `onQuit()` fires when leaving.
 - `postUpdate(float dt)` runs every frame after physics; good place for
-  per-frame work (timers, HUD, drawing).
+  per-frame work (timers, HUD, drawing). **(unverified)** whether it keeps
+  running between the death and `resetLevel` — the gauge fill used to land
+  only at the next attempt, which suggests not; death-tracker checks
+  `m_player1->m_isDead` inside it, which suggests it does. Anything that must
+  animate through the death delay is driven from a `scheduleUpdate()` node
+  or CCActions instead (`RunHud.cpp::stepReward`); GD's own respawn is a
+  CCAction, so the scheduler is certainly running then.
 - `getCurrentPercent()` returns 0–100 as float and is accurate at death time.
 - Practice / test attempts: `m_isPracticeMode`, `m_isTestMode` on GJBaseGameLayer.
 
@@ -144,6 +150,19 @@ drawing. This supersedes the older "player rect is inlined, rejected" note in
   `PlayerObject`, so in dual each half is checked on its own.
 - `PlayerObject` does **not** override either `getObjectRect`, so one
   `$modify(GameObject)` covers it.
+- **Visual size = node scale.** GD draws the player node at `m_vehicleSize`:
+  `PlayerObject::updatePlayerScale()` (`win 0x3a0220`, hookable) is
+  `m_actionManager->stopInternalAction(6); setScaleX/Y(m_vehicleSize)`
+  (bindings `2.2081/inline/PlayerObject.cpp:823`); the icon sprites, glow and
+  whitener are children, so they follow. The mini-portal transition is action
+  tag 6 on the same node. `PlayerObject` overrides `setScale/X/Y` (`win 0x3a3910..30`).
+  The wave trail thickness is `m_waveTrail->m_waveSize`, the same factor
+  (qolmod sets it to `m_vehicleSize * k` per frame in a `PlayerObject::update`
+  hook, `refs/qolmod/src/Hacks/Cosmetic/WaveTrailSize.cpp:47-49`). Ours:
+  `HitboxScales.cpp` `syncPlayerVisual` sets `setScale(m_vehicleSize * wave)` +
+  `m_waveSize` every frame from `PlayLayer::postUpdate` while `m_isDart`, restores
+  once otherwise. **(unverified)** in game; whether GD re-sets `m_waveSize` each
+  frame before our hook is also unknown.
 - **Not covered (unverified):** the player's oriented box. GD compares
   `obj->m_orientedBox->overlaps(player->m_orientedBox)` when the *hazard* is
   rotated off the 90-degree grid, and where the player OBB gets its size is

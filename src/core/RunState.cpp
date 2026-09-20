@@ -2,6 +2,7 @@
 #include "Formulas.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace augment {
 
@@ -41,11 +42,13 @@ DeathResult RunState::onDeath(float percent, GaugeRule const& rule) {
 
     // No floor: dying at 3 % is worth 3, so farming early deaths never pays.
     // New ground is paid twice (at mult 1): the bonuses over a whole run sum
-    // to at most 100 * mult, so this rewards progress and nothing else.
-    if (percent > m_bestPercent) {
-        r.bonus = (percent - m_bestPercent) * rule.newBestMult;
-        m_bestPercent = percent;
-    }
+    // to at most 100 * mult, so this rewards progress and nothing else. A
+    // new best counts in whole percents (4.1 -> 4.4 is not one: a "NEW
+    // BEST +0" annoyed the user), while the best itself keeps the decimals
+    // for the HUD and the progress dot.
+    float wholeNew = std::floor(percent) - std::floor(m_bestPercent);
+    if (wholeNew > 0.f) r.bonus = wholeNew * rule.newBestMult;
+    m_bestPercent = std::max(m_bestPercent, percent);
     r.charge = percent + r.bonus;
     m_gauge += r.charge;
 

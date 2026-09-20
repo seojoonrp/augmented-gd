@@ -73,6 +73,7 @@ public:
         float progress = s.progress();
 
         scales::setWave(run ? mgr.waveScale(progress) : 1.f);
+        this->syncPlayerVisuals(s);
 
         float want = run ? mgr.hazardScale(progress) : 1.f;
         if (std::abs(want - m_hazardApplied) >= kHazardReapplyStep) this->apply(s);
@@ -119,6 +120,7 @@ private:
         // The player's scale is a single global the hook reads per call, so it
         // can follow the nerve boost exactly.
         scales::setWave(run ? mgr.waveScale(progress) : 1.f);
+        this->syncPlayerVisuals(s);
 
         float want = run ? mgr.hazardScale(progress) : 1.f;
         scales::setHazard(want);
@@ -143,8 +145,42 @@ private:
         log::info("HazardHitbox: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
     }
 
+    // Visual half of wave-hitbox: the icon shrinks with the rect. GD draws the
+    // player node at m_vehicleSize (updatePlayerScale = setScaleX/Y(m_vehicleSize),
+    // bindings inline/PlayerObject.cpp:823; the rect uses the same factor), so
+    // the same scale times ours keeps icon and hitbox in step. Re-asserted every
+    // frame after GD's update because GD snaps the scale back on its own
+    // (resets, mode changes, the mini-portal action), and restored once when the
+    // player leaves wave or the run ends. The trail thickness follows too
+    // (m_waveSize is the same factor, qolmod WaveTrailSize.cpp:47-49).
+    void syncPlayerVisuals(LevelSession& s) {
+        auto layer = s.layer();
+        this->syncPlayerVisual(layer->m_player1, m_visualApplied[0], 1);
+        this->syncPlayerVisual(layer->m_player2, m_visualApplied[1], 2);
+    }
+
+    static void syncPlayerVisual(PlayerObject* p, float& applied, int index) {
+        if (!p) return;
+        float want = scales::wave();
+        if (want < 1.f && p->m_isDart) {
+            float scale = p->m_vehicleSize * want;
+            p->setScale(scale);
+            if (p->m_waveTrail) p->m_waveTrail->m_waveSize = scale;
+            if (applied == 1.f) log::info("WaveHitbox: player {} icon x{:.2f} (node scale {:.2f})", index, want, scale);
+            applied = want;
+            return;
+        }
+        if (applied == 1.f) return;
+        p->setScale(p->m_vehicleSize);
+        if (p->m_waveTrail) p->m_waveTrail->m_waveSize = p->m_vehicleSize;
+        log::info("WaveHitbox: player {} icon restored (node scale {:.2f})", index, p->m_vehicleSize);
+        applied = 1.f;
+    }
+
     // The hazard scale every object currently in the level carries.
     float m_hazardApplied = 1.f;
+    // The wave scale each player's node currently carries (1 = GD's own).
+    float m_visualApplied[2] = { 1.f, 1.f };
 };
 
 } // namespace

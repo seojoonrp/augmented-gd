@@ -66,7 +66,6 @@ void testTable() {
     CHECK(contains(findAugment(ids::HazardHitbox)->initialDesc, "5% 감소"));
     CHECK(contains(findAugment(ids::WaveHitbox)->initialDesc, "10% 감소"));
     CHECK(contains(findAugment(ids::Nerve)->initialDesc, "각각 X% 증가"));
-    CHECK(contains(findAugment(ids::Nerve)->levelUpDesc, "각각 1.5X% 증가"));
     CHECK(contains(findAugment(ids::DraftCount)->initialDesc, "4개씩"));
     CHECK(contains(findAugment(ids::Cat)->initialDesc, "4초마다"));
     CHECK(contains(findAugment(ids::Cat)->initialDesc, "장애물 5개"));
@@ -94,17 +93,16 @@ void testFormulas() {
     CHECK_NEAR(formula::nerveBoost(0, 1.f), 1.f);
     CHECK_NEAR(formula::nerveBoost(1, 0.f), 1.f);
     CHECK_NEAR(formula::nerveBoost(1, 0.5f), 1.5f);
-    CHECK_NEAR(formula::nerveBoost(2, 1.f), 2.5f);
-    CHECK_NEAR(formula::nerveBoost(2, 7.f), 2.5f);    // progress clamped
-    CHECK_NEAR(formula::nerveBoost(9, 1.f), 2.5f);    // level clamped to the table
+    CHECK_NEAR(formula::nerveBoost(1, 1.f), 2.f);
+    CHECK_NEAR(formula::nerveBoost(1, 7.f), 2.f);     // progress clamped
 
     CHECK_NEAR(formula::hazardScale(0, 0, 0.f), 1.f);
     CHECK_NEAR(formula::hazardScale(1, 0, 0.f), 0.95f);
     CHECK_NEAR(formula::hazardScale(5, 0, 0.f), 0.75f);
-    CHECK_NEAR(formula::hazardScale(5, 2, 1.f), 1.f - 0.25f * 2.5f);
+    CHECK_NEAR(formula::hazardScale(5, 1, 1.f), 1.f - 0.25f * 2.f);
     CHECK_NEAR(formula::waveScale(5, 0, 0.f), 0.5f);
-    // wave Lv5 + nerve Lv2 at 100 % would be 1 - 1.25: floored.
-    CHECK_NEAR(formula::waveScale(5, 2, 1.f), tune::MinHitboxScale);
+    // wave Lv5 + nerve at 100 % would be 1 - 1.0: floored.
+    CHECK_NEAR(formula::waveScale(5, 1, 1.f), tune::MinHitboxScale);
 
     CHECK(formula::catCount(0) == 0);
     CHECK(formula::catCount(1) == 5);
@@ -180,6 +178,26 @@ void testGaugeNoFloor() {
     r = s.onDeath(1.f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     CHECK_NEAR(s.gauge(), 10.f);
+}
+
+void testGaugeNewBestWholePercents() {
+    auto s = freshRun();
+    GaugeRule rule;
+    s.onDeath(4.1f, rule);
+    CHECK_NEAR(s.bestPercent(), 4.1f);
+    // Same whole percent, further along: the best moves, no bonus.
+    auto r = s.onDeath(4.4f, rule);
+    CHECK_NEAR(r.bonus, 0.f);
+    CHECK_NEAR(r.charge, 4.4f);
+    CHECK_NEAR(s.bestPercent(), 4.4f);
+    // Crossing into 5 %: one whole percent of bonus, not 0.6.
+    r = s.onDeath(5.0f, rule);
+    CHECK_NEAR(r.bonus, 1.f);
+    // Decimals never add up to a bonus on their own.
+    r = s.onDeath(5.9f, rule);
+    CHECK_NEAR(r.bonus, 0.f);
+    r = s.onDeath(7.2f, rule);
+    CHECK_NEAR(r.bonus, 2.f);
 }
 
 void testGaugeNewBestBonusBounded() {
@@ -342,6 +360,7 @@ int main() {
     testFormulas();
     testLifecycle();
     testGaugeNoFloor();
+    testGaugeNewBestWholePercents();
     testGaugeNewBestBonusBounded();
     testGaugeRamp();
     testGaugeMultiDraft();

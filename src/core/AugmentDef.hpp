@@ -56,11 +56,11 @@ namespace tune {
     constexpr float HazardStep = 0.05f;
     // Player hitbox shrink while in wave mode at wave-hitbox level n: WaveStep * n.
     constexpr float WaveStep = 0.10f;
-    // Nerve level 1..2: both shrinks grow to shrink * (1 + NerveMult[level - 1]
+    // Nerve (single level): both shrinks grow to shrink * (1 + NerveMult
     // * progress), progress = current level percent / 100.
-    constexpr float NerveMult[2] = { 1.f, 1.5f };
-    // Floor for either hitbox scale. wave-hitbox Lv5 boosted by nerve Lv2 at
-    // 100 % would otherwise shrink the box past nothing (0.5 * 2.5 = 1.25).
+    constexpr float NerveMult = 1.f;
+    // Floor for either hitbox scale. wave-hitbox Lv5 boosted by nerve at
+    // 100 % would otherwise shrink the box to nothing (0.5 * 2 = 1.0).
     constexpr float MinHitboxScale = 0.2f;
     // Cards per draft, with and without draft-count.
     constexpr int DefaultDraftCards = 3;

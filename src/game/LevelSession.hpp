@@ -8,10 +8,12 @@
 // a PlayLayer pointer of their own (CLAUDE.md rule 5).
 
 #include "../augments/Augment.hpp"
+#include "../core/RunState.hpp"
 #include "../ui/ProgressMarks.hpp"
 
 #include <Geode/Geode.hpp>
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,6 +59,11 @@ public:
     bool owns(std::string const& id) const { return this->levelOf(id) > 0; }
     // Centre-screen message via the HUD (no-op without one).
     void notice(std::string const& text, cocos2d::ccColor3B color);
+    // Death reward on the HUD: numbers beside the dead icon (screen point
+    // `at`), particles into the gauge, fill by `r` over the gauge as it
+    // was (`before` / `cost`) — and the HUD text refreshed at once, so
+    // nothing waits for the next attempt.
+    void rewardDeath(cocos2d::CCPoint at, float before, float cost, DeathResult const& r);
 
     // Non-decoration objects sorted by x, built on first use (foresight, cat).
     std::vector<GameObject*>& objectsByX();
@@ -98,6 +105,7 @@ private:
     std::vector<std::unique_ptr<Augment>> m_augments;
     std::vector<GameObject*> m_objectsByX;
     bool m_deathCounted = false;
+    std::chrono::steady_clock::time_point m_deathAt;   // for the death -> reset timing log
     float m_hudClock = 1.f;   // seconds since the last text rebuild; starts due
 };
 

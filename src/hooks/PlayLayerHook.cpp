@@ -126,13 +126,34 @@ class $modify(AugPlayLayer, PlayLayer) {
 
             // destroyPlayer can fire more than once per attempt; count once.
             if (player == m_player1 && s->countDeath()) {
-                float bonus = AugmentManager::get().onDeath(this->getCurrentPercent());
-                if (bonus > 0.f) s->notice(fmt::format("NEW BEST  +{:.0f}", bonus), { 255, 220, 90 });
+                auto& mgr = AugmentManager::get();
+                // The gauge and its cost as the bar showed them, so the
+                // reward animates from there even when this death wraps
+                // the gauge and raises the cost.
+                float before = mgr.gauge();
+                float cost = mgr.gaugeThreshold();
+                auto r = mgr.onDeath(this->getCurrentPercent());
+                if (r.bonus > 0.f) s->notice("NEW BEST", { 255, 220, 90 });
+                s->rewardDeath(this->hudPointOf(player), before, cost, r);
                 s->onDeath();
             }
         }
 
         PlayLayer::destroyPlayer(player, object);
+    }
+
+    // Where a node of the object layer sits on the HUD (screen space):
+    // through world space like Cat.cpp does for its targets.
+    CCPoint hudPointOf(CCNode* node) {
+        auto s = this->session();
+        auto hud = s ? s->hud() : nullptr;
+        auto parent = node ? node->getParent() : nullptr;
+        if (!hud || !parent) {
+            log::info("hudPointOf: no {}, falling back to screen centre", hud ? "parent" : "hud");
+            auto winSize = CCDirector::get()->getWinSize();
+            return { winSize.width / 2, winSize.height / 2 };
+        }
+        return hud->convertToNodeSpace(parent->convertToWorldSpace(node->getPosition()));
     }
 
     void resetLevel() {

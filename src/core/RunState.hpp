@@ -44,7 +44,8 @@ public:
 
     // --- draft gauge ---
     // Once per attempt when player 1 dies. Charges by the percent reached
-    // (no floor) plus the new-best delta times the bonus multiplier; while
+    // (no floor) plus the new-best delta in whole percents times the bonus
+    // multiplier (bestPercent itself keeps the decimals); while
     // the gauge covers the (rising) cost and something is still draftable,
     // a draft is queued and the cost rises. Leftover charge carries over.
     DeathResult onDeath(float percent, GaugeRule const& rule);

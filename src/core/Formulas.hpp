@@ -20,10 +20,7 @@ inline float slowMoScale(int slowMoLevel) {
 // / 100, clamped to 0..1. 1.0 when nerve is unowned.
 inline float nerveBoost(int nerveLevel, float progress) {
     if (nerveLevel <= 0) return 1.f;
-    // NerveMult has one entry per nerve level; clamp in case maxLevel grows
-    // before the table does.
-    int idx = std::clamp(nerveLevel, 1, static_cast<int>(std::size(tune::NerveMult))) - 1;
-    return 1.f + tune::NerveMult[idx] * std::clamp(progress, 0.f, 1.f);
+    return 1.f + tune::NerveMult * std::clamp(progress, 0.f, 1.f);
 }
 
 // shrink is "how much is cut off", so 0 = untouched; floored at MinHitboxScale.

@@ -15,8 +15,6 @@ namespace {
     }
     // A step stored as a fraction (0.05) quoted as a percentage ("5").
     std::string pct(float step) { return num(std::round(step * 1000.f) / 10.f); }
-    // Nerve multiplier as it appears in "X% 도달 시 … 1.5X% 증가": 1 → "X".
-    std::string multX(float m) { return m == 1.f ? "X" : num(m) + "X"; }
     // Korean count words for the small steps the cat text uses.
     std::string countKo(int n) { return n == 1 ? "한 개" : std::to_string(n) + "개"; }
 }
@@ -51,10 +49,9 @@ std::vector<AugmentDef> const& allAugments() {
         { ids::WaveHitbox, "웨이브브레이커", 5,
             "웨이브 모드일 때 플레이어 히트박스 크기가 " + pct(tune::WaveStep) + "% 감소합니다.",
             "웨이브 모드일 때 플레이어 히트박스 크기가 " + pct(tune::WaveStep) + "% 더 감소합니다." },
-        { ids::Nerve, "청심환", 2,
-            "레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다.\nX% 도달 시 두 능력의 효과가 각각 "
-                + multX(tune::NerveMult[0]) + "% 증가합니다.",
-            "X% 도달 시 두 능력의 효과가 각각 " + multX(tune::NerveMult[1]) + "% 증가합니다." },
+        { ids::Nerve, "청심환", 1,
+            "레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다.\nX% 도달 시 두 능력의 효과가 각각 X% 증가합니다.",
+            "" },
         { ids::DraftCount, "기회비용", 1,
             "다음 드래프트부터 카드가 " + std::to_string(tune::DraftCountCards) + "개씩 등장합니다.",
             "" },

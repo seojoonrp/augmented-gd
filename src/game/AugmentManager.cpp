@@ -68,14 +68,14 @@ GaugeRule AugmentManager::gaugeRule() const {
     return rule;
 }
 
-float AugmentManager::onDeath(float percent) {
-    if (!m_state.active()) return 0.f;
+DeathResult AugmentManager::onDeath(float percent) {
+    if (!m_state.active()) return {};
     auto r = m_state.onDeath(percent, this->gaugeRule());
     log::info(
         "Death #{} at {:.1f}% -> +{:.0f} (+{:.0f} new best), gauge {:.0f}/{:.0f}, {} draft(s) earned, {} pending",
         m_state.deaths(), percent, percent, r.bonus, m_state.gauge(), this->gaugeThreshold(), r.earned, m_state.pendingDrafts()
     );
-    return r.bonus;
+    return r;
 }
 
 float AugmentManager::debugFillGauge() {
