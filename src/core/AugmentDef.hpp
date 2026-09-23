@@ -22,6 +22,7 @@ namespace ids {
     constexpr char const* DraftCount   = "draft-count";
     constexpr char const* Cat          = "cat";
     constexpr char const* Brake        = "brake";
+    constexpr char const* Missile      = "missile";
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
@@ -84,6 +85,17 @@ namespace tune {
     // seconds per attempt.
     constexpr float BrakeCut = 0.6f;
     constexpr float BrakeSecondsPerLevel = 7.f;
+    // One GD grid block, in object-layer units; the missile text quotes
+    // its radius in blocks.
+    constexpr float BlockUnits = 30.f;
+    // Missile at level n: every MissileBaseInterval - MissileIntervalStep
+    // * (n - 1) seconds a strike on a random hazard in view removes every
+    // hazard within MissileBaseRadius + MissileRadiusStep * (n - 1) units.
+    constexpr float MissileBaseInterval = 6.f;
+    constexpr float MissileIntervalStep = 0.5f;
+    constexpr float MissileMinInterval = 1.f;
+    constexpr float MissileBaseRadius = 3.f * BlockUnits;
+    constexpr float MissileRadiusStep = 0.5f * BlockUnits;
 }
 
 } // namespace augment

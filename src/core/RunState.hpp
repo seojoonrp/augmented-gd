@@ -98,6 +98,8 @@ public:
     float waveScale(float progress) const;
     int catCount() const;
     float catInterval() const;
+    float missileInterval() const;
+    float missileRadius() const;
 
 private:
     bool m_active = false;

@@ -25,7 +25,7 @@ std::string const& AugmentDef::describe(int level) const {
 }
 
 // Text is the design table (docs/DESIGN.md) with its numbers taken from
-// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th, Shift+2 the 11th).
+// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th, Shift+2 the 11th, Shift+3 the 12th).
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
         { ids::Shield, "결계인가?", 3,
@@ -64,6 +64,11 @@ std::vector<AugmentDef> const& allAugments() {
             "C를 누르고 있으면 게임 속도가 " + pct(tune::BrakeCut) + "% 감소합니다.\n어템마다 최대 "
                 + num(tune::BrakeSecondsPerLevel) + "초씩 사용할 수 있습니다.",
             "[브레이크]를 어템마다 " + num(tune::BrakeSecondsPerLevel) + "초 더 사용할 수 있습니다." },
+        { ids::Missile, "공습경보", 5,
+            num(tune::MissileBaseInterval) + "초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다.\n반경 "
+                + num(tune::MissileBaseRadius / tune::BlockUnits) + "칸 안의 위험 요소가 모두 제거됩니다.",
+            "폭발 반경이 " + num(tune::MissileRadiusStep / tune::BlockUnits) + "칸 커지고,\n미사일 쿨타임이 "
+                + num(tune::MissileIntervalStep) + "초 감소합니다." },
     };
     return pool;
 }

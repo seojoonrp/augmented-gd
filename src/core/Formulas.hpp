@@ -51,6 +51,18 @@ inline float catInterval(int catLevel) {
     return std::max(tune::CatMinInterval, tune::CatBaseInterval - tune::CatIntervalStep * static_cast<float>(catLevel - 1));
 }
 
+// Seconds between missile strikes; 0 when unowned.
+inline float missileInterval(int missileLevel) {
+    if (missileLevel <= 0) return 0.f;
+    return std::max(tune::MissileMinInterval, tune::MissileBaseInterval - tune::MissileIntervalStep * static_cast<float>(missileLevel - 1));
+}
+
+// Blast radius in object-layer units; 0 when unowned.
+inline float missileRadius(int missileLevel) {
+    if (missileLevel <= 0) return 0.f;
+    return tune::MissileBaseRadius + tune::MissileRadiusStep * static_cast<float>(missileLevel - 1);
+}
+
 // Game speed while the brake is held; independent of slow-mo.
 inline float brakeScale() {
     return 1.f - tune::BrakeCut;

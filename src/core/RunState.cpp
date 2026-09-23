@@ -145,4 +145,12 @@ float RunState::catInterval() const {
     return formula::catInterval(this->levelOf(ids::Cat));
 }
 
+float RunState::missileInterval() const {
+    return formula::missileInterval(this->levelOf(ids::Missile));
+}
+
+float RunState::missileRadius() const {
+    return formula::missileRadius(this->levelOf(ids::Missile));
+}
+
 } // namespace augment

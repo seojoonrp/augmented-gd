@@ -27,6 +27,10 @@ and HUD text it should produce (`scripts/logs.ps1` with every report).
 - **Refactor 2b + 4** (2026-09-17): startpos and cat as `Augment` modules, HUD text
   from the session at 10 Hz, unmirror as a `toggleFlipped` hook — user: "다 잘 되는듯"
   (regular levels; a mirror-portal level is still to be tried, row below).
+- **Missile** (공습경보, 12th augment, strike on a random hazard ≥ 300 units
+  ahead every 6 s, 3-block blast) — user: "괜찮은데" then "딱 괜찮은듯" with the
+  300 lead (2026-09-20). The cat on the shared `HazardRemoval` scan is covered
+  by the same rounds.
 
 ## Broken / unverified
 

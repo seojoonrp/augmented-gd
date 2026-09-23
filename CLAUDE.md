@@ -106,13 +106,15 @@ src/augments/            one file per augment behind Augment.hpp (all hooks defa
   Augments.*             factories + makeAllAugments() (table order)
   Shield SlowMo StartPos Foresight Unmirror(+toggleFlipped hook) HitboxScales(hazard+wave+nerve) DraftCount Cat
                          Brake (held C, scales::setTimeOverride over SlowMo's base speed)
+                         Missile (timed strike on a random hazard in view, blast-radius removal)
+  HazardRemoval.*        shared by Cat + Missile: hazard::Removed (take / restore), viewAhead / hazardsInView, touchesCircle
 src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-frame dedup → session->onHotkey),
                          raw KeyboardInputEvent listener at priority -1, debug number keys
 src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (AUG button),
                          HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
                          (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time())
 src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
-                         notice), ProgressMarks (dots on GD's bar), CatNode (square + lasers)
+                         notice), ProgressMarks (dots on GD's bar), CatNode (square + lasers), MissileNode (reticle / drop / blast, world space)
 tests/core_tests.cpp     host tests, plain asserts (scripts/test.ps1)
 docs/                    STATUS / SESSIONS / GD-INTERNALS / DESIGN / RECIPES / HARNESS / ROADMAP / VISUAL-IDEAS / refs/
 scripts/                 see docs/HARNESS.md

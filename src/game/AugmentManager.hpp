@@ -93,6 +93,9 @@ public:
     // --- cat: hazards removed per sweep and seconds between sweeps (0 when unowned) ---
     int catCount() const { return m_state.catCount(); }
     float catInterval() const { return m_state.catInterval(); }
+    // --- missile: seconds between strikes and blast radius in object units (0 when unowned) ---
+    float missileInterval() const { return m_state.missileInterval(); }
+    float missileRadius() const { return m_state.missileRadius(); }
 
 private:
     AugmentManager();

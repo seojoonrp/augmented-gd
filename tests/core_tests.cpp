@@ -42,7 +42,7 @@ RunState freshRun() {
 
 void testTable() {
     auto const& defs = allAugments();
-    CHECK(defs.size() == 11);
+    CHECK(defs.size() == 12);
     std::set<std::string> ids;
     for (auto const& d : defs) {
         CHECK(!d.id.empty());
@@ -74,6 +74,10 @@ void testTable() {
     CHECK(contains(findAugment(ids::Brake)->initialDesc, "60% 감소"));
     CHECK(contains(findAugment(ids::Brake)->initialDesc, "최대 7초씩"));
     CHECK(contains(findAugment(ids::Brake)->levelUpDesc, "7초 더"));
+    CHECK(contains(findAugment(ids::Missile)->initialDesc, "6초마다"));
+    CHECK(contains(findAugment(ids::Missile)->initialDesc, "반경 3칸"));
+    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5칸 커지고"));
+    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5초 감소"));
 
     // describe(): initial for level 1, level-up text after, initial again
     // when there is no level-up text.
@@ -111,6 +115,14 @@ void testFormulas() {
     CHECK_NEAR(formula::catInterval(1), 4.f);
     CHECK_NEAR(formula::catInterval(5), 2.f);
     CHECK_NEAR(formula::catInterval(50), tune::CatMinInterval);
+
+    CHECK_NEAR(formula::missileInterval(0), 0.f);
+    CHECK_NEAR(formula::missileInterval(1), 6.f);
+    CHECK_NEAR(formula::missileInterval(5), 4.f);
+    CHECK_NEAR(formula::missileInterval(50), tune::MissileMinInterval);
+    CHECK_NEAR(formula::missileRadius(0), 0.f);
+    CHECK_NEAR(formula::missileRadius(1), 90.f);
+    CHECK_NEAR(formula::missileRadius(5), 150.f);
 
     CHECK(formula::draftCardCount(false) == 3);
     CHECK(formula::draftCardCount(true) == 4);
@@ -351,6 +363,10 @@ void testEffectsAtLevels() {
     s.grant(ids::Cat); s.grant(ids::Cat);
     CHECK(s.catCount() == 6);
     CHECK_NEAR(s.catInterval(), 3.5f);
+    CHECK_NEAR(s.missileRadius(), 0.f);
+    s.grant(ids::Missile); s.grant(ids::Missile); s.grant(ids::Missile);
+    CHECK_NEAR(s.missileInterval(), 5.f);
+    CHECK_NEAR(s.missileRadius(), 120.f);
 }
 
 } // namespace
