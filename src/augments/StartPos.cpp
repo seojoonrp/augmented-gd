@@ -31,14 +31,17 @@ public:
 
     // An unused placement means we come back to it. Our own ref decides,
     // not GD's array.
-    void onDeath(LevelSession& s) override {
-        if (!s.owns(ids::StartPos)) return;
+    // The answer also tells the gauge whether this death ends the life: a
+    // death we come back from charges nothing (the life pays once).
+    bool onDeath(LevelSession& s) override {
+        if (!s.owns(ids::StartPos)) return false;
         m_respawnPending = m_checkpoint != nullptr;
         log::info(
             "Checkpoint: death with {}/{} placed, {}, GD array {} -> {}",
             m_placed, s.levelOf(ids::StartPos), m_checkpoint ? "one ready" : "none ready",
             this->gdCount(s), m_respawnPending ? "respawn" : "restart from 0"
         );
+        return m_respawnPending;
     }
 
     // Decides the kind of reset and points GD at the right checkpoint (or

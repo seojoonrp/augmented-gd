@@ -286,6 +286,64 @@ void testGaugeMultiDraft() {
     CHECK(t.pendingGaugeDrafts() == 0);
 }
 
+// A life is one visit to the level: deaths a checkpoint brings the player
+// back from charge nothing, and the death that really ends the life pays once
+// for the furthest point the whole life reached.
+void testGaugeCheckpointLife() {
+    auto s = freshRun();
+    GaugeRule rule;
+    rule.thresholdStart = 100000.f;   // never draft, just charge
+
+    auto r = s.onDeath(6.f, rule, true);
+    CHECK(r.deferred);
+    CHECK_NEAR(r.charge, 0.f);
+    CHECK_NEAR(r.bonus, 0.f);
+    CHECK(r.earned == 0);
+    CHECK(s.deaths() == 1);           // it still is a death
+    CHECK_NEAR(s.gauge(), 0.f);
+    CHECK_NEAR(s.bestPercent(), 0.f); // the bonus is not spent yet either
+    CHECK_NEAR(s.lifeBest(), 6.f);
+
+    // 6 (+6 new best), not 6 + 4: the 4 % death only ends the life.
+    r = s.onDeath(4.f, rule);
+    CHECK(!r.deferred);
+    CHECK_NEAR(r.bonus, 6.f);
+    CHECK_NEAR(r.charge, 12.f);
+    CHECK_NEAR(s.gauge(), 12.f);
+    CHECK_NEAR(s.bestPercent(), 6.f);
+    CHECK_NEAR(s.lifeBest(), 0.f);
+
+    // Several respawns in one life: one payment, at the furthest point.
+    s.onDeath(20.f, rule, true);
+    s.onDeath(12.f, rule, true);
+    CHECK_NEAR(s.lifeBest(), 20.f);
+    CHECK_NEAR(s.gauge(), 12.f);
+    r = s.onDeath(8.f, rule);
+    CHECK_NEAR(r.charge, 20.f + 14.f);   // 20, and 20 - 6 whole new percents
+    CHECK_NEAR(s.bestPercent(), 20.f);
+
+    // A life that stayed below the best pays its own percent only.
+    s.onDeath(10.f, rule, true);
+    r = s.onDeath(3.f, rule);
+    CHECK_NEAR(r.bonus, 0.f);
+    CHECK_NEAR(r.charge, 10.f);
+
+    // Drafts wait for the settling death as well.
+    auto t = freshRun();
+    GaugeRule fixed;
+    fixed.fixedThreshold = 20.f;
+    CHECK(t.onDeath(60.f, fixed, true).earned == 0);
+    CHECK(t.pendingGaugeDrafts() == 0);
+    CHECK(t.onDeath(1.f, fixed).earned == 6);   // 60 + 60 bonus = 6 x 20
+
+    // Ending the run drops a life nothing was paid for.
+    auto u = freshRun();
+    u.onDeath(30.f, rule, true);
+    CHECK_NEAR(u.lifeBest(), 30.f);
+    u.end();
+    CHECK_NEAR(u.lifeBest(), 0.f);
+}
+
 void testGaugeStopsWhenNothingDraftable() {
     auto s = freshRun();
     for (auto const& d : allAugments()) {
@@ -398,6 +456,7 @@ int main() {
     testGaugeNewBestBonusBounded();
     testGaugeRamp();
     testGaugeMultiDraft();
+    testGaugeCheckpointLife();
     testGaugeStopsWhenNothingDraftable();
     testFillGauge();
     testGrantAndPick();

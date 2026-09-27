@@ -43,6 +43,20 @@ icon (`RunHud::playDeathReward`); while a gauge-earned draft waits the gauge
 readout says `DRAFT!` instead of numbers (the cost has already risen, so
 `50/50` would show the *next* cost).
 
+**A life pays once** (2026-09-27): a death a checkpoint brings the player back
+from charges nothing. A life — one visit to the level from 0 % — is settled by
+the death that really ends it, for the furthest point the whole life reached
+(`respawning` in `RunState::onDeath`, answered by `StartPos::onDeath`, which
+already knows whether a respawn follows). Dying at 6 % and then, after the
+respawn, at 4 % is worth 6, not 10 (the user's report). The deferred death
+still counts as a death, but nothing is settled, so it shows no `NEW BEST`, no
+`+X` and no particles — the whole reward plays on the settling death, at the
+life's best. The best percent is held back with it (otherwise the new-best
+bonus would be paid before the life is), so the HUD folds `RunState::lifeBest`
+into the best it draws and the white mark never slides back to the checkpoint.
+A life left hanging by a quit or a manual restart is not lost: its best is
+charged by the next death that settles, which comes to the same total.
+
 Rationale (2026-09-17): the old flat floor (`max(10, percent)`) made
 "die at 0 % ten times" the fastest route to a draft. Without the floor a 3 %
 death is worth 3, so farming never pays, while being stuck at 60 % still pays
@@ -76,7 +90,7 @@ level. The id is the "코드" column and is what the hooks key on.
 |---|---|---|---|---|---|
 | `shield` | 결계인가? | 3 | 매 어템마다 보호막이 지급됩니다. 보호막이 깨지면 1.5초간 노클립 상태로 전환됩니다. | 보호막 개수가 하나 늘어납니다. | working. Covers both players in dual. Charges left at checkpoint placement come back on the respawn (verified 2026-09-17). |
 | `slow-mo` | 나무늘보 | 3 | 게임 속도가 5% 감소합니다. X를 눌러 토글할 수 있습니다. | 게임 속도가 5% 더 감소합니다. | working. Speed = 1 − 0.05·level (95/90/85 %), game + music; toggle state persists within the run; pause menu at normal speed. |
-| `startpos` | 스타트포스 | 5 | 매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다. 해당 어템에 죽으면 체크포인트에서 부활합니다. | 체크포인트를 한 번 더 찍을 수 있습니다. | working (v3 verified 2026-09-17). `level` placements per attempt (a life from 0 %), but **only the newest one is live**: placing again moves it; a death respawns there **once**, and the next death restarts from 0 unless a new one was placed in between (budget permitting). The older "each checkpoint is one respawn, newest first" chain was dropped as too loose (user, 2026-09-17). A checkpoint also **snapshots shield charges and brake seconds left** and the respawn restores them (`Augment::onCheckpointPlaced` / `onCheckpointRespawn`). |
+| `startpos` | 스타트포스 | 5 | 매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다. 해당 어템에 죽으면 체크포인트에서 부활합니다. | 체크포인트를 한 번 더 찍을 수 있습니다. | working (v3 verified 2026-09-17). `level` placements per attempt (a life from 0 %), but **only the newest one is live**: placing again moves it; a death respawns there **once**, and the next death restarts from 0 unless a new one was placed in between (budget permitting). The older "each checkpoint is one respawn, newest first" chain was dropped as too loose (user, 2026-09-17). A checkpoint also **snapshots shield charges and brake seconds left** and the respawn restores them (`Augment::onCheckpointPlaced` / `onCheckpointRespawn`). A death the respawn comes back from **charges no gauge**: the life pays once, at its best percent (2026-09-27, see the gauge section). |
 | `foresight` | 사륜안 | 1 | 히트박스를 보여줍니다. | – | working. GD colours: blue solid, red hazard, green interactive, yellow player. |
 | `unmirror` | 멀미약 | 1 | 레벨 내 모든 미러포탈을 제거합니다. | – | rewritten 2026-09-17 as a `GJBaseGameLayer::toggleFlipped` hook (refs pattern), untested: flips are refused while owned, drafting un-flips at once. |
 | `hazard-hitbox` | 위협제거 | 5 | 위험 요소(빨간 히트박스)의 크기가 5% 감소합니다. | 위험 요소의 크기가 5% 더 감소합니다. | built, in-game test pending. Hazard / AnimatedHazard hitboxes shrink around their centre to 1 − 0.05·level (95…75 %); solids, slopes, player untouched. |

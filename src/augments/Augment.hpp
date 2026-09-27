@@ -58,8 +58,11 @@ public:
     // an augment that can answer a hit for free (berserk smashing the
     // hazard), which is asked first so the shield keeps its charge.
     virtual int hitPriority() const { return 0; }
-    // Player 1 really died (counted once per attempt), before GD's reset.
-    virtual void onDeath(LevelSession&) {}
+    // Player 1 really died (counted once per attempt), before GD's reset and
+    // before the gauge is charged. Return true when the run comes back from
+    // this death (a checkpoint respawn): the life is not over, so the draft
+    // gauge waits for the death that ends it.
+    virtual bool onDeath(LevelSession&) { return false; }
     // A checkpoint was placed (startpos). Snapshot whatever per-attempt
     // state should come back with the respawn (shield charges, brake time).
     // Only the newest checkpoint is ever respawned at, so one slot suffices.

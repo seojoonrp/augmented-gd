@@ -14,6 +14,7 @@ void RunState::start(int levelID, std::string levelName) {
     m_draftsTaken = 0;
     m_gaugeDrafts = 0;
     m_bestPercent = 0.f;
+    m_lifeBest = 0.f;
     m_gauge = 0.f;
     // Every run opens with a free draft; PlayLayer::startGame shows it. Not
     // gauge-earned, so it leaves the threshold ramp alone.
@@ -27,6 +28,7 @@ void RunState::end() {
     m_active = false;
     m_pendingDrafts = 0;
     m_pendingGaugeDrafts = 0;
+    m_lifeBest = 0.f;
 }
 
 float RunState::gaugeThreshold(GaugeRule const& rule) const {
@@ -34,11 +36,24 @@ float RunState::gaugeThreshold(GaugeRule const& rule) const {
     return rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts);
 }
 
-DeathResult RunState::onDeath(float percent, GaugeRule const& rule) {
+DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawning) {
     DeathResult r;
     if (!m_active) return r;
 
     m_deaths++;
+
+    // A death the run comes back from (checkpoint respawn) settles nothing:
+    // the life is one visit to the level, so it pays once, for the furthest
+    // point it reached. The best percent is left alone too, or the bonus
+    // below would already be spent when the life ends.
+    m_lifeBest = std::max(m_lifeBest, percent);
+    if (respawning) {
+        r.deferred = true;
+        return r;
+    }
+    // Everything this life reached, including the deaths it was revived from.
+    percent = m_lifeBest;
+    m_lifeBest = 0.f;
 
     // No floor: dying at 3 % is worth 3, so farming early deaths never pays.
     // New ground is paid twice (at mult 1): the bonuses over a whole run sum

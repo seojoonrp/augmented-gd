@@ -78,7 +78,10 @@ void LevelSession::refreshHud(bool force) {
     auto& mgr = this->mgr();
 
     float now = this->percent();
-    float best = std::max(now, mgr.bestPercent());
+    // lifeBest is the furthest a life held open by a checkpoint got to: the
+    // run's best does not count it until the life settles, but the readout
+    // and the mark must not slide back to the checkpoint in the meantime.
+    float best = std::max({ now, mgr.bestPercent(), mgr.lifeBest() });
     // A gauge-earned draft that is still waiting shows as a full bar with
     // DRAFT!; the free opening draft does not (the gauge really is at 0 then).
     m_hud->setGauge(mgr.gauge(), mgr.gaugeThreshold(), mgr.pendingGaugeDrafts() > 0);
@@ -169,8 +172,10 @@ void LevelSession::onHazardsDestroyed(int count) {
     for (auto& a : m_augments) a->onHazardsDestroyed(*this, count);
 }
 
-void LevelSession::onDeath() {
-    for (auto& a : m_augments) a->onDeath(*this);
+bool LevelSession::onDeath() {
+    bool respawning = false;
+    for (auto& a : m_augments) respawning = a->onDeath(*this) || respawning;
+    return respawning;
 }
 
 void LevelSession::onFrame(float dt) {

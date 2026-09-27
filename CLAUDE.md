@@ -101,7 +101,7 @@ src/game/                Geode glue
 src/augments/            one file per augment behind Augment.hpp (all hooks default to no-op):
   Augment.hpp            onLevelInit (before PlayLayer::init) / onLevelReady / onObjectAdded / onBeforeReset→resume? /
                          onAttemptStart(fromCheckpoint) / onCheckpointPlaced→snapshot / onCheckpointRespawn→restore /
-                         onHit→swallow / onDeath / onFrame / onPause /
+                         onHit→swallow / onDeath→respawning? (defers the gauge) / onFrame / onPause /
                          onGranted(id, lv) (every augment hears every grant) / onHotkey(key, down) / hudState(id) / onQuit
   Augments.*             factories + makeAllAugments() (table order)
   Shield SlowMo StartPos Foresight Unmirror(+toggleFlipped hook) HitboxScales(hazard+wave+nerve) DraftCount Cat

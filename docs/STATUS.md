@@ -33,6 +33,9 @@ and HUD text it should produce (`scripts/logs.ps1` with every report).
   300 lead (2026-09-20). The cat on the shared `HazardRemoval` scan is covered
   by the same rounds.
 - **Shield bubble** (white bubble around the icon, ring burst on the absorbed hit, icon blinks 100/50/100 % through noclip via `PlayerObject::setOpacity`) — user: "잘 된다" (2026-09-27).
+- **A life pays the gauge once** (2026-09-27): a death a checkpoint brings the
+  player back from charges nothing and shows no reward; the death that restarts
+  from 0 settles the whole life at its best percent — user: "잘 된다".
 
 ## Broken / unverified
 

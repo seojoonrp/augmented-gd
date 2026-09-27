@@ -127,15 +127,25 @@ class $modify(AugPlayLayer, PlayLayer) {
             // destroyPlayer can fire more than once per attempt; count once.
             if (player == m_player1 && s->countDeath()) {
                 auto& mgr = AugmentManager::get();
+                // The augments hear the death first, because startpos
+                // answers there whether a checkpoint brings this attempt
+                // back: a death the run comes back from charges nothing yet.
+                bool respawning = s->onDeath();
                 // The gauge and its cost as the bar showed them, so the
                 // reward animates from there even when this death wraps
                 // the gauge and raises the cost.
                 float before = mgr.gauge();
                 float cost = mgr.gaugeThreshold();
-                auto r = mgr.onDeath(this->getCurrentPercent());
-                if (r.bonus > 0.f) s->notice("NEW BEST", { 255, 220, 90 });
-                s->rewardDeath(this->hudPointOf(player), before, cost, r);
-                s->onDeath();
+                auto r = mgr.onDeath(this->getCurrentPercent(), respawning);
+                if (r.deferred) {
+                    // Nothing is settled while the life goes on: no NEW BEST,
+                    // no numbers, no particles — just the HUD text.
+                    s->refreshHud(true);
+                }
+                else {
+                    if (r.bonus > 0.f) s->notice("NEW BEST", { 255, 220, 90 });
+                    s->rewardDeath(this->hudPointOf(player), before, cost, r);
+                }
             }
         }
 

@@ -68,12 +68,22 @@ GaugeRule AugmentManager::gaugeRule() const {
     return rule;
 }
 
-DeathResult AugmentManager::onDeath(float percent) {
+DeathResult AugmentManager::onDeath(float percent, bool respawning) {
     if (!m_state.active()) return {};
-    auto r = m_state.onDeath(percent, this->gaugeRule());
+    auto r = m_state.onDeath(percent, this->gaugeRule(), respawning);
+    if (r.deferred) {
+        log::info(
+            "Death #{} at {:.1f}% -> gauge waits for the end of the life (checkpoint respawn, life best {:.1f}%)",
+            m_state.deaths(), percent, m_state.lifeBest()
+        );
+        return r;
+    }
+    // The charge is the life's best, which is above `percent` when earlier
+    // deaths of this life were deferred.
     log::info(
         "Death #{} at {:.1f}% -> +{:.0f} (+{:.0f} new best), gauge {:.0f}/{:.0f}, {} draft(s) earned, {} pending",
-        m_state.deaths(), percent, percent, r.bonus, m_state.gauge(), this->gaugeThreshold(), r.earned, m_state.pendingDrafts()
+        m_state.deaths(), percent, r.charge - r.bonus, r.bonus, m_state.gauge(), this->gaugeThreshold(),
+        r.earned, m_state.pendingDrafts()
     );
     return r;
 }

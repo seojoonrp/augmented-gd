@@ -49,8 +49,10 @@ public:
     // --- draft gauge ---
     // Called once per attempt when player 1 dies. Returns what the death
     // charged (`charge` includes the new-best `bonus`) so the caller can
-    // show it.
-    DeathResult onDeath(float percent);
+    // show it. `respawning` = a checkpoint brings this attempt back, so the
+    // gauge waits for the death that ends the life (`deferred` result, and
+    // nothing to show).
+    DeathResult onDeath(float percent, bool respawning);
     int pendingDrafts() const { return m_state.pendingDrafts(); }
     bool hasPendingDraft() const { return m_state.hasPendingDraft(); }
     void clearPendingDraft() { m_state.takePendingDraft(); }
@@ -68,6 +70,9 @@ public:
     int deaths() const { return m_state.deaths(); }
     int draftsTaken() const { return m_state.draftsTaken(); }
     float bestPercent() const { return m_state.bestPercent(); }
+    // Best percent of a life a checkpoint respawn is holding open (0 when
+    // nothing is deferred); the HUD shows it as part of the best.
+    float lifeBest() const { return m_state.lifeBest(); }
 
     // --- augments ---
     int levelOf(std::string const& id) const { return m_state.levelOf(id); }

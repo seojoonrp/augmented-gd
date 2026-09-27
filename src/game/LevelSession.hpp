@@ -81,7 +81,9 @@ public:
     bool onHit(PlayerObject* player, GameObject* object);
     // Hazards an augment just destroyed; berserker rolls on these.
     void onHazardsDestroyed(int count);
-    void onDeath();
+    // True when an augment brings the attempt back (a checkpoint respawn
+    // follows), which makes the death defer the gauge charge.
+    bool onDeath();
     void onFrame(float dt);
     void onPause();
     void onGranted(std::string const& id, int level);

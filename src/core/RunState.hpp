@@ -29,6 +29,9 @@ struct DeathResult {
     float charge = 0.f;   // percent + bonus added to the gauge
     float bonus = 0.f;    // new-best part of that (0 when the best did not move)
     int earned = 0;       // drafts this death queued
+    // A checkpoint respawn follows, so nothing was charged yet (charge,
+    // bonus and earned are all 0): the life pays once, when it ends.
+    bool deferred = false;
 };
 
 class RunState {
@@ -48,8 +51,18 @@ public:
     // multiplier (bestPercent itself keeps the decimals); while
     // the gauge covers the (rising) cost and something is still draftable,
     // a draft is queued and the cost rises. Leftover charge carries over.
-    DeathResult onDeath(float percent, GaugeRule const& rule);
+    //
+    // `respawning` = a checkpoint respawn follows this death, so the life
+    // goes on: the death is counted, the gauge waits, and the percent is
+    // remembered. The death that really ends the life charges for the best
+    // percent of the whole life, once (user, 2026-09-27: dying at 6 % and
+    // then at 4 % behind one checkpoint must pay 6, not 10).
+    DeathResult onDeath(float percent, GaugeRule const& rule, bool respawning = false);
     float gauge() const { return m_gauge; }
+    // Best percent of the life in progress, 0 when no death is waiting on a
+    // checkpoint respawn. What the next settling death will charge for; the
+    // HUD folds it into the best it shows, so the mark never slides back.
+    float lifeBest() const { return m_lifeBest; }
     // Cost of the next draft under `rule`.
     float gaugeThreshold(GaugeRule const& rule) const;
     // Debug: tops the gauge up to the threshold. Returns the charge added.
@@ -115,6 +128,9 @@ private:
     // and so does not raise the threshold.
     int m_gaugeDrafts = 0;
     float m_bestPercent = 0.f;
+    // Best percent of the life that a checkpoint respawn is holding open;
+    // 0 when nothing is deferred.
+    float m_lifeBest = 0.f;
     float m_gauge = 0.f;
     int m_pendingDrafts = 0;
     int m_pendingGaugeDrafts = 0;
