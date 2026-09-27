@@ -87,7 +87,10 @@ private:
             "Cat: removed {}/{} of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f}, {} removed this attempt)",
             removed, want, candidates.size(), s.percent(), view.lo, view.hi, m_removed.size()
         );
-        if (removed > 0) s.notice(fmt::format("CAT  -{}", removed), { 255, 180, 230 });
+        if (removed > 0) {
+            s.notice(fmt::format("CAT  -{}", removed), { 255, 180, 230 });
+            s.onHazardsDestroyed(removed);
+        }
     }
 
     // Seconds since the last sweep, and what this attempt's sweeps removed.

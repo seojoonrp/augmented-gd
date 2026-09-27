@@ -100,6 +100,9 @@ public:
     float catInterval() const;
     float missileInterval() const;
     float missileRadius() const;
+    // Berserker: the per-destroyed-hazard roll and how long a hit roll lasts.
+    float berserkChance() const;
+    float berserkSeconds() const;
 
 private:
     bool m_active = false;

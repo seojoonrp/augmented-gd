@@ -39,7 +39,7 @@ Augment design space (every candidate falls in one):
 | M2 | Gauge, draft popup, mandatory pick, HUD | done, verified |
 | M3 | First 5 augments | 3 verified (Shield, Slow-Mo, Foresight); Checkpoint and Unmirror unverified |
 | **M4** | **Unblock input** (hotkeys, or a no-key fallback) | **blocked** — see `GD-INTERNALS.md` |
-| M5 | Pool to ~12 with Tier-1 augments | next (pool is at 9, all implemented since 2026-09-17) |
+| M5 | Pool to ~12 with Tier-1 augments | done (pool is at 13, all implemented; berserker 2026-09-27) |
 | M6 | Draft depth: rarity, curses, prerequisites, reroll | after M5 |
 | M7 | Run persistence, run summary, safe mode → release candidate | — |
 | M8 | Tier-2/3 augments (new GD hooks) | — |

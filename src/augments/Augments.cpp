@@ -20,6 +20,7 @@ std::vector<std::unique_ptr<Augment>> makeAllAugments() {
     all.push_back(makeCat());
     all.push_back(makeBrake());
     all.push_back(makeMissile());
+    all.push_back(makeBerserk());
     return all;
 }
 

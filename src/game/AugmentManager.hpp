@@ -96,6 +96,9 @@ public:
     // --- missile: seconds between strikes and blast radius in object units (0 when unowned) ---
     float missileInterval() const { return m_state.missileInterval(); }
     float missileRadius() const { return m_state.missileRadius(); }
+    // --- berserker: roll per destroyed hazard and window length (0 when unowned) ---
+    float berserkChance() const { return m_state.berserkChance(); }
+    float berserkSeconds() const { return m_state.berserkSeconds(); }
 
 private:
     AugmentManager();

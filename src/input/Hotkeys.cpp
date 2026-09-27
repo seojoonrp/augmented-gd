@@ -100,7 +100,8 @@ $on_mod(Loaded) {
         if (!down) return ListenerResult::Propagate;
 
         // Debug: 1..9 grant augments (table order), Shift+1..9 the 10th
-        // onwards (Shift+1 cat, Shift+2 brake, Shift+3 missile), 0 fills the gauge. Never while a draft is up.
+        // onwards (Shift+1 cat, Shift+2 brake, Shift+3 missile, Shift+4 berserker),
+        // 0 fills the gauge. Never while a draft is up.
         bool shift = data.modifiers == KeyboardModifier::Shift;
         if (data.key >= KEY_Zero && data.key <= KEY_Nine && (data.modifiers == KeyboardModifier::None || shift)
             && AugmentManager::debugMode() && !draft::isOpen()) {

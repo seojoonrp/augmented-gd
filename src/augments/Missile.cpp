@@ -157,6 +157,7 @@ private:
             centre.x, centre.y, radius, removed, s.percent(), m_removed.size()
         );
         s.notice(fmt::format("MISSILE  -{}", removed), { 255, 170, 60 });
+        s.onHazardsDestroyed(removed);
     }
 
     // Seconds since the last launch (not counted while a missile is in the

@@ -152,11 +152,21 @@ void LevelSession::onCheckpointPlaced() {
     for (auto& a : m_augments) a->onCheckpointPlaced(*this);
 }
 
-bool LevelSession::onHit(PlayerObject* player) {
-    for (auto& a : m_augments) {
-        if (a->onHit(*this, player)) return true;
+bool LevelSession::onHit(PlayerObject* player, GameObject* object) {
+    // Augments that can answer the hit for free go first (Augment::hitPriority),
+    // then the rest in table order.
+    for (int tier = 1; tier >= 0; tier--) {
+        for (auto& a : m_augments) {
+            if ((a->hitPriority() > 0) != (tier > 0)) continue;
+            if (a->onHit(*this, player, object)) return true;
+        }
     }
     return false;
+}
+
+void LevelSession::onHazardsDestroyed(int count) {
+    if (count <= 0) return;
+    for (auto& a : m_augments) a->onHazardsDestroyed(*this, count);
 }
 
 void LevelSession::onDeath() {
@@ -200,7 +210,13 @@ bool LevelSession::countDeath() {
 
 bool LevelSession::debugGrant(int index) {
     auto const& defs = allAugments();
-    if (index < 0 || index >= static_cast<int>(defs.size())) return false;
+    if (index < 0 || index >= static_cast<int>(defs.size())) {
+        // Says out loud that the key hit nothing: a debug key for an
+        // augment the running build does not have (a stale install) is
+        // otherwise silent.
+        log::info("Debug grant: no augment at index {} ({} in the table)", index, defs.size());
+        return false;
+    }
     if (!this->runLevel()) {
         log::info("Debug grant ignored: not a run level");
         return false;

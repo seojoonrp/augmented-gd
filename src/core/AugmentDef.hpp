@@ -23,6 +23,7 @@ namespace ids {
     constexpr char const* Cat          = "cat";
     constexpr char const* Brake        = "brake";
     constexpr char const* Missile      = "missile";
+    constexpr char const* Berserk      = "berserker";
 }
 
 // Static definition of one augment. Runtime state (current level, etc.)
@@ -96,6 +97,11 @@ namespace tune {
     constexpr float MissileMinInterval = 1.f;
     constexpr float MissileBaseRadius = 3.f * BlockUnits;
     constexpr float MissileRadiusStep = 0.5f * BlockUnits;
+    // Berserker: every destroyed hazard (cat, missile, or a berserk smash
+    // itself) rolls BerserkChanceStep * level to open a BerserkSeconds
+    // window in which touching a hazard destroys it instead of dying.
+    constexpr float BerserkChanceStep = 0.02f;
+    constexpr float BerserkSeconds = 3.f;
 }
 
 } // namespace augment

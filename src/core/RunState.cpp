@@ -153,4 +153,12 @@ float RunState::missileRadius() const {
     return formula::missileRadius(this->levelOf(ids::Missile));
 }
 
+float RunState::berserkChance() const {
+    return formula::berserkChance(this->levelOf(ids::Berserk));
+}
+
+float RunState::berserkSeconds() const {
+    return formula::berserkSeconds(this->levelOf(ids::Berserk));
+}
+
 } // namespace augment

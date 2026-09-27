@@ -78,7 +78,9 @@ public:
     // A checkpoint respawn also fans out onCheckpointRespawn afterwards.
     void onAttemptStart(bool fromCheckpoint);
     void onCheckpointPlaced();
-    bool onHit(PlayerObject* player);
+    bool onHit(PlayerObject* player, GameObject* object);
+    // Hazards an augment just destroyed; berserker rolls on these.
+    void onHazardsDestroyed(int count);
     void onDeath();
     void onFrame(float dt);
     void onPause();

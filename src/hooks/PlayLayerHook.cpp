@@ -121,8 +121,8 @@ class $modify(AugPlayLayer, PlayLayer) {
 
         auto s = this->session();
         if (s && s->runAttempt() && (player == m_player1 || player == m_player2)) {
-            // Shield may swallow the hit.
-            if (s->onHit(player)) return;
+            // Shield (or a berserk smash) may swallow the hit.
+            if (s->onHit(player, object)) return;
 
             // destroyPlayer can fire more than once per attempt; count once.
             if (player == m_player1 && s->countDeath()) {

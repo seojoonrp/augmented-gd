@@ -53,7 +53,8 @@ be farmed either. The rising threshold stops late-run draft floods (stuck at
 (the floor was dropped instead).
 
 **Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
-augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat, Shift+2 = brake, Shift+3 = missile), key 0 tops the gauge up to the threshold (the draft still happens
+augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat, Shift+2 = brake, Shift+3 = missile,
+Shift+4 = berserker), key 0 tops the gauge up to the threshold (the draft still happens
 on the next death), and `debug-threshold` replaces the ramp with a fixed
 cost so one number can be tuned in the settings UI without rebuilding.
 
@@ -61,7 +62,7 @@ cost so one number can be tuned in the settings UI without rebuilding.
 
 Three random augments that are not yet maxed, shown on respawn. Picking is
 mandatory (no close button, back key ignored). Duplicate picks level the
-augment up. Pool is 12 augments, all implemented. Owning `draft-count` raises
+augment up. Pool is 13 augments, all implemented. Owning `draft-count` raises
 the card count to 4 from the next draft on; the popup then narrows the cards
 and scales their text by the same ratio so four still fit GD's 569 pt width.
 
@@ -85,11 +86,13 @@ level. The id is the "코드" column and is what the hooks key on.
 | `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and fires a laser at each removed hazard; real cat art later. |
 | `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. `BRAKE EMPTY` notice when used up. Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
 | `missile` | 공습경보 | 5 | 6초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다. 반경 3칸 안의 위험 요소가 모두 제거됩니다. | 폭발 반경이 0.5칸 커지고, 미사일 쿨타임이 0.5초 감소합니다. | working (verified 2026-09-20, lead 300 "딱 괜찮은듯"). Every `6 − 0.5·(lv−1)` s of play a missile is aimed at a **random hazard** on screen and at least 300 units (~1 s at 1x) ahead of the player (was 150; the user found the impact landed where they already were, 2026-09-20 — aiming at a hazard, not a point, so every strike hits something; nothing in view → the strike stays armed and fires as soon as a hazard scrolls in). It drops for 0.35 s (world-space reticle + missile, `MissileNode` in `m_objectLayer`), then every hazard whose collision shape (AABB, or radius for saws) touches the blast circle of `3 + 0.5·(lv−1)` blocks is removed for the rest of the attempt — same `destroyObject()` flags and put-back as the cat (`HazardRemoval.hpp`). A reset mid-drop cancels the missile. |
+| `berserker` | 버서커 | 3 | 위험 요소가 파괴될 때마다 2% 확률로 3초간 버서커 모드에 돌입합니다. 버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다. | 버서커 모드 발동 확률이 2% 증가합니다. | built 2026-09-27, in-game test pending. Every hazard **an augment destroys** rolls `0.02·level` to open a 3 s window; while it is open, `destroyPlayer` with a **hazard** object smashes that hazard (same `destroyObject()` flags and put-back as the cat and the missile) instead of killing the player. A smash is itself a destroyed hazard, so it rolls again and can refresh the window. Solids, slopes and a death GD names no object for (`object == nullptr`, e.g. suicide) still kill. The window is **game** seconds (slow-mo stretches it, like the cat and missile timers) and closes on any reset. Asked before the shield (`Augment::hitPriority`) so a free smash never spends a charge. **Dependency:** nothing else destroys hazards, so without `cat` or `missile` it can never roll — the HUD row says `needs cat/missile`. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
 behaviour in `src/augments/` (one file per augment, see `Augment.hpp`). Debug keys 1-9 grant augments in
-table order, Shift+1-9 continue from the 10th (Shift+1 cat, Shift+2 brake, Shift+3 missile).
+table order, Shift+1-9 continue from the 10th (Shift+1 cat, Shift+2 brake, Shift+3 missile,
+Shift+4 berserker).
 
 ## Text & fonts (decided 2026-09-17)
 

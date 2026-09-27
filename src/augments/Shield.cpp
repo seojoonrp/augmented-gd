@@ -32,7 +32,7 @@ public:
         log::info("Shield: restored from checkpoint, {} left", s.levelOf(ids::Shield) - m_used);
     }
 
-    bool onHit(LevelSession& s, PlayerObject*) override {
+    bool onHit(LevelSession& s, PlayerObject*, GameObject*) override {
         // Still inside the noclip window -> ignore the hit entirely.
         if (m_noclipTimer > 0.f) return true;
 

@@ -42,7 +42,7 @@ RunState freshRun() {
 
 void testTable() {
     auto const& defs = allAugments();
-    CHECK(defs.size() == 12);
+    CHECK(defs.size() == 13);
     std::set<std::string> ids;
     for (auto const& d : defs) {
         CHECK(!d.id.empty());
@@ -131,6 +131,14 @@ void testFormulas() {
     CHECK_NEAR(formula::brakeBudget(0), 0.f);
     CHECK_NEAR(formula::brakeBudget(1), 7.f);
     CHECK_NEAR(formula::brakeBudget(3), 21.f);
+
+    CHECK_NEAR(formula::berserkChance(0), 0.f);
+    CHECK_NEAR(formula::berserkChance(1), 0.02f);
+    CHECK_NEAR(formula::berserkChance(3), 0.06f);
+    CHECK_NEAR(formula::berserkChance(500), 1.f);   // a probability, so clamped
+    CHECK_NEAR(formula::berserkSeconds(0), 0.f);
+    CHECK_NEAR(formula::berserkSeconds(1), 3.f);
+    CHECK_NEAR(formula::berserkSeconds(3), 3.f);
 }
 
 // ---------------------------------------------------------------- run lifecycle
@@ -367,6 +375,11 @@ void testEffectsAtLevels() {
     s.grant(ids::Missile); s.grant(ids::Missile); s.grant(ids::Missile);
     CHECK_NEAR(s.missileInterval(), 5.f);
     CHECK_NEAR(s.missileRadius(), 120.f);
+    CHECK_NEAR(s.berserkChance(), 0.f);
+    CHECK_NEAR(s.berserkSeconds(), 0.f);
+    s.grant(ids::Berserk); s.grant(ids::Berserk);
+    CHECK_NEAR(s.berserkChance(), 0.04f);
+    CHECK_NEAR(s.berserkSeconds(), tune::BerserkSeconds);
 }
 
 } // namespace

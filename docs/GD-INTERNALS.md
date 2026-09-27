@@ -31,6 +31,16 @@ Windows (linked from `libcocos2d.dll`); an entry marked `win inline` is not.
     phantom deaths at 0%. Always pass it straight through.
   - possibly more than once per attempt for the same death → guard with a
     per-attempt flag in `Fields`.
+  - `object` **can be null**: qolmod's noclip only records it as the death
+    object `if (p1 != nullptr)` and its Suicide hack calls
+    `destroyPlayer(m_player1, nullptr)`
+    (`refs/qolmod/src/Hacks/Level/Noclip/Hooks.cpp:151-157`,
+    `Suicide.cpp:57`). Anything that reacts to *what* killed the player
+    must treat null as "not that" — `Berserk.cpp` lets a null-object death
+    stand. **(from refs)** Which real deaths pass null (out of bounds?) is
+    **(unverified)**; qolmod tracks the object from
+    `PlayerObject::collidedWithObjectInternal(dt, object, rect, skipCheck)`
+    instead when it needs one for sure.
 - After a death GD queues a `CCSequence` with **tag `0x10`** on the PlayLayer
   that ends in `delayedResetLevel()` → `resetLevel()` (qolmod `RespawnTime.cpp:74-98`
   replaces that action to change the respawn delay). Our `resetLevel` hook is

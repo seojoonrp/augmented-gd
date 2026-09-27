@@ -49,9 +49,15 @@ public:
     // Inside resetLevel, after GD reset. A checkpoint respawn is the same
     // attempt: per-attempt budgets refill only when `fromCheckpoint` is false.
     virtual void onAttemptStart(LevelSession&, bool fromCheckpoint) {}
-    // destroyPlayer on a run attempt, before the death is counted. Return
-    // true to swallow the hit (the original is not called).
-    virtual bool onHit(LevelSession&, PlayerObject*) { return false; }
+    // destroyPlayer on a run attempt, before the death is counted. `object`
+    // is what killed the player, or null when GD names nothing (suicide, out
+    // of bounds — qolmod guards the same way). Return true to swallow the hit
+    // (the original is not called).
+    virtual bool onHit(LevelSession&, PlayerObject*, GameObject* object) { return false; }
+    // Two tiers for that question: everything is 0 (table order) except
+    // an augment that can answer a hit for free (berserk smashing the
+    // hazard), which is asked first so the shield keeps its charge.
+    virtual int hitPriority() const { return 0; }
     // Player 1 really died (counted once per attempt), before GD's reset.
     virtual void onDeath(LevelSession&) {}
     // A checkpoint was placed (startpos). Snapshot whatever per-attempt
@@ -60,6 +66,10 @@ public:
     virtual void onCheckpointPlaced(LevelSession&) {}
     // Right after onAttemptStart(fromCheckpoint = true): restore the snapshot.
     virtual void onCheckpointRespawn(LevelSession&) {}
+    // `count` hazards were just destroyed by an augment (cat sweep, missile
+    // blast, berserk smash). Fired by whoever removed them, after the
+    // removal; berserker rolls its chance per hazard here.
+    virtual void onHazardsDestroyed(LevelSession&, int count) {}
     // postUpdate, run levels only. dt is already time-scaled.
     virtual void onFrame(LevelSession&, float dt) {}
     // PlayLayer::pauseGame.

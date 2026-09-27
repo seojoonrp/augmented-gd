@@ -63,6 +63,18 @@ inline float missileRadius(int missileLevel) {
     return tune::MissileBaseRadius + tune::MissileRadiusStep * static_cast<float>(missileLevel - 1);
 }
 
+// Probability (0..1) that one destroyed hazard opens berserk; 0 when unowned.
+inline float berserkChance(int berserkLevel) {
+    if (berserkLevel <= 0) return 0.f;
+    return std::clamp(tune::BerserkChanceStep * static_cast<float>(berserkLevel), 0.f, 1.f);
+}
+
+// How long one roll keeps berserk open; 0 when unowned.
+inline float berserkSeconds(int berserkLevel) {
+    if (berserkLevel <= 0) return 0.f;
+    return tune::BerserkSeconds;
+}
+
 // Game speed while the brake is held; independent of slow-mo.
 inline float brakeScale() {
     return 1.f - tune::BrakeCut;

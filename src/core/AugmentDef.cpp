@@ -25,7 +25,8 @@ std::string const& AugmentDef::describe(int level) const {
 }
 
 // Text is the design table (docs/DESIGN.md) with its numbers taken from
-// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th, Shift+2 the 11th, Shift+3 the 12th).
+// tune::. Number keys 1-9 grant augments in this order (Shift+1 = the 10th,
+// Shift+2 the 11th, Shift+3 the 12th, Shift+4 the 13th).
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
         { ids::Shield, "결계인가?", 3,
@@ -69,6 +70,11 @@ std::vector<AugmentDef> const& allAugments() {
                 + num(tune::MissileBaseRadius / tune::BlockUnits) + "칸 안의 위험 요소가 모두 제거됩니다.",
             "폭발 반경이 " + num(tune::MissileRadiusStep / tune::BlockUnits) + "칸 커지고,\n미사일 쿨타임이 "
                 + num(tune::MissileIntervalStep) + "초 감소합니다." },
+        { ids::Berserk, "버서커", 3,
+            "위험 요소가 파괴될 때마다 " + pct(tune::BerserkChanceStep) + "% 확률로\n"
+                + num(tune::BerserkSeconds) + "초간 버서커 모드에 돌입합니다.\n"
+                "버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다.",
+            "버서커 모드 발동 확률이 " + pct(tune::BerserkChanceStep) + "% 증가합니다." },
     };
     return pool;
 }

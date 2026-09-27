@@ -20,6 +20,7 @@ std::unique_ptr<Augment> makeDraftCount();
 std::unique_ptr<Augment> makeCat();
 std::unique_ptr<Augment> makeBrake();
 std::unique_ptr<Augment> makeMissile();
+std::unique_ptr<Augment> makeBerserk();
 
 // Table order, so HUD rows and grant dispatch follow docs/DESIGN.md.
 std::vector<std::unique_ptr<Augment>> makeAllAugments();
