@@ -66,7 +66,8 @@ inline float missileRadius(int missileLevel) {
 // Probability (0..1) that one destroyed hazard opens berserk; 0 when unowned.
 inline float berserkChance(int berserkLevel) {
     if (berserkLevel <= 0) return 0.f;
-    return std::clamp(tune::BerserkChanceStep * static_cast<float>(berserkLevel), 0.f, 1.f);
+    float chance = tune::BerserkChanceBase + tune::BerserkChanceStep * static_cast<float>(berserkLevel - 1);
+    return std::clamp(chance, 0.f, 1.f);
 }
 
 // How long one roll keeps berserk open; 0 when unowned.

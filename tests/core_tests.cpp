@@ -78,6 +78,9 @@ void testTable() {
     CHECK(contains(findAugment(ids::Missile)->initialDesc, "반경 3칸"));
     CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5칸 커지고"));
     CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5초 감소"));
+    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "3% 확률로"));
+    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "2초간"));
+    CHECK(contains(findAugment(ids::Berserk)->levelUpDesc, "1% 증가"));
 
     // describe(): initial for level 1, level-up text after, initial again
     // when there is no level-up text.
@@ -133,12 +136,14 @@ void testFormulas() {
     CHECK_NEAR(formula::brakeBudget(3), 21.f);
 
     CHECK_NEAR(formula::berserkChance(0), 0.f);
-    CHECK_NEAR(formula::berserkChance(1), 0.02f);
-    CHECK_NEAR(formula::berserkChance(3), 0.06f);
+    CHECK_NEAR(formula::berserkChance(1), 0.03f);
+    CHECK_NEAR(formula::berserkChance(2), 0.04f);
+    CHECK_NEAR(formula::berserkChance(3), 0.05f);
     CHECK_NEAR(formula::berserkChance(500), 1.f);   // a probability, so clamped
+    // The window is flat across levels; only the chance grows.
     CHECK_NEAR(formula::berserkSeconds(0), 0.f);
-    CHECK_NEAR(formula::berserkSeconds(1), 3.f);
-    CHECK_NEAR(formula::berserkSeconds(3), 3.f);
+    CHECK_NEAR(formula::berserkSeconds(1), 2.f);
+    CHECK_NEAR(formula::berserkSeconds(3), 2.f);
 }
 
 // ---------------------------------------------------------------- run lifecycle

@@ -71,7 +71,7 @@ std::vector<AugmentDef> const& allAugments() {
             "폭발 반경이 " + num(tune::MissileRadiusStep / tune::BlockUnits) + "칸 커지고,\n미사일 쿨타임이 "
                 + num(tune::MissileIntervalStep) + "초 감소합니다." },
         { ids::Berserk, "버서커", 3,
-            "위험 요소가 파괴될 때마다 " + pct(tune::BerserkChanceStep) + "% 확률로\n"
+            "위험 요소가 파괴될 때마다 " + pct(tune::BerserkChanceBase) + "% 확률로\n"
                 + num(tune::BerserkSeconds) + "초간 버서커 모드에 돌입합니다.\n"
                 "버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다.",
             "버서커 모드 발동 확률이 " + pct(tune::BerserkChanceStep) + "% 증가합니다." },

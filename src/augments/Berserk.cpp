@@ -17,6 +17,7 @@
 #include "../game/LevelSession.hpp"
 #include "../game/AugmentManager.hpp"
 #include "../hooks/HazardHitboxHook.hpp"
+#include "../ui/BerserkAura.hpp"
 #include "../ui/BerserkNode.hpp"
 
 #include <Geode/Geode.hpp>
@@ -43,6 +44,7 @@ public:
         m_left = 0.f;
         m_smashed = 0;
         m_rollLogged = false;
+        if (m_aura) m_aura->reset();
     }
 
     // Close the window and put back everything this attempt's smashes took.
@@ -52,6 +54,7 @@ public:
         if (m_left > 0.f) log::info("Berserk: window ({:.2f}s left) closed by the reset", m_left);
         m_left = 0.f;
         if (m_node) m_node->setWindow(0.f, 0.f);
+        if (m_aura) m_aura->reset();
         if (m_removed.empty()) return false;
         auto count = m_removed.size();
         int stillDisabled = m_removed.restore();
@@ -115,9 +118,15 @@ public:
         if (!s.owns(ids::Berserk)) return;
         this->ensureNode(s);
         auto layer = s.layer();
-        if (!s.runAttempt() || layer->m_isPaused || !layer->m_player1 || layer->m_player1->m_isDead) return;
+        // Paused: leave the picture exactly as it was, like the cat and the
+        // missile do.
+        if (layer->m_isPaused) return;
 
-        if (m_left > 0.f) {
+        // The window only runs down while the attempt is really being played;
+        // the pictures still animate after a death so nothing freezes on
+        // screen through GD's respawn delay (they are told the window is shut).
+        bool live = s.runAttempt() && layer->m_player1 && !layer->m_player1->m_isDead;
+        if (live && m_left > 0.f) {
             m_left -= dt;
             if (m_left <= 0.f) {
                 m_left = 0.f;
@@ -125,9 +134,10 @@ public:
             }
         }
         if (m_node) {
-            m_node->setWindow(m_left, s.mgr().berserkSeconds());
+            m_node->setWindow(live ? m_left : 0.f, s.mgr().berserkSeconds());
             m_node->tick(dt);
         }
+        this->tickAura(s, dt, live);
     }
 
     std::string hudState(LevelSession& s, std::string const&) override {
@@ -152,6 +162,37 @@ private:
         log::info("Berserk: node added to the UI layer");
     }
 
+    // The fire goes in the object layer (world space, like ShieldNode) one z
+    // order below the player, so the icon stays drawn on top of it.
+    // (unverified: the player's z is read at creation time; if the flame ends
+    // up hidden behind level blocks, that z is the thing to tune.)
+    void ensureAura(LevelSession& s) {
+        if (m_aura || !s.owns(ids::Berserk)) return;
+        auto layer = s.layer();
+        if (!layer->m_objectLayer || !layer->m_player1) return;
+        int playerZ = layer->m_player1->getZOrder();
+        m_aura = BerserkAura::create();
+        layer->m_objectLayer->addChild(m_aura, playerZ - 1);
+        log::info("Berserk: aura added to the object layer at z {} (player 1 is at z {})", playerZ - 1, playerZ);
+    }
+
+    // Feeds the aura one entry per live player, and whether the window is open.
+    void tickAura(LevelSession& s, float dt, bool live) {
+        this->ensureAura(s);
+        if (!m_aura) return;
+        auto layer = s.layer();
+
+        std::vector<BerserkAura::Flame> flames;
+        auto add = [&](PlayerObject* p) {
+            if (!p || p->m_isDead) return;
+            flames.push_back({ p->getPosition(), kAuraSize * p->m_vehicleSize, p->m_isGoingLeft });
+        };
+        add(layer->m_player1);
+        if (layer->m_gameState.m_isDualMode) add(layer->m_player2);
+
+        m_aura->tick(dt, flames, live && m_left > 0.f);
+    }
+
     // Opens the window, or refreshes it when one is already running.
     void enter(LevelSession& s, int ofCount) {
         float seconds = s.mgr().berserkSeconds();
@@ -165,6 +206,10 @@ private:
         s.notice(again ? "BERSERK +" : "BERSERK!", { 255, 70, 60 });
     }
 
+    // The flame's reach around a normal-size icon (30 units); scaled by
+    // m_vehicleSize for mini, the way ShieldNode sizes its bubble.
+    static constexpr float kAuraSize = 17.f;
+
     // Seconds left of the window (game seconds: the dt is time-scaled, like
     // the cat's and the missile's timers), smashes this attempt, and what
     // they took.
@@ -172,8 +217,9 @@ private:
     int m_smashed = 0;
     bool m_rollLogged = false;
     hazard::Removed m_removed;
-    // Child of m_uiLayer; dies with the level.
+    // Children of the level's layers; both die with the level.
     BerserkNode* m_node = nullptr;
+    BerserkAura* m_aura = nullptr;
 };
 
 } // namespace

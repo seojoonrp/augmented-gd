@@ -10,15 +10,17 @@ namespace augment {
 namespace {
     // The frame is faked as a few nested bands (CCDrawNode has no gradients):
     // kBands rings of kBandWidth each, dimmer toward the middle of the screen.
-    constexpr int kBands = 6;
-    constexpr float kBandWidth = 9.f;
-    constexpr float kFrameAlpha = 0.5f;
+    // Tuned in two passes with the user (2026-09-27): 6 x 9 units at 0.5 alpha
+    // was too much, 4 x 6 at 0.2 too little, so this sits in between.
+    constexpr int kBands = 5;
+    constexpr float kBandWidth = 7.5f;
+    constexpr float kFrameAlpha = 0.33f;
     // The frame dims away over the window's last moments.
-    constexpr float kFadeOutSeconds = 0.5f;
-    constexpr float kPulseRate = 11.f;
+    constexpr float kFadeOutSeconds = 0.4f;
+    constexpr float kPulseRate = 9.f;
 
-    constexpr float kBurstStart = 8.f;
-    constexpr float kBurstEnd = 52.f;
+    constexpr float kBurstStart = 7.f;
+    constexpr float kBurstEnd = 36.f;
     constexpr int kSegments = 28;
 
     // CCDrawNode wants premultiplied alpha.
@@ -87,7 +89,8 @@ void BerserkNode::redraw() {
         float fade = std::clamp(m_left / kFadeOutSeconds, 0.f, 1.f);
         // Faster pulse as the window runs out, so "about to end" reads.
         float urgency = m_total > 0.f ? 1.f + (1.f - std::clamp(m_left / m_total, 0.f, 1.f)) : 1.f;
-        float pulse = 0.55f + 0.45f * std::sin(m_age * kPulseRate * urgency);
+        // A breath, not a strobe.
+        float pulse = 0.72f + 0.28f * std::sin(m_age * kPulseRate * urgency);
         for (int i = 0; i < kBands; i++) {
             float inner = static_cast<float>(i) * kBandWidth;
             float outer = inner + kBandWidth;
@@ -115,8 +118,9 @@ void BerserkNode::redraw() {
         float ease = 1.f - (1.f - u) * (1.f - u);
         float radius = kBurstStart + (kBurstEnd - kBurstStart) * ease;
         float alpha = 1.f - u;
-        m_draw->drawCircle(at, radius, kNoFill, 2.5f, premul(1.f, 0.25f, 0.15f, alpha), kSegments);
-        m_draw->drawDot(at, kBurstStart * (1.f - u), premul(1.f, 0.9f, 0.7f, alpha));
+        m_draw->drawCircle(at, radius, kNoFill, 1.8f, premul(1.f, 0.25f, 0.15f, alpha * 0.85f), kSegments);
+        // Filled drawCircle, not drawDot (GD draws a dot as a square quad).
+        m_draw->drawCircle(at, kBurstStart * (1.f - u), premul(1.f, 0.9f, 0.7f, alpha * 0.7f), 0.f, kNoFill, 12);
     }
 }
 

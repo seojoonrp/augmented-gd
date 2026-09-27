@@ -98,10 +98,12 @@ namespace tune {
     constexpr float MissileBaseRadius = 3.f * BlockUnits;
     constexpr float MissileRadiusStep = 0.5f * BlockUnits;
     // Berserker: every destroyed hazard (cat, missile, or a berserk smash
-    // itself) rolls BerserkChanceStep * level to open a BerserkSeconds
-    // window in which touching a hazard destroys it instead of dying.
-    constexpr float BerserkChanceStep = 0.02f;
-    constexpr float BerserkSeconds = 3.f;
+    // itself) rolls BerserkChanceBase + BerserkChanceStep * (level - 1) to
+    // open a BerserkSeconds window in which touching a hazard destroys it
+    // instead of dying. The window does not grow with the level.
+    constexpr float BerserkChanceBase = 0.03f;
+    constexpr float BerserkChanceStep = 0.01f;
+    constexpr float BerserkSeconds = 2.f;
 }
 
 } // namespace augment
