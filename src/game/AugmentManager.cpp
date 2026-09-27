@@ -61,11 +61,9 @@ bool AugmentManager::debugMode() {
 }
 
 GaugeRule AugmentManager::gaugeRule() const {
-    GaugeRule rule;
-    if (debugMode()) {
-        rule.fixedThreshold = std::max(1.f, static_cast<float>(Mod::get()->getSettingValue<int64_t>("debug-threshold")));
-    }
-    return rule;
+    // tune:: only: debug mode used to replace the ramp with a fixed cost,
+    // which meant testing an economy nobody plays (user, 2026-09-27).
+    return GaugeRule{};
 }
 
 DeathResult AugmentManager::onDeath(float percent, bool respawning) {

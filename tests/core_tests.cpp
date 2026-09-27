@@ -238,13 +238,13 @@ void testGaugeNewBestBonusBounded() {
 void testGaugeRamp() {
     auto s = freshRun();
     GaugeRule rule;
-    CHECK_NEAR(s.gaugeThreshold(rule), 40.f);
+    CHECK_NEAR(s.gaugeThreshold(rule), 30.f);
 
-    // 25 % fresh = 25 + 25 = 50 >= 40: one draft, 10 left, cost now 50.
+    // 25 % fresh = 25 + 25 = 50 >= 30: one draft, 20 left, cost now 35.
     auto r = s.onDeath(25.f, rule);
     CHECK(r.earned == 1);
-    CHECK_NEAR(s.gauge(), 10.f);
-    CHECK_NEAR(s.gaugeThreshold(rule), 50.f);
+    CHECK_NEAR(s.gauge(), 20.f);
+    CHECK_NEAR(s.gaugeThreshold(rule), 35.f);
     CHECK(s.pendingDrafts() == 2);         // opening + this one
     CHECK(s.pendingGaugeDrafts() == 1);
 
@@ -258,29 +258,40 @@ void testGaugeRamp() {
     s.takePendingDraft();                   // never negative
     CHECK(s.pendingDrafts() == 0);
 
-    // The opening draft did not raise the cost: still 50 after one gauge draft.
-    CHECK_NEAR(s.gaugeThreshold(rule), 50.f);
+    // The opening draft did not raise the cost: still 35 after one gauge draft.
+    CHECK_NEAR(s.gaugeThreshold(rule), 35.f);
+}
+
+// 30, 35, 40 ... 95, 100, and flat from there (user, 2026-09-27).
+void testGaugeThresholdCap() {
+    auto s = freshRun();
+    GaugeRule rule;
+    // Fourteen gauge drafts walk the ramp up to its ceiling.
+    for (int i = 0; i < 14; i++) {
+        CHECK_NEAR(s.gaugeThreshold(rule), 30.f + 5.f * static_cast<float>(i));
+        s.fillGauge(rule);
+        CHECK(s.onDeath(0.f, rule).earned == 1);
+    }
+    CHECK_NEAR(s.gaugeThreshold(rule), 100.f);
+    s.fillGauge(rule);
+    CHECK(s.onDeath(0.f, rule).earned == 1);
+    CHECK_NEAR(s.gaugeThreshold(rule), 100.f);   // stays there
+    CHECK(s.draftsTaken() == 0);                 // queued, not taken
 }
 
 void testGaugeMultiDraft() {
     auto s = freshRun();
     GaugeRule rule;
-    rule.fixedThreshold = 20.f;
-    // 60 % fresh = 60 + 60 = 120 = 6 drafts at a fixed cost of 20.
+    // 60 % fresh = 60 + 60 = 120 pays 30 + 35 + 40, 15 left (< 45).
     auto r = s.onDeath(60.f, rule);
-    CHECK(r.earned == 6);
-    CHECK_NEAR(s.gauge(), 0.f);
-    CHECK(s.pendingDrafts() == 7);
-    CHECK(s.pendingGaugeDrafts() == 6);
-    CHECK_NEAR(s.gaugeThreshold(rule), 20.f);   // fixed: no ramp
+    CHECK(r.earned == 3);
+    CHECK_NEAR(s.gauge(), 15.f);
+    CHECK(s.pendingDrafts() == 4);         // opening + these three
+    CHECK(s.pendingGaugeDrafts() == 3);
+    CHECK_NEAR(s.gaugeThreshold(rule), 45.f);
 
-    // With the ramp: 120 pays 40 + 50 = 90, 30 left (< 60).
     auto t = freshRun();
-    r = t.onDeath(60.f, GaugeRule{});
-    CHECK(r.earned == 2);
-    CHECK_NEAR(t.gauge(), 30.f);
-    CHECK_NEAR(t.gaugeThreshold(GaugeRule{}), 60.f);
-
+    t.onDeath(60.f, rule);
     t.dropPendingDrafts();
     CHECK(t.pendingDrafts() == 0);
     CHECK(t.pendingGaugeDrafts() == 0);
@@ -330,11 +341,10 @@ void testGaugeCheckpointLife() {
 
     // Drafts wait for the settling death as well.
     auto t = freshRun();
-    GaugeRule fixed;
-    fixed.fixedThreshold = 20.f;
-    CHECK(t.onDeath(60.f, fixed, true).earned == 0);
+    GaugeRule plain;
+    CHECK(t.onDeath(60.f, plain, true).earned == 0);
     CHECK(t.pendingGaugeDrafts() == 0);
-    CHECK(t.onDeath(1.f, fixed).earned == 6);   // 60 + 60 bonus = 6 x 20
+    CHECK(t.onDeath(1.f, plain).earned == 3);   // 60 + 60 bonus pays 30 + 35 + 40
 
     // Ending the run drops a life nothing was paid for.
     auto u = freshRun();
@@ -359,8 +369,8 @@ void testFillGauge() {
     auto s = freshRun();
     GaugeRule rule;
     s.onDeath(5.f, rule);            // gauge 10
-    CHECK_NEAR(s.fillGauge(rule), 30.f);
-    CHECK_NEAR(s.gauge(), 40.f);
+    CHECK_NEAR(s.fillGauge(rule), 20.f);
+    CHECK_NEAR(s.gauge(), 30.f);
     CHECK_NEAR(s.fillGauge(rule), 0.f);
     // Next death (any percent) drafts.
     CHECK(s.onDeath(0.f, rule).earned == 1);
@@ -455,6 +465,7 @@ int main() {
     testGaugeNewBestWholePercents();
     testGaugeNewBestBonusBounded();
     testGaugeRamp();
+    testGaugeThresholdCap();
     testGaugeMultiDraft();
     testGaugeCheckpointLife();
     testGaugeStopsWhenNothingDraftable();

@@ -59,10 +59,10 @@ public:
     void dropPendingDrafts() { m_state.dropPendingDrafts(); }
     int pendingGaugeDrafts() const { return m_state.pendingGaugeDrafts(); }
     float gauge() const { return m_state.gauge(); }
-    // Cost of the next draft: the rising ramp, or the fixed `debug-threshold`
-    // setting in debug mode.
+    // Cost of the next draft: the rising ramp (30, +5 per draft, stopping
+    // at 100), the same in debug mode.
     float gaugeThreshold() const { return m_state.gaugeThreshold(this->gaugeRule()); }
-    // The `debug-mode` setting: number keys grant augments, fixed threshold.
+    // The `debug-mode` setting: number keys grant augments and fill the gauge.
     static bool debugMode();
     // Debug: tops the gauge up to the threshold so the next death drafts.
     // Returns the charge added.

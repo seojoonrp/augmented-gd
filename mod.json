@@ -55,21 +55,8 @@
 		"debug-mode": {
 			"type": "bool",
 			"name": "Debug mode",
-			"description": "Testing aid. Keys 1-9 grant one level of the matching augment (table order: shield, slow-mo, startpos, foresight, unmirror, hazard-hitbox, wave-hitbox, nerve, draft-count; Shift+1 = cat, Shift+2 = brake, Shift+3 = missile, Shift+4 = berserker), key 0 fills the draft gauge (the draft still happens on death), and the draft threshold below replaces the normal rising cost.",
+			"description": "Testing aid. Keys 1-9 grant one level of the matching augment (table order: shield, slow-mo, startpos, foresight, unmirror, hazard-hitbox, wave-hitbox, nerve, draft-count; Shift+1 = cat, Shift+2 = brake, Shift+3 = missile, Shift+4 = berserker), and key 0 fills the draft gauge (the draft still happens on death). The draft cost is the normal one (30, +5 per draft, stopping at 100).",
 			"default": false
-		},
-		"debug-threshold": {
-			"type": "int",
-			"name": "Debug: fixed draft threshold",
-			"description": "Debug mode only. Gauge charge needed per draft, the same for every draft (normally 40, +10 per draft taken).",
-			"default": 40,
-			"min": 1,
-			"max": 1000,
-			"enable-if": "debug-mode",
-			"control": {
-				"arrows": true,
-				"slider": false
-			}
 		}
 	}
 }

@@ -32,8 +32,8 @@ void RunState::end() {
 }
 
 float RunState::gaugeThreshold(GaugeRule const& rule) const {
-    if (rule.fixedThreshold > 0.f) return rule.fixedThreshold;
-    return rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts);
+    float cost = rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts);
+    return std::min(cost, rule.thresholdMax);
 }
 
 DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawning) {

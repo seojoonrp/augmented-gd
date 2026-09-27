@@ -27,7 +27,8 @@ death charges the gauge:
 ```
 charge = percent                                             (no floor)
        + (floor(percent) - floor(best)) * NewBestBonusMult   (only when > 0, mult 1.0)
-threshold = GaugeThresholdStart + GaugeThresholdStep * gaugeDrafts   (40, +10 each)
+threshold = min(GaugeThresholdStart + GaugeThresholdStep * gaugeDrafts,
+                GaugeThresholdMax)                           (30, +5 each, stops at 100)
 ```
 
 Each time the gauge reaches the threshold a draft is queued for the next
@@ -68,9 +69,10 @@ be farmed either. The rising threshold stops late-run draft floods (stuck at
 
 **Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
 augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat, Shift+2 = brake, Shift+3 = missile,
-Shift+4 = berserker), key 0 tops the gauge up to the threshold (the draft still happens
-on the next death), and `debug-threshold` replaces the ramp with a fixed
-cost so one number can be tuned in the settings UI without rebuilding.
+Shift+4 = berserker) and key 0 tops the gauge up to the threshold (the draft
+still happens on the next death). The cost is the normal ramp: the fixed
+`debug-threshold` setting is gone (2026-09-27), since it meant testing an
+economy nobody plays.
 
 ## Draft
 
@@ -131,9 +133,9 @@ opens and can't be picked until they land.
 
 Kept small so it stays out of the way. The **draft gauge** is a twin of
 GD's progress bar mirrored to the bottom edge (same sprite and scale, fill
-in the draft cards' green, eased) with `charge/cost` (e.g. `23/40`) in GD's
+in the draft cards' green, eased) with `charge/cost` (e.g. `23/30`) in GD's
 percent font at its right end; while a gauge-earned draft waits it reads
-`40/40` — the free opening draft does not fill it. At the far left, a grey
+`DRAFT!` — the free opening draft does not fill it. At the far left, a grey
 header (deaths, live %, best %) and then one **row per owned augment**, top
 to bottom: a framed placeholder box where the icon will go, the Korean name,
 and its English per-attempt state. GD's own progress bar gets rimmed dots:

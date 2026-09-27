@@ -77,9 +77,10 @@ namespace tune {
     // Draft gauge: a death charges by the percent reached, plus every percent
     // of new best times NewBestBonusMult. A draft costs GaugeThresholdStart
     // and each gauge-earned draft raises the next cost by GaugeThresholdStep
-    // (the `debug-threshold` setting overrides the ramp in debug mode).
-    constexpr float GaugeThresholdStart = 40.f;
-    constexpr float GaugeThresholdStep = 10.f;
+    // until GaugeThresholdMax, where the ramp stops (30, 35 … 95, 100, 100 …).
+    constexpr float GaugeThresholdStart = 30.f;
+    constexpr float GaugeThresholdStep = 5.f;
+    constexpr float GaugeThresholdMax = 100.f;
     constexpr float NewBestBonusMult = 1.f;
     // Brake: game speed 1 - BrakeCut while the key is held (slow-mo is
     // ignored, the cut is absolute), for BrakeSecondsPerLevel * level real

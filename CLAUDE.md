@@ -85,7 +85,7 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
 
 ```
 mod.json                 id, GD/Geode versions, fonts (AugDebug generated, charset from src/; baked UI
-                         fonts via resources.files), settings (keybinds, debug-mode, debug-threshold)
+                         fonts via resources.files), settings (keybinds, debug-mode)
 resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
   AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup

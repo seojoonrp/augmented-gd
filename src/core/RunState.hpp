@@ -16,13 +16,13 @@
 namespace augment {
 
 // How the draft gauge charges and what a draft costs. Defaults are tune::;
-// debug mode replaces the ramp with a fixed cost.
+// the tests build their own.
 struct GaugeRule {
     float thresholdStart = tune::GaugeThresholdStart;
     float thresholdStep = tune::GaugeThresholdStep;
+    // The ramp stops here: every draft past it costs this much.
+    float thresholdMax = tune::GaugeThresholdMax;
     float newBestMult = tune::NewBestBonusMult;
-    // > 0: every draft costs this much, whatever the ramp says.
-    float fixedThreshold = 0.f;
 };
 
 struct DeathResult {
@@ -63,7 +63,7 @@ public:
     // checkpoint respawn. What the next settling death will charge for; the
     // HUD folds it into the best it shows, so the mark never slides back.
     float lifeBest() const { return m_lifeBest; }
-    // Cost of the next draft under `rule`.
+    // Cost of the next draft under `rule`: the ramp, capped at its ceiling.
     float gaugeThreshold(GaugeRule const& rule) const;
     // Debug: tops the gauge up to the threshold. Returns the charge added.
     float fillGauge(GaugeRule const& rule);

@@ -186,7 +186,7 @@ $execute {
 ## Read settings / react to changes — verified (`src/game/AugmentManager.cpp` `gaugeRule`) / (from ref CBF `main.cpp:707-737`)
 
 ```cpp
-auto n = Mod::get()->getSettingValue<int64_t>("debug-threshold");   // int settings are int64_t
+auto n = Mod::get()->getSettingValue<int64_t>("some-number");   // int settings are int64_t
 $on_mod(Loaded) {
     listenForSettingChanges<bool>("some-flag", +[](bool v) { … });
 }
