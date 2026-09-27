@@ -124,10 +124,45 @@ Both get their charset from the sources (`scripts/fontcharset.ps1`); see
 ## Draft card look (decided 2026-09-17)
 
 GD button styling: white rim, green body with black ring, darker footer band;
-top to bottom — name, image box (empty frame until art exists), description,
+top to bottom — name, image box, description,
 footer with `NEW` / `Lv a → b` on the left and level pips (gold ★ reached,
 grey ☆ remaining) on the right. Cards fan out from the centre when the draft
 opens and can't be picked until they land.
+
+**Card art** (2026-09-27): one drawing per augment in `resources/augments/`,
+named after the augment id (`slow-mo.png`), 480x280 px — the image slot
+(120x70 pt) at uhd, which is what Geode's `resources.sprites` wants: it bakes
+the hd and sd copies itself. `AugmentDraftPopup::createCard` builds the name
+from `def.id` at runtime (`Mod::expandSpriteName`), scales it to fit the white
+panel inside the black border (116x66 pt, aspect kept) and leaves the panel
+empty with a warning if the file is missing — so a new augment needs a file,
+not a code change.
+
+## Mark and the AUG button (2026-09-27)
+
+The mark is the user's own drawing (2026-09-27, after a generated one they
+turned down): a level card tilted behind a white arrow pointing up, in the
+mod's line style — near-white fills, `#2D2D2D` strokes. Two exports:
+`logo.png` at the root (336, the drawing on sky blue `#37BAF4`) is what the
+Geode mod list shows, and `resources/ui/aug-logo.png` (128, transparent) is
+the glyph in the game. The glyph is the drawing cropped to its own bounds
+and padded 2 % into a square, because the button fits whatever it is given
+into a box and any margin inside the file only makes the mark smaller.
+The vector lives with the user (`Desktop/augmented-gd/logo`), not in the
+repo, so a new export is re-cropped the same way. Geode does **not** round
+a logo's corners — `createModLogo` just scales the file — so the rounding
+in `logo.png` is the user's own (2026-09-27).
+
+On the level info screen that glyph sits in a round green button
+(`CircleButtonSprite`, Medium; the glyph fills the 65 % it is fitted to,
+`setTopRelativeScale` left at 1.0 once the file's own padding came down to
+2 %). The button is **beside GD's copy button, on its row**:
+`LevelInfoHook::augmentButtonSpot` reads `copy-button` inside node-ids'
+`left-side-menu` and offsets 56 pt to its right, so the two read
+as a pair without ours joining the column's layout. A level with no copy
+button falls back to the column's mid-height, and no column at all to a
+fixed x = 78. Decided over three rounds with the user (vertically centred
+at 78, then 98, then this).
 
 ## HUD (v2, 2026-09-17)
 

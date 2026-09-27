@@ -216,19 +216,34 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     name->setPosition(fromTop(kNameY));
     card->addChild(name, 3);
 
-    // Image slot: black border around a white panel, empty until the art
-    // exists. The inner radius is the outer one minus the border so the
+    // Image slot: black border around a white panel, with the augment's art
+    // on top. The inner radius is the outer one minus the border so the
     // border looks the same thickness around the corners.
     auto const imageCentre = fromTop(kImageTop + kImageHeight / 2);
     auto imageFrame = roundedBox({ kImageWidth, kImageHeight }, ccBLACK, kImageRadius);
     imageFrame->setPosition(imageCentre);
     card->addChild(imageFrame, 2);
-    auto imageFill = roundedBox(
-        { kImageWidth - 2 * kImageBorder, kImageHeight - 2 * kImageBorder }, ccWHITE,
-        kImageRadius - kImageBorder
-    );
+    float const panelWidth = kImageWidth - 2 * kImageBorder;
+    float const panelHeight = kImageHeight - 2 * kImageBorder;
+    auto imageFill = roundedBox({ panelWidth, panelHeight }, ccWHITE, kImageRadius - kImageBorder);
     imageFill->setPosition(imageCentre);
     card->addChild(imageFill, 3);
+
+    // `resources/augments/<id>.png` (480x280, the slot at uhd; Geode makes the
+    // smaller ones). Built at runtime from the id, so a new augment needs no
+    // wiring here — and a missing file only leaves the panel empty.
+    auto artName = Mod::get()->expandSpriteName(fmt::format("{}.png", def.id));
+    if (auto art = CCSprite::create(artName.c_str())) {
+        auto size = art->getContentSize();
+        if (size.width > 0.f && size.height > 0.f) {
+            art->setScale(std::min(panelWidth / size.width, panelHeight / size.height));
+        }
+        art->setPosition(imageCentre);
+        card->addChild(art, 4);
+    }
+    else {
+        log::warn("Draft card '{}': no art at '{}'", def.id, artName);
+    }
 
     // Description: wrapped here (see wrapText) at the card's inner width and
     // shrunk in steps until it fits between the image box and the footer,

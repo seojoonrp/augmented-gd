@@ -85,8 +85,10 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
 
 ```
 mod.json                 id, GD/Geode versions, fonts (AugDebug generated, charset from src/; baked UI
-                         fonts via resources.files), settings (keybinds, debug-mode)
+                         fonts via resources.files, card art via resources.sprites), settings (keybinds, debug-mode)
 resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
+resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
+resources/ui/            aug-logo.png (the mark inside the round AUG button); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
   AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup
   Formulas.hpp           level → effect (slowMoScale, nerveBoost, hazard/waveScale, cat*, draftCardCount)
@@ -112,7 +114,7 @@ src/augments/            one file per augment behind Augment.hpp (all hooks defa
   HazardRemoval.*        shared by Cat + Missile: hazard::Removed (take / restore), viewAhead / hazardsInView, touchesCircle
 src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-frame dedup → session->onHotkey),
                          raw KeyboardInputEvent listener at priority -1, debug number keys
-src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (AUG button),
+src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (round AUG button),
                          HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
                          (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time())
 src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
