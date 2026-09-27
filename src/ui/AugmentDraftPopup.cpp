@@ -1,5 +1,6 @@
 #include "AugmentDraftPopup.hpp"
 #include "Fonts.hpp"
+#include "CardStyle.hpp"
 #include "../game/AugmentManager.hpp"
 
 #include <Geode/Geode.hpp>
@@ -24,10 +25,11 @@ namespace {
     // narrowed to fit. Leaves a margin inside the 569 pt screen.
     constexpr float kMaxPopupWidth = 540.f;
 
-    // GD button look: white rim, then GJ_button_01 (black ring + flat green).
-    constexpr float kRim = 2.f;
-    constexpr float kRimRadius = 8.f;                   // just outside GJ_button_01's ~6 pt corners
-    constexpr float kRing = 2.5f;                       // GJ_button_01's black ring at sd
+    // GD button look: white rim, then GJ_button_01 (CardStyle.hpp).
+    using card::roundedBox;
+    constexpr float kRim = card::Rim;
+    constexpr float kRimRadius = card::RimRadius;
+    constexpr float kRing = card::Ring;
     constexpr ccColor3B kBodyGreen = { 122, 222, 45 };  // GJ_button_01's fill
     constexpr float kInset = 10.f;
 
@@ -49,9 +51,6 @@ namespace {
     constexpr float kFooterScale = 0.5f;
     constexpr float kTitleScale = 1.f;
 
-    // square02b_001's corner radius at scale 1 (measured: ~36 of 320 uhd px).
-    constexpr float kSquareRadius = 9.f;
-
     // Reveal: cards start stacked at the row centre, small and slightly
     // fanned, and ease out to their slots one after another.
     constexpr float kRevealDuration = 0.45f;
@@ -69,18 +68,6 @@ namespace {
         constexpr float s = 1.3f;  // overshoot; cocos' default 1.70158 is too bouncy for cards
         t -= 1.f;
         return t * t * ((s + 1.f) * t + s) + 1.f;
-    }
-
-    // square02b_001 is a plain white rounded square; the slices are scaled so
-    // the corner radius comes out as asked, whatever the box size.
-    NineSlice* roundedBox(CCSize size, ccColor3B color, float radius, GLubyte opacity = 255) {
-        float const scale = radius / kSquareRadius;
-        auto box = NineSlice::create("square02b_001.png");
-        box->setScale(scale);
-        box->setContentSize(size / scale);
-        box->setColor(color);
-        box->setOpacity(opacity);
-        return box;
     }
 
     // Word-wrap by measuring words with throwaway labels. CCLabelBMFont's
