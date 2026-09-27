@@ -40,7 +40,6 @@ public:
         mgr.toggleSlowMo();
         log::info("Slow-mo toggled -> {}", mgr.slowMoEnabled() ? "ON" : "OFF");
         this->apply(s);
-        s.notice(mgr.slowMoEnabled() ? "SLOW-MO ON" : "SLOW-MO OFF", { 255, 220, 120 });
         return true;
     }
 

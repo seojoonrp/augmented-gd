@@ -203,7 +203,8 @@ private:
             "Berserk: {} for {:.1f}s at {:.1f}% (rolled {:.0f}% on 1 of {} destroyed)",
             again ? "refreshed" : "triggered", seconds, s.percent(), s.mgr().berserkChance() * 100.f, ofCount
         );
-        s.notice(again ? "BERSERK +" : "BERSERK!", { 255, 70, 60 });
+        // Only entering the mode is announced; a refresh mid-window is not.
+        if (!again) s.notice("버서커!");
     }
 
     // The flame's reach around a normal-size icon (30 units); scaled by

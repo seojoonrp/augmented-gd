@@ -12,9 +12,15 @@ namespace {
     constexpr float kFallbackInset = 2.f;
     constexpr float kFallbackFillHeight = 8.f;
     constexpr float kRim = 1.f;
+    // Dot size as a fraction of the fill track's height. A dot as tall as the
+    // track itself poked out of the bar (user screenshot, 2026-09-27) — and
+    // the measured fill is sometimes the whole bar, so the height is clamped
+    // to the known-good 8 before this applies.
+    constexpr float kDotOfTrack = 0.375f;
 
     constexpr ccColor4F kRimColor = { 0.f, 0.f, 0.f, 1.f };
-    constexpr ccColor4F kBestColor = { 1.f, 1.f, 1.f, 1.f };
+    // Gold, the colour of the new-best particles in RunHud (255, 210, 60).
+    constexpr ccColor4F kBestColor = { 1.f, 0.824f, 0.235f, 1.f };
     constexpr ccColor4F kCheckpointColor = { 0.47f, 1.f, 0.47f, 1.f };
     // The dots are drawn as filled circles: GD's CCDrawNode::drawDot puts down
     // a square quad instead of a disc (user 2026-09-27).
@@ -49,13 +55,13 @@ bool ProgressMarks::init(CCSprite* bar, CCSprite* fill) {
         ? fill->getPositionY() - fill->getAnchorPoint().y * fillHeight
         : (size.height - fillHeight) / 2.f;
     m_centreY = fillBottom + fillHeight / 2.f;
-    m_radius = fillHeight / 2.f;
+    m_radius = std::min(fillHeight, kFallbackFillHeight) * kDotOfTrack;
 
     log::info(
-        "ProgressMarks: bar size {}x{} at ({:.1f}, {:.1f}); fill {} -> track left {:.1f} width {:.1f}, dots r {:.1f} at y {:.1f}",
+        "ProgressMarks: bar size {}x{} at ({:.1f}, {:.1f}); fill {} {:.1f} high -> track left {:.1f} width {:.1f}, dots r {:.1f} at y {:.1f}",
         size.width, size.height, bar->getPositionX(), bar->getPositionY(),
         fill ? (fillIsChild ? "measured" : "not a child of the bar") : "missing",
-        m_trackLeft, m_trackWidth, m_radius, m_centreY
+        fillHeight, m_trackLeft, m_trackWidth, m_radius, m_centreY
     );
 
     this->setPosition({ 0.f, 0.f });

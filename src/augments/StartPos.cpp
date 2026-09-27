@@ -93,7 +93,7 @@ public:
             "Respawned from checkpoint ({}/{} placed this attempt, next death restarts from 0)",
             m_placed, s.levelOf(ids::StartPos)
         );
-        s.notice("CHECKPOINT", { 120, 255, 120 });
+        s.notice("체크포인트에서 부활합니다.");
     }
 
     // The dot on GD's progress bar follows the live placement; ProgressMarks
@@ -150,8 +150,8 @@ private:
         );
     }
 
-    // Returns true when the key was consumed (also when it only showed a
-    // "none left" notice: the player has the augment, so Z is ours).
+    // Returns true when the key was consumed (also when the budget is spent
+    // or GD refuses: the player has the augment, so Z is ours either way).
     bool tryPlace(LevelSession& s) {
         auto layer = s.layer();
         int lvl = s.levelOf(ids::StartPos);
@@ -162,7 +162,7 @@ private:
         }
 
         if (m_placed >= lvl) {
-            s.notice("NO CHECKPOINTS LEFT", { 255, 120, 120 });
+            log::info("Z ignored: no checkpoints left ({}/{})", m_placed, lvl);
             return true;
         }
 
@@ -181,13 +181,12 @@ private:
                 "Checkpoint placed ({}/{}){} at {:.1f}%, GD array {}", m_placed, lvl,
                 replaced ? ", replaces the previous one" : "", s.percent(), this->gdCount(s)
             );
-            s.notice(replaced ? "CHECKPOINT MOVED" : "CHECKPOINT PLACED", { 120, 255, 120 });
+            s.notice("체크포인트가 설정되었습니다.");
         }
         else {
-            // GD refused (its own conditions, e.g. mid-dash). Say so, or the
-            // player believes a checkpoint exists.
+            // GD refused (its own conditions, e.g. mid-dash). Nothing is shown
+            // — the HUD row still reads `none`, and the log says why.
             log::info("markCheckpoint returned null at {:.1f}%", s.percent());
-            s.notice("CAN'T PLACE HERE", { 255, 120, 120 });
         }
         return true;
     }

@@ -47,7 +47,7 @@ public:
         m_used++;
         m_noclipTimer = tune::NoclipSeconds;
         log::info("Shield broke ({} left), noclip for {}s", shields - 1, tune::NoclipSeconds);
-        s.notice("SHIELD BROKEN", { 120, 200, 255 });
+        s.notice("보호막이 깨졌습니다.");
         if (m_node) m_node->shatter();
         return true;
     }

@@ -57,8 +57,10 @@ public:
     float progress() const;
     int levelOf(std::string const& id) const;
     bool owns(std::string const& id) const { return this->levelOf(id) > 0; }
-    // Centre-screen message via the HUD (no-op without one).
-    void notice(std::string const& text, cocos2d::ccColor3B color);
+    // One short player-facing line in the HUD's bottom-left corner
+    // (no-op without a HUD). Korean, and only for the four moments the
+    // player is told about: see RunHud::notice.
+    void notice(std::string const& text);
     // Death reward on the HUD: numbers beside the dead icon (screen point
     // `at`), particles into the gauge, fill by `r` over the gauge as it
     // was (`before` / `cost`) — and the HUD text refreshed at once, so

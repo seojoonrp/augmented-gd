@@ -43,6 +43,16 @@ namespace {
     constexpr int kMaxParticles = 12;
     constexpr float kPi = 3.14159265f;
 
+    // Notices: short Korean lines in the bottom-left corner (left of the
+    // gauge, which sits at the bottom centre), newest at the bottom.
+    constexpr int kToastLines = 3;
+    constexpr float kToastScale = 0.45f;
+    constexpr float kToastY = 14.f;      // the bottom line's middle
+    constexpr float kToastStep = 14.f;   // an older line slides up by this
+    constexpr float kToastSlide = 0.12f;
+    constexpr float kToastHold = 1.1f;
+    constexpr float kToastFade = 0.45f;
+
     // Augment column at the far left.
     constexpr float kColumnX = kMargin;
     constexpr float kHeaderScale = 0.36f;
@@ -113,13 +123,19 @@ bool RunHud::init() {
     m_header->setID("header");
     this->addChild(m_header);
 
-    // Notices are player-facing (UI font); everything else is a debug readout.
-    m_notice = CCLabelBMFont::create("", fonts::Name);
-    m_notice->setScale(0.7f);
-    m_notice->setPosition({ winSize.width / 2, winSize.height * 0.7f });
-    m_notice->setOpacity(0);
-    m_notice->setID("notice");
-    this->addChild(m_notice, 1);
+    // Notices are player-facing (UI font, white with the baked outline);
+    // everything else on this HUD is a debug readout. One label per line,
+    // reused in turn — see notice().
+    for (int i = 0; i < kToastLines; i++) {
+        auto toast = CCLabelBMFont::create("", fonts::Name);
+        toast->setScale(kToastScale);
+        toast->setAnchorPoint({ 0.f, 0.5f });
+        toast->setPosition({ kMargin, kToastY });
+        toast->setOpacity(0);
+        toast->setID(fmt::format("toast-{}", i));
+        this->addChild(toast, 1);
+        m_toasts.push_back(toast);
+    }
 
     // Death reward: the numbers beside the dead icon and the particle layer.
     // Player-facing, so the UI font.
@@ -513,14 +529,24 @@ void RunHud::setSlots(std::vector<Slot> const& slots) {
 
 // ---------------------------------------------------------------- notice
 
-void RunHud::notice(std::string const& text, ccColor3B color) {
-    m_notice->setString(text.c_str());
-    m_notice->setColor(color);
-    m_notice->stopAllActions();
-    m_notice->setOpacity(255);
-    m_notice->runAction(CCSequence::create(
-        CCDelayTime::create(1.f),
-        CCFadeOut::create(0.5f),
+void RunHud::notice(std::string const& text) {
+    // The label taken next is the one that has been on screen longest, so
+    // whatever is still visible slides up a line and the new text always
+    // appears in the corner. A label at opacity 0 has finished fading.
+    auto label = m_toasts[m_nextToast];
+    m_nextToast = (m_nextToast + 1) % m_toasts.size();
+    for (auto other : m_toasts) {
+        if (other == label || other->getOpacity() == 0) continue;
+        other->runAction(CCMoveBy::create(kToastSlide, { 0.f, kToastStep }));
+    }
+
+    label->stopAllActions();
+    label->setString(text.c_str());
+    label->setPosition({ kMargin, kToastY });
+    label->setOpacity(255);
+    label->runAction(CCSequence::create(
+        CCDelayTime::create(kToastHold),
+        CCFadeOut::create(kToastFade),
         nullptr
     ));
 }

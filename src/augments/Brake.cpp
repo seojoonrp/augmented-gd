@@ -72,7 +72,6 @@ public:
                 if (!m_emptyNoticed) {
                     m_emptyNoticed = true;
                     log::info("Brake: budget used up this attempt");
-                    s.notice("BRAKE EMPTY", { 255, 140, 120 });
                 }
             }
         }

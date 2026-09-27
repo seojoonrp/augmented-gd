@@ -25,7 +25,17 @@ Windows (linked from `libcocos2d.dll`); an entry marked `win inline` is not.
 - `PlayLayer::init` → calls `resetLevel()` **before the scene is running**
   (`isRunning()` is false). Don't show popups from there.
 - `destroyPlayer(player, object)` is called:
-  - once per real death, for `m_player1` (and `m_player2` in dual mode);
+  - once per real death, for `m_player1` (and `m_player2` in dual mode).
+    **Which player GD names is not always player 1** (2026-09-27 log: a
+    60 % death produced a death in death-tracker and a reset here, but our
+    `player == m_player1` branch never ran, so the gauge and the checkpoint
+    respawn were both skipped). Key off the death, not off the player:
+    call the original and test `player->m_isDead` (below), then dedupe
+    per attempt. **Confirmed by the user the same day: the death was in a
+    dual section**, so GD named player 2 (the half that hit) and nothing
+    else — a dual death has never counted here. Everything else in the mod
+    already handled both players (shield bubble, foresight, hitbox scales,
+    berserk aura); only the death did not.
   - **at the start of every attempt with `object == m_anticheatSpike`**.
     That call is not a death. Blocking it flags the level; counting it gives
     phantom deaths at 0%. Always pass it straight through.

@@ -74,9 +74,10 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
 10. In-game augment text is Korean (names, descriptions, popup title) and must
     use the mod fonts in `src/ui/Fonts.hpp`; GD's fonts draw nothing for Hangul.
     Player-facing UI = `fonts::Name` / `fonts::Text` (ImcreSoojin, outlined);
-    debug readouts (HUD lines) = `fonts::Debug` (Pretendard). Logs, notices and
-    HUD wording stay English. New Korean literals need no extra step:
-    `build.ps1` regenerates the charset and re-bakes the fonts.
+    debug readouts (HUD lines) = `fonts::Debug` (Pretendard). Logs and HUD
+    wording stay English; the four bottom-left notices are Korean (2026-09-27).
+    New Korean literals need no extra step: `build.ps1` regenerates the charset
+    and re-bakes the fonts.
 11. Docs cite our own sources as `` `path/File.cpp` `symbol` `` or `File.cpp::symbol`,
     never by line number (`check.ps1` warns). Line numbers are fine for `refs/` (pinned).
 
@@ -115,7 +116,7 @@ src/hooks/               PlayLayerHook (lifecycle only, dispatches to the sessio
                          HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
                          (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time())
 src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
-                         notice), ProgressMarks (dots on GD's bar), CatNode (square + white magic circles), MissileNode (reticle / drop / blast, world space, white),
+                         bottom-left notices), ProgressMarks (dots on GD's bar), CatNode (square + white magic circles), MissileNode (reticle / drop / blast, world space, white),
                          BerserkNode (screen frame + smash bursts), BerserkAura (fire on the player, object layer under the icon)
 tests/core_tests.cpp     host tests, plain asserts (scripts/test.ps1)
 docs/                    STATUS / SESSIONS / GD-INTERNALS / DESIGN / RECIPES / HARNESS / ROADMAP / VISUAL-IDEAS / refs/

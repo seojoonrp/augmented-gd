@@ -111,45 +111,67 @@ class $modify(AugPlayLayer, PlayLayer) {
     // ---------------------------------------------------------------- death
 
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        // GD pokes the player with an invisible anticheat spike at the start
-        // of every attempt. That call must go through untouched: it is not a
-        // death, and blocking it flags the level as hacked.
-        if (object == m_anticheatSpike) {
-            PlayLayer::destroyPlayer(player, object);
-            return;
-        }
-
         auto s = this->session();
-        if (s && s->runAttempt() && (player == m_player1 || player == m_player2)) {
-            // Shield (or a berserk smash) may swallow the hit.
-            if (s->onHit(player, object)) return;
+        // GD pokes the player with an invisible anticheat spike at the start
+        // of every attempt. That call must go through untouched — blocking it
+        // flags the level as hacked — so it is never swallowed; whether it is
+        // a *death* is decided after the original call, by m_isDead.
+        bool anticheat = object == m_anticheatSpike;
+        bool ours = s && s->runAttempt() && (player == m_player1 || player == m_player2);
+        // Read before the original: the percent belongs to the death.
+        float percent = this->getCurrentPercent();
 
-            // destroyPlayer can fire more than once per attempt; count once.
-            if (player == m_player1 && s->countDeath()) {
-                auto& mgr = AugmentManager::get();
-                // The augments hear the death first, because startpos
-                // answers there whether a checkpoint brings this attempt
-                // back: a death the run comes back from charges nothing yet.
-                bool respawning = s->onDeath();
-                // The gauge and its cost as the bar showed them, so the
-                // reward animates from there even when this death wraps
-                // the gauge and raises the cost.
-                float before = mgr.gauge();
-                float cost = mgr.gaugeThreshold();
-                auto r = mgr.onDeath(this->getCurrentPercent(), respawning);
-                if (r.deferred) {
-                    // Nothing is settled while the life goes on: no NEW BEST,
-                    // no numbers, no particles — just the HUD text.
-                    s->refreshHud(true);
-                }
-                else {
-                    if (r.bonus > 0.f) s->notice("NEW BEST", { 255, 220, 90 });
-                    s->rewardDeath(this->hudPointOf(player), before, cost, r);
-                }
-            }
-        }
+        // Shield (or a berserk smash) may swallow the hit, which means not
+        // calling the original at all.
+        if (ours && !anticheat && s->onHit(player, object)) return;
 
         PlayLayer::destroyPlayer(player, object);
+
+        // A real death is the call the original leaves dead — the attempt-start
+        // anticheat poke and a swallowed hit leave `m_isDead` false
+        // (death-tracker's test, `refs/death-tracker/src/hooks/DTPlayLayer.cpp:241`).
+        // Whichever player GD names ends the attempt, so player 2 counts too:
+        // requiring player 1 dropped dual deaths entirely (user, 2026-09-27 —
+        // a 60 % death paid no gauge and skipped the checkpoint respawn), and
+        // countDeath() already keeps it to once per attempt.
+        if (!player || !player->m_isDead) return;
+        if (!ours) {
+            if (s && s->runLevel()) {
+                log::info(
+                    "Death ignored at {:.1f}%: runAttempt {}, player {}",
+                    percent, s->runAttempt(),
+                    player == m_player1 ? "1" : (player == m_player2 ? "2" : "neither")
+                );
+            }
+            return;
+        }
+        if (!s->countDeath()) return;
+
+        log::info(
+            "Death: player {} at {:.1f}%, object {}{}, dual {}",
+            player == m_player1 ? 1 : 2, percent, object ? "named" : "none",
+            anticheat ? " (anticheat!)" : "", m_gameState.m_isDualMode
+        );
+
+        auto& mgr = AugmentManager::get();
+        // The augments hear the death first, because startpos answers there
+        // whether a checkpoint brings this attempt back: a death the run
+        // comes back from charges nothing yet.
+        bool respawning = s->onDeath();
+        // The gauge and its cost as the bar showed them, so the reward
+        // animates from there even when this death wraps the gauge and
+        // raises the cost.
+        float before = mgr.gauge();
+        float cost = mgr.gaugeThreshold();
+        auto r = mgr.onDeath(percent, respawning);
+        if (r.deferred) {
+            // Nothing is settled while the life goes on: no numbers, no
+            // particles — just the HUD text.
+            s->refreshHud(true);
+        }
+        else {
+            s->rewardDeath(this->hudPointOf(player), before, cost, r);
+        }
     }
 
     // Where a node of the object layer sits on the HUD (screen space):

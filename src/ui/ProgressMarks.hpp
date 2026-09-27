@@ -6,9 +6,10 @@
 
 namespace augment {
 
-// Markers drawn on GD's own progress bar (PlayLayer::m_progressBar): a white
-// dot at the run's best percent and a green dot per placed checkpoint, each
-// with a black rim like the bar's, sized to sit inside the fill track.
+// Markers drawn on GD's own progress bar (PlayLayer::m_progressBar): a gold
+// dot at the run's best percent (the new-best particles' colour) and a green
+// dot per placed checkpoint, each with a black rim like the bar's and small
+// enough to sit inside the fill track.
 // Lives as a child of the bar, so it follows the bar's position, scale and
 // visibility and dies with it. One draw node, redrawn only when a value
 // changes.

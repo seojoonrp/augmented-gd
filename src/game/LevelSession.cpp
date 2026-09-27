@@ -41,8 +41,8 @@ int LevelSession::levelOf(std::string const& id) const {
     return this->mgr().levelOf(id);
 }
 
-void LevelSession::notice(std::string const& text, ccColor3B color) {
-    if (m_hud) m_hud->notice(text, color);
+void LevelSession::notice(std::string const& text) {
+    if (m_hud) m_hud->notice(text);
 }
 
 void LevelSession::rewardDeath(CCPoint at, float before, float cost, DeathResult const& r) {
@@ -229,13 +229,11 @@ bool LevelSession::debugGrant(int index) {
     auto const& def = defs[index];
     if (this->levelOf(def.id) >= def.maxLevel) {
         log::info("Debug grant: '{}' already maxed", def.id);
-        this->notice(fmt::format("{} MAXED", def.name), { 255, 120, 120 });
         return true;
     }
     int lvl = this->mgr().grant(def.id);
     log::info("Debug grant: '{}' -> level {}", def.id, lvl);
     this->onGranted(def.id, lvl);
-    this->notice(fmt::format("+{} Lv{} (DEBUG)", def.name, lvl), { 200, 160, 255 });
     return true;
 }
 
@@ -244,8 +242,7 @@ bool LevelSession::debugFillGauge() {
         log::info("Debug fill ignored: not a run level");
         return false;
     }
-    float added = this->mgr().debugFillGauge();
-    this->notice(fmt::format("GAUGE FULL +{:.0f} (DEBUG)", added), { 200, 160, 255 });
+    this->mgr().debugFillGauge();
     return true;
 }
 

@@ -11,7 +11,8 @@ namespace augment {
 // bottom of the screen (same sprite, fills left to right) with "charge/cost"
 // in GD's percent font at its right end; a column at the far left with one
 // row per owned augment (placeholder icon box + name + state text — art
-// comes later); and a transient centred notice.
+// comes later); and short notice lines that fade out in the bottom-left
+// corner.
 class RunHud : public cocos2d::CCNode {
 public:
     struct Slot {
@@ -49,8 +50,10 @@ public:
     // One row per owned augment, top to bottom. Only rows whose text changed
     // are touched.
     void setSlots(std::vector<Slot> const& slots);
-    // Show a big message in the middle of the screen that fades out.
-    void notice(std::string const& text, cocos2d::ccColor3B color = { 255, 255, 255 });
+    // One short player-facing line (Korean, UI font) in the bottom-left
+    // corner: it shows at once, holds and fades out. A second line while the
+    // first is up pushes it a line higher, three at most.
+    void notice(std::string const& text);
 
 protected:
     bool init() override;
@@ -119,7 +122,9 @@ protected:
 
     cocos2d::CCLabelBMFont* m_header = nullptr;
     std::vector<SlotNodes> m_slots;
-    cocos2d::CCLabelBMFont* m_notice = nullptr;
+    // Notice lines, reused round-robin (oldest first).
+    std::vector<cocos2d::CCLabelBMFont*> m_toasts;
+    std::size_t m_nextToast = 0;
 };
 
 } // namespace augment

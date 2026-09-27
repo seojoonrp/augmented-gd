@@ -98,8 +98,8 @@ level. The id is the "코드" column and is what the hooks key on.
 | `nerve` | 청심환 | 1 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 X% 증가합니다. | — | working (verified 2026-09-17). Both *shrinks* × (1 + progress), progress = current percent / 100. Was 2 levels (k = 1.5 at Lv2); fixed to a single level 2026-09-20. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv5 + nerve at 100 % would otherwise hit exactly (shrink 1.0). |
 | `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
 | `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and **casts a small magic circle** on each removed hazard (two rings, 4 rim ticks, one spinning triangle, r16 screen units, 0.55 s, **white** — plainer and white after the first look, user 2026-09-27) — it replaced the lasers the square used to fire (user 2026-09-27: "그냥 마법으로"). Real cat art later. |
-| `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. `BRAKE EMPTY` notice when used up. Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
-| `missile` | 공습경보 | 5 | 6초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다. 반경 3칸 안의 위험 요소가 모두 제거됩니다. | 폭발 반경이 0.5칸 커지고, 미사일 쿨타임이 0.5초 감소합니다. | working (verified 2026-09-20, lead 300 "딱 괜찮은듯"). Every `6 − 0.5·(lv−1)` s of play a missile is aimed at a **random hazard** on screen and at least 300 units (~1 s at 1x) ahead of the player (was 150; the user found the impact landed where they already were, 2026-09-20 — aiming at a hazard, not a point, so every strike hits something; nothing in view → the strike stays armed and fires as soon as a hazard scrolls in). It drops for 0.35 s (world-space reticle + missile, `MissileNode` in `m_objectLayer`, **all white** since 2026-09-27 — the depth the orange carried is alpha now, and the `MISSILE -n` notice is white too), then every hazard whose collision shape (AABB, or radius for saws) touches the blast circle of `3 + 0.5·(lv−1)` blocks is removed for the rest of the attempt — same `destroyObject()` flags and put-back as the cat (`HazardRemoval.hpp`). A reset mid-drop cancels the missile. |
+| `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. Running out is log-only (its notice went with the centre texts, 2026-09-27). Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
+| `missile` | 공습경보 | 5 | 6초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다. 반경 3칸 안의 위험 요소가 모두 제거됩니다. | 폭발 반경이 0.5칸 커지고, 미사일 쿨타임이 0.5초 감소합니다. | working (verified 2026-09-20, lead 300 "딱 괜찮은듯"). Every `6 − 0.5·(lv−1)` s of play a missile is aimed at a **random hazard** on screen and at least 300 units (~1 s at 1x) ahead of the player (was 150; the user found the impact landed where they already were, 2026-09-20 — aiming at a hazard, not a point, so every strike hits something; nothing in view → the strike stays armed and fires as soon as a hazard scrolls in). It drops for 0.35 s (world-space reticle + missile, `MissileNode` in `m_objectLayer`, **all white** since 2026-09-27 — the depth the orange carried is alpha now; the `MISSILE -n` notice is gone), then every hazard whose collision shape (AABB, or radius for saws) touches the blast circle of `3 + 0.5·(lv−1)` blocks is removed for the rest of the attempt — same `destroyObject()` flags and put-back as the cat (`HazardRemoval.hpp`). A reset mid-drop cancels the missile. |
 | `berserker` | 버서커 | 3 | 위험 요소가 파괴될 때마다 3% 확률로 2초간 버서커 모드에 돌입합니다. 버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다. | 버서커 모드 발동 확률이 1% 증가합니다. | built 2026-09-27, in-game test pending. Every hazard **an augment destroys** rolls `0.03 + 0.01·(level−1)` (3 / 4 / 5 %) to open a 2 s window; while it is open, `destroyPlayer` with a **hazard** object smashes that hazard (same `destroyObject()` flags and put-back as the cat and the missile) instead of killing the player. A smash is itself a destroyed hazard, so it rolls again and can refresh the window. Solids, slopes and a death GD names no object for (`object == nullptr`, e.g. suicide) still kill. The window is flat across levels (only the chance grows) and is **game** seconds (slow-mo stretches it, like the cat and missile timers); it closes on any reset. Retuned with the user 2026-09-27: 2 % / 3 s at Lv1 became 3 % / 2 s, and the red screen frame landed at 5 bands x 7.5 units, 0.33 alpha, pulse 0.72 +- 0.28 (the middle of three passes: 6 x 9 / 0.5 was "너무 과함", 4 x 6 / 0.2 too little). A `BerserkAura` (`src/ui/BerserkAura.hpp`) also puts a flickering fire crown on the player while the window is open, in the object layer at `player z - 1` so the icon draws on top. Asked before the shield (`Augment::hitPriority`) so a free smash never spends a charge. **Dependency:** nothing else destroys hazards, so without `cat` or `missile` it can never roll — the HUD row says `needs cat/missile`. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
@@ -110,9 +110,9 @@ Shift+4 berserker).
 
 ## Text & fonts (decided 2026-09-17)
 
-In-game augment text is Korean; logs, notices and the HUD's non-name words
-stay English. GD's fonts have no Hangul, so the mod ships its own
-(`resources/fonts/`). Player-facing UI (draft cards, popup title, centre
+In-game augment text and the four bottom-left notices are Korean; logs and
+the HUD's non-name words stay English. GD's fonts have no Hangul, so the mod ships its own
+(`resources/fonts/`). Player-facing UI (draft cards, popup title,
 notices) uses 아임크리수진 (`ImcreSoojin.ttf`) rendered GD-style — white
 glyphs, black outline, drop shadow — baked by `scripts/fontgen.py`. Debug
 readouts (the HUD lines) stay in plain Pretendard Regular, generated by Geode.
@@ -137,12 +137,32 @@ percent font at its right end; while a gauge-earned draft waits it reads
 header (deaths, live %, best %) and then one **row per owned augment**, top
 to bottom: a framed placeholder box where the icon will go, the Korean name,
 and its English per-attempt state. GD's own progress bar gets rimmed dots:
-white at the run's best (moves with the player past it), green at the live
-checkpoint (`ProgressMarks`). Decided with the user over four rounds on
+gold at the run's best (moves with the player past it, and the colour of the
+new-best particles), green at the live checkpoint (`ProgressMarks`). Both are
+`0.375` of the fill track's height, so they sit inside it instead of poking
+out of the bar (user screenshot, 2026-09-27). Decided with the user over four rounds on
 2026-09-17. The two hitbox lines
 show the scale *at the player's current position*, so they move as nerve ramps
-up; 웨이브브레이커 adds `ACTIVE` while a player is in wave. Centre notices for events (SHIELD BROKEN, CHECKPOINT
-PLACED, SLOW-MO ON/OFF…).
+up; 웨이브브레이커 adds `ACTIVE` while a player is in wave.
+
+**Notices** (2026-09-27): the screen used to carry a big centred line for every
+event, which the user read as debug text and asked to have gone. What is left
+are four short Korean lines in the **bottom-left** corner (UI font, white with
+the baked outline, scale 0.45), each shown at once, held ~1.1 s and faded over
+0.45 s; a second line while one is still up pushes it a line higher, three at
+most (`RunHud::notice`).
+
+| when | line |
+|---|---|
+| checkpoint placed or moved | 체크포인트가 설정되었습니다. |
+| respawned at a checkpoint | 체크포인트에서 부활합니다. |
+| shield absorbed a hit | 보호막이 깨졌습니다. |
+| berserk window opened (not a refresh) | 버서커! |
+
+Everything else that used to pop up (`CAT -n`, `MISSILE -n`, `SLOW-MO ON/OFF`,
+`BRAKE EMPTY`, `NEW BEST`, `NO CHECKPOINTS LEFT`, `CAN'T PLACE HERE`, the debug
+grants) is log-only now; a new best is still visible as the gold `+X` beside
+the dead icon.
 
 ## Not decided yet
 
