@@ -9,31 +9,33 @@ class GameObject;
 namespace augment {
 
 // The cat's on-screen presence: a placeholder square in the bottom-right
-// corner (art comes later) that fires a laser at every hazard it removes.
-// Lives in PlayLayer's UI layer (screen space); the lasers are redrawn each
-// frame from the square to the targets' current screen positions, so they
-// stay glued to objects that scroll past while they fade.
+// corner (art comes later) that casts a small magic circle on every hazard it
+// removes — two rings, runes around the rim and a star inside, spinning as
+// they fade. Lives in PlayLayer's UI layer (screen space); each circle is
+// redrawn every frame at its target's current screen position, so it stays
+// glued to the object that scrolls past while it fades. Replaced the lasers
+// the cat used to fire (user 2026-09-27: magic, not lasers).
 class CatNode : public cocos2d::CCNode {
 public:
     static CatNode* create();
 
-    // One laser per target, all fired now. Targets are followed by
+    // One magic circle per target, all cast now. Targets are followed by
     // reference; a dead one just drops out.
-    void fireAt(std::vector<GameObject*> const& targets);
+    void castAt(std::vector<GameObject*> const& targets);
 
 protected:
     bool init() override;
     void update(float dt) override;
-    void redrawLasers();
+    void redrawSigils();
 
-    struct Laser {
+    struct Sigil {
         geode::Ref<GameObject> target;
         float age = 0.f;
     };
 
     cocos2d::CCDrawNode* m_body = nullptr;    // the square
-    cocos2d::CCDrawNode* m_lasers = nullptr;  // child of this, origin = the square's centre
-    std::vector<Laser> m_active;
+    cocos2d::CCDrawNode* m_sigils = nullptr;  // child of this, drawn in screen space
+    std::vector<Sigil> m_active;
 };
 
 } // namespace augment

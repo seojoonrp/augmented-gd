@@ -156,7 +156,7 @@ private:
             "Missile: impact at ({:.0f}, {:.0f}) r{:.0f} removed {} hazards at {:.1f}% ({} removed this attempt)",
             centre.x, centre.y, radius, removed, s.percent(), m_removed.size()
         );
-        s.notice(fmt::format("MISSILE  -{}", removed), { 255, 170, 60 });
+        s.notice(fmt::format("MISSILE  -{}", removed), { 255, 255, 255 });
         s.onHazardsDestroyed(removed);
     }
 

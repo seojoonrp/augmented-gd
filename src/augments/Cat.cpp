@@ -1,8 +1,8 @@
 // cat (고양이): every catInterval() seconds of play, remove catCount()
 // random hazards that are on screen and ahead of the player. The scan and
 // the removal / put-back bookkeeping are hazard:: (HazardRemoval.hpp), shared
-// with the missile. A CatNode in the UI layer fires a laser at each removed
-// hazard.
+// with the missile. A CatNode in the UI layer casts a small magic circle on
+// each removed hazard.
 
 #include "Augments.hpp"
 #include "HazardRemoval.hpp"
@@ -82,7 +82,7 @@ private:
             hit.push_back(obj);
             removed++;
         }
-        if (m_node) m_node->fireAt(hit);
+        if (m_node) m_node->castAt(hit);
         log::info(
             "Cat: removed {}/{} of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f}, {} removed this attempt)",
             removed, want, candidates.size(), s.percent(), view.lo, view.hi, m_removed.size()

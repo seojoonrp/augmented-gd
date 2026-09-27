@@ -83,9 +83,9 @@ void MissileNode::redraw() {
     if (m_phase == Phase::Falling) {
         // Reticle: the blast circle, pulsing while the missile is on its way.
         float pulse = 0.5f + 0.5f * std::sin(m_age * 25.f);
-        m_draw->drawCircle(m_impact, m_radius, kNoFill, kReticleWidth, premul(1.f, 0.35f, 0.1f, 0.35f + 0.45f * pulse), kSegments);
-        m_draw->drawSegment({ m_impact.x - 6.f, m_impact.y }, { m_impact.x + 6.f, m_impact.y }, 0.8f, premul(1.f, 0.35f, 0.1f, 0.9f));
-        m_draw->drawSegment({ m_impact.x, m_impact.y - 6.f }, { m_impact.x, m_impact.y + 6.f }, 0.8f, premul(1.f, 0.35f, 0.1f, 0.9f));
+        m_draw->drawCircle(m_impact, m_radius, kNoFill, kReticleWidth, premul(1.f, 1.f, 1.f, 0.3f + 0.4f * pulse), kSegments);
+        m_draw->drawSegment({ m_impact.x - 6.f, m_impact.y }, { m_impact.x + 6.f, m_impact.y }, 0.8f, premul(1.f, 1.f, 1.f, 0.85f));
+        m_draw->drawSegment({ m_impact.x, m_impact.y - 6.f }, { m_impact.x, m_impact.y + 6.f }, 0.8f, premul(1.f, 1.f, 1.f, 0.85f));
 
         // The missile: eased-in drop from `from` to the impact point, a
         // white body with an orange trail behind it.
@@ -98,9 +98,9 @@ void MissileNode::redraw() {
         CCPoint dir = len < 1.f ? CCPoint{ 0.f, -1.f } : CCPoint{ dx / len, dy / len };
         CCPoint tail = { pos.x - dir.x * kBodyLength, pos.y - dir.y * kBodyLength };
         CCPoint trailEnd = { tail.x - dir.x * kTrailLength, tail.y - dir.y * kTrailLength };
-        m_draw->drawSegment(tail, trailEnd, kBodyWidth * 1.5f, premul(1.f, 0.6f, 0.2f, 0.35f));
-        m_draw->drawSegment(pos, tail, kBodyWidth, premul(1.f, 1.f, 1.f, 1.f));
-        m_draw->drawDot(pos, kBodyWidth * 1.3f, premul(1.f, 0.8f, 0.3f, 1.f));
+        m_draw->drawSegment(tail, trailEnd, kBodyWidth * 1.5f, premul(1.f, 1.f, 1.f, 0.3f));
+        m_draw->drawSegment(pos, tail, kBodyWidth, premul(1.f, 1.f, 1.f, 0.95f));
+        m_draw->drawCircle(pos, kBodyWidth * 1.3f, premul(1.f, 1.f, 1.f, 1.f), 0.f, kNoFill, 12);
     }
     else if (m_phase == Phase::Blast) {
         // A filled disc that snaps out to the radius, then a ring that keeps
@@ -109,9 +109,14 @@ void MissileNode::redraw() {
         float grow = std::min(1.f, u / 0.25f);
         float discR = m_radius * (1.f - (1.f - grow) * (1.f - grow));
         float fade = 1.f - u;
-        m_draw->drawDot(m_impact, discR, premul(1.f, 0.55f, 0.15f, 0.55f * fade));
-        m_draw->drawDot(m_impact, discR * 0.45f, premul(1.f, 0.95f, 0.7f, 0.8f * fade));
-        m_draw->drawCircle(m_impact, m_radius * (1.f + 0.15f * u), kNoFill, 2.f, premul(1.f, 0.8f, 0.4f, fade), kSegments);
+        // All white now (user 2026-09-27), so the depth that the orange used
+        // to carry comes from the alphas instead: a soft disc, a bright core,
+        // a crisp ring. Filled drawCircle, never drawDot: GD's CCDrawNode
+        // draws a dot as a square quad, which is what made the blast look
+        // rectangular (user 2026-09-27).
+        m_draw->drawCircle(m_impact, discR, premul(1.f, 1.f, 1.f, 0.35f * fade), 0.f, kNoFill, kSegments);
+        m_draw->drawCircle(m_impact, discR * 0.45f, premul(1.f, 1.f, 1.f, 0.85f * fade), 0.f, kNoFill, kSegments);
+        m_draw->drawCircle(m_impact, m_radius * (1.f + 0.15f * u), kNoFill, 2.f, premul(1.f, 1.f, 1.f, fade), kSegments);
     }
 }
 
