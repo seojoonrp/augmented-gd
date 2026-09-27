@@ -445,8 +445,31 @@ Measured on this machine (log 2026-09-17, 569x320 window, default settings):
   `getFntFile()` (Geode inline) gives its font for a twin label.
 - A mirrored copy at `y = winHeight - y` lands at the bottom edge with the
   same margin (what the draft gauge does).
-- `CCLayerColor` children inside a `CCSprite` and a `CCDrawNode` with
-  `drawDot` both render fine there **(dots unverified in game yet)**.
+- `CCLayerColor` children inside a `CCSprite` and a `CCDrawNode` both render
+  fine there (verified in game).
+
+## CCDrawNode: drawDot is a square, not a disc (verified in game 2026-09-27)
+
+`CCDrawNode::drawDot(centre, radius, colour)` draws a **square** of side
+`2 * radius`, not a circle: the user saw the missile blast as "무슨 네모"
+when its disc and core were drawn that way. (Why is **unverified** — most
+likely the point-sprite path GD ships does not apply a round falloff.)
+
+For a filled disc, pass a **fill colour** to `drawCircle` instead and give it
+no border:
+
+```cpp
+constexpr ccColor4F kNoBorder = { 0.f, 0.f, 0.f, 0.f };
+node->drawCircle(centre, radius, fill, 0.f, kNoBorder, 14);   // disc
+node->drawCircle(centre, radius, kNoBorder, width, rim, 28);  // ring
+```
+
+`drawCircle`'s fill was already proven by `ShieldNode` (its bubble is a
+filled circle the user verified). 14 segments is smooth for a dot of a few
+units, 24-40 for anything bigger. `src/` has no `drawDot` call left; every
+round shape (missile blast, cat sigil, berserk burst and aura, progress-bar
+marks, reward particles) goes through `drawCircle`. Colours stay
+premultiplied either way.
 
 ## Misc
 

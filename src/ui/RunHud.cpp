@@ -35,6 +35,10 @@ namespace {
     constexpr float kTextScale = 0.55f;
     constexpr float kTextGap = 16.f;         // number's distance from the icon centre
     constexpr float kParticleRadius = 3.f;
+    // Particles are drawn as filled circles: GD's CCDrawNode::drawDot puts
+    // down a square quad instead of a disc (user 2026-09-27).
+    constexpr ccColor4F kNoBorder = { 0.f, 0.f, 0.f, 0.f };
+    constexpr int kDotSegments = 14;
     constexpr int kMinParticles = 4;
     constexpr int kMaxParticles = 12;
     constexpr float kPi = 3.14159265f;
@@ -393,8 +397,8 @@ void RunHud::stepReward(float dt) {
         float e = u < 0.5f ? 2.f * u * u : 1.f - 2.f * (1.f - u) * (1.f - u);
         CCPoint pos = bezier(p.from, p.ctrl, p.to, e);
         float radius = kParticleRadius * (1.f - 0.3f * u);
-        m_particles->drawDot(pos, radius + 1.f, { 0.f, 0.f, 0.f, 1.f });
-        m_particles->drawDot(pos, radius, opaque(p.gold ? kGoldColor : kFillColor));
+        m_particles->drawCircle(pos, radius + 1.f, { 0.f, 0.f, 0.f, 1.f }, 0.f, kNoBorder, kDotSegments);
+        m_particles->drawCircle(pos, radius, opaque(p.gold ? kGoldColor : kFillColor), 0.f, kNoBorder, kDotSegments);
     }
     // Landing: a ring that grows and thins out where the particle hit.
     std::erase_if(r.flashes, [&](Reward::Flash const& f) { return r.t - f.born >= kFlashTime; });
@@ -402,7 +406,7 @@ void RunHud::stepReward(float dt) {
         float k = (r.t - f.born) / kFlashTime;
         auto c = f.gold ? kGoldColor : kFillColor;
         float a = 1.f - k;
-        m_particles->drawDot(f.at, kParticleRadius * (1.f + 2.f * k), { c.r / 255.f * a, c.g / 255.f * a, c.b / 255.f * a, a });
+        m_particles->drawCircle(f.at, kParticleRadius * (1.f + 2.f * k), { c.r / 255.f * a, c.g / 255.f * a, c.b / 255.f * a, a }, 0.f, kNoBorder, kDotSegments);
     }
 
     if (m_gaugeFill) {

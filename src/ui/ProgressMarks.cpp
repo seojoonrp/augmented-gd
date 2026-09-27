@@ -16,6 +16,10 @@ namespace {
     constexpr ccColor4F kRimColor = { 0.f, 0.f, 0.f, 1.f };
     constexpr ccColor4F kBestColor = { 1.f, 1.f, 1.f, 1.f };
     constexpr ccColor4F kCheckpointColor = { 0.47f, 1.f, 0.47f, 1.f };
+    // The dots are drawn as filled circles: GD's CCDrawNode::drawDot puts down
+    // a square quad instead of a disc (user 2026-09-27).
+    constexpr ccColor4F kNoBorder = { 0.f, 0.f, 0.f, 0.f };
+    constexpr int kDotSegments = 14;
 }
 
 ProgressMarks* ProgressMarks::create(CCSprite* bar, CCSprite* fill) {
@@ -84,8 +88,8 @@ void ProgressMarks::redraw() {
     m_node->clear();
     auto dot = [&](float percent, ccColor4F color) {
         CCPoint c{ this->xForPercent(percent), m_centreY };
-        m_node->drawDot(c, m_radius, kRimColor);
-        m_node->drawDot(c, m_radius - kRim, color);
+        m_node->drawCircle(c, m_radius, kRimColor, 0.f, kNoBorder, kDotSegments);
+        m_node->drawCircle(c, m_radius - kRim, color, 0.f, kNoBorder, kDotSegments);
     };
     for (float p : m_checkpoints) dot(p, kCheckpointColor);
     if (m_best > 0.f) dot(m_best, kBestColor);
