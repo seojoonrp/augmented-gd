@@ -31,6 +31,7 @@ and HUD text it should produce (`scripts/logs.ps1` with every report).
   ahead every 6 s, 3-block blast) — user: "괜찮은데" then "딱 괜찮은듯" with the
   300 lead (2026-09-20). The cat on the shared `HazardRemoval` scan is covered
   by the same rounds.
+- **Shield bubble** (white bubble around the icon, ring burst on the absorbed hit, icon blinks 100/50/100 % through noclip via `PlayerObject::setOpacity`) — user: "잘 된다" (2026-09-27).
 
 ## Broken / unverified
 
