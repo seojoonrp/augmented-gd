@@ -1,7 +1,8 @@
-// M2: "AUG" button on the level info screen that starts (or previews) a run.
+// "AUG" button on the level info screen: starts a run, or asks whether to
+// continue / restart the one in progress.
 
 #include "../game/AugmentManager.hpp"
-#include "../ui/AugmentDraftPopup.hpp"
+#include "../ui/RunResumePopup.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
@@ -36,54 +37,25 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
 
     void onAugment(CCObject*) {
         auto& mgr = AugmentManager::get();
-        auto levelName = std::string(m_level->m_levelName);
         int levelID = m_level->m_levelID.value();
-        log::info("AUG pressed on '{}' (id {})", levelName, levelID);
+        log::info("AUG pressed on '{}' (id {})", std::string(m_level->m_levelName), levelID);
 
-        std::string body;
-        if (mgr.isRunFor(levelID)) {
-            body = fmt::format(
-                "Run in progress on <cy>{}</c>\n"
-                "Deaths: <cr>{}</c>   Augments: <cg>{}</c>\n\n"
-                "<cl>Continue</c> keeps your augments.\n<cr>Restart</c> starts a fresh run.",
-                levelName, mgr.deaths(), mgr.augments().size()
-            );
-        }
-        else {
-            body = fmt::format(
-                "Start an augmented run on <cy>{}</c>?\n\n"
-                "Die, draft an augment, get stronger.\n"
-                "Augments persist until you beat the level.",
-                levelName
-            );
+        // No run on this level yet: start one straight away.
+        if (!mgr.isRunFor(levelID)) {
+            mgr.startRun(m_level);
+            this->onPlay(nullptr);
+            return;
         }
 
+        // The popup sits on top of this layer, so `this` outlives it.
         Ref<GJGameLevel> level = m_level;
-        bool const continuing = mgr.isRunFor(levelID);
-        createQuickPopup(
-            "Augment Mode",
-            body,
-            continuing ? "Restart" : "Preview",
-            continuing ? "Continue" : "Start",
-            [this, level, continuing](FLAlertLayer*, bool btn2) {
-                auto& mgr = AugmentManager::get();
-                if (continuing) {
-                    if (!btn2) mgr.startRun(level);
-                    this->onPlay(nullptr);
-                    return;
-                }
-                if (btn2) {
-                    mgr.startRun(level);
-                    this->onPlay(nullptr);
-                }
-                else {
-                    // Preview: just show the draft UI, don't apply anything.
-                    auto popup = AugmentDraftPopup::create(mgr.rollDraft(tune::DefaultDraftCards), [](std::string const& id) {
-                        log::info("Preview pick (not applied): {}", id);
-                    });
-                    if (popup) popup->show();
-                }
-            }
+        auto popup = RunResumePopup::create(
+            [this, level] {
+                AugmentManager::get().startRun(level);
+                this->onPlay(nullptr);
+            },
+            [this] { this->onPlay(nullptr); }
         );
+        if (popup) popup->show();
     }
 };
