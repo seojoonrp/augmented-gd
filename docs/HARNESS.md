@@ -37,6 +37,7 @@ retired.
 | `fetch-refs.ps1` | clones the reference mods into `refs/` at pinned commits, writes `refs/MANIFEST.md` | `refs/` is gitignored; `docs/refs/` is what is committed. |
 | `fontcharset.ps1` | rebuilds the `AugDebug` charset in `mod.json` from every string literal in `src/` | Concatenated literals are fine; comments are ignored. |
 | `fontgen.py` | bakes `AugName` / `AugText` (ImcreSoojin, white + black outline + shadow) sd/hd/uhd into `resources/fonts/gen/` | Windows `py -3` + Pillow + fonttools. Skips when the charset stamp is unchanged. Geode CLI's own `outline` key is a no-op. |
+| `stargen.py` | bakes `resources/ui/round-star.png` (96 px uhd, white fill + 7 px black outline, tinted in game) from the user's `resources/ui/round-star.svg` | One-off, **not** run by `build.ps1`; rerun after changing the SVG. No SVG renderer is installed, so it parses the path itself — `M` + relative `c` only, anything else raises. Pillow, 4x supersampling. |
 
 ## Docs
 

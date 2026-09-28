@@ -515,6 +515,29 @@ round shape (missile blast, cat sigil, berserk burst and aura, progress-bar
 marks, reward particles) goes through `drawCircle`. Colours stay
 premultiplied either way.
 
+Polygons (2026-09-28, `CardStyle.hpp`): `drawPolygon` fills with a fan from
+the first vertex, so only convex shapes (triangles, quads, a rounded
+rectangle's outline) fill correctly — a star is drawn as ten triangles from
+its centre, a gradient as horizontal strips. Each polygon gets an
+anti-aliased fringe on its edges, which would leave a hairline seam where
+two polygons share an edge; giving it a thin border in its own fill colour
+closes that (the border path, `borderWidth > 0` with an opaque border, skips
+the inset fringe). The gradient strips work that way (seen in game, rounds
+2–4). **Never on thin, sharp triangles**: the border's corners are mitred,
+and a rounded star fanned into ~70 sliver triangles threw long black spikes
+across the card (user screenshot, 2026-09-28) — stars are a sprite now.
+For translucent pieces the fringe itself is the problem (overlapping fades
+darken the seam); a near-invisible border (0.01 pt, alpha 0.002) should
+make the fill land exactly on the vertices — tried for the inset boxes in
+round 5, gone with them in round 7 before it was judged **(unverified)**.
+
+`CCLayerGradient::create(start, end, { 1.f, 0.f })` is used for GD's
+left-to-right tile shading (`card::gdPanel`), start colour on the **left**
+— read from cocos2d-x 2.2's `updateColor` (the default `(0, -1)` puts the
+start at the top). Seen in game 2026-09-28 — the user approved the tiles
+("훨낫다") without calling out a flipped shade; if they ever come out darker
+on the left, swap the colours or pass `{ -1.f, 0.f }`.
+
 ## Misc
 
 - Node IDs on `LevelInfoLayer` (node-ids): `left-side-menu`, `right-side-menu`, `back-menu`.

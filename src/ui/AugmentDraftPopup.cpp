@@ -1,10 +1,9 @@
 #include "AugmentDraftPopup.hpp"
+#include "AugmentCard.hpp"
 #include "Fonts.hpp"
-#include "CardStyle.hpp"
 #include "../game/AugmentManager.hpp"
 
 #include <Geode/Geode.hpp>
-#include <Geode/ui/NineSlice.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -15,40 +14,16 @@ namespace augment {
 
 namespace {
     // Card geometry (sd points) for a three-card draft. The card is drawn at
-    // full size and scaled down as a whole when four cards have to fit.
-    constexpr float kCardWidth = 140.f;
-    constexpr float kCardHeight = 210.f;
+    // full size (AugmentCard.hpp) and scaled down as a whole when four cards
+    // have to fit.
+    constexpr float kCardWidth = card::CardWidth;
+    constexpr float kCardHeight = card::CardHeight;
     constexpr float kCardGap = 12.f;
     constexpr float kPopupPadding = 16.f;
     constexpr float kTitleSpace = 36.f;
     // Four cards (draft-count) at full width would need 644 pt, so they are
     // narrowed to fit. Leaves a margin inside the 569 pt screen.
     constexpr float kMaxPopupWidth = 540.f;
-
-    // GD button look: white rim, then GJ_button_01 (CardStyle.hpp).
-    using card::roundedBox;
-    constexpr float kRim = card::Rim;
-    constexpr float kRimRadius = card::RimRadius;
-    constexpr float kRing = card::Ring;
-    constexpr ccColor3B kBodyGreen = { 122, 222, 45 };  // GJ_button_01's fill
-    constexpr float kInset = 10.f;
-
-    // Vertical slots, measured down from the card's top edge.
-    constexpr float kNameY = 18.f;
-    constexpr float kNameScale = 0.6f;
-    constexpr float kImageTop = 34.f;
-    constexpr float kImageWidth = 120.f;
-    constexpr float kImageHeight = 70.f;
-    constexpr float kImageBorder = 2.f;
-    constexpr float kImageRadius = 4.5f;
-    // Description block is centred between the image box and the footer band,
-    // with this much breathing room above and below.
-    constexpr float kDescMargin = 5.f;
-    constexpr float kDescScale = 0.5f;
-    constexpr float kDescMinScale = 0.35f;
-    constexpr float kFooterHeight = 20.f;
-    constexpr float kFooterRadius = 4.f;
-    constexpr float kFooterScale = 0.5f;
     constexpr float kTitleScale = 1.f;
 
     // Reveal: cards start stacked at the row centre, small and slightly
@@ -68,45 +43,6 @@ namespace {
         constexpr float s = 1.3f;  // overshoot; cocos' default 1.70158 is too bouncy for cards
         t -= 1.f;
         return t * t * ((s + 1.f) * t + s) + 1.f;
-    }
-
-    // Word-wrap by measuring words with throwaway labels. CCLabelBMFont's
-    // width argument never wrapped our fonts in game (Pretendard or the baked
-    // ImcreSoojin, 2026-09-17), so the label gets explicit newlines instead.
-    // `maxWidth` is in label units (pre-scale). Existing newlines are kept.
-    std::string wrapText(std::string const& text, char const* font, float maxWidth) {
-        auto measure = [&](std::string const& s) {
-            auto probe = CCLabelBMFont::create(s.c_str(), font);
-            return probe ? probe->getContentSize().width : 0.f;
-        };
-        std::string out;
-        size_t paraStart = 0;
-        while (paraStart <= text.size()) {
-            size_t paraEnd = text.find('\n', paraStart);
-            if (paraEnd == std::string::npos) paraEnd = text.size();
-            std::string line;
-            size_t wordStart = paraStart;
-            while (wordStart <= paraEnd) {
-                size_t wordEnd = text.find(' ', wordStart);
-                if (wordEnd == std::string::npos || wordEnd > paraEnd) wordEnd = paraEnd;
-                auto word = text.substr(wordStart, wordEnd - wordStart);
-                if (!word.empty()) {
-                    auto candidate = line.empty() ? word : line + " " + word;
-                    if (!line.empty() && measure(candidate) > maxWidth) {
-                        out += line + '\n';
-                        line = word;
-                    }
-                    else {
-                        line = candidate;
-                    }
-                }
-                wordStart = wordEnd + 1;
-            }
-            out += line;
-            if (paraEnd < text.size()) out += '\n';
-            paraStart = paraEnd + 1;
-        }
-        return out;
     }
 }
 
@@ -187,124 +123,16 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
     return true;
 }
 
+// What a pick would give: the next level's draft text, "NEW" or the level
+// change in the footer, and the stars of the level held *now* (all empty on
+// a new augment).
 CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
-    auto card = CCNode::create();
-    card->setContentSize({ kCardWidth, kCardHeight });
-    card->setAnchorPoint({ 0.5f, 0.5f });
-    auto const centre = CCPoint{ kCardWidth / 2, kCardHeight / 2 };
-    auto const fromTop = [](float dy) { return CCPoint{ kCardWidth / 2, kCardHeight - dy }; };
-    float const inner = kCardWidth - 2 * kInset;
-
-    // White rim (full-size slices: its corner radius must cover the body's).
-    auto rim = roundedBox({ kCardWidth + 2 * kRim, kCardHeight + 2 * kRim }, ccWHITE, kRimRadius);
-    rim->setPosition(centre);
-    card->addChild(rim, 0);
-
-    // Body: GD's green button, black ring and highlight included.
-    auto body = NineSlice::create("GJ_button_01.png");
-    body->setContentSize({ kCardWidth, kCardHeight });
-    body->setPosition(centre);
-    card->addChild(body, 1);
-
-    // Footer band: the darker strip along the bottom of GD's big buttons.
-    auto band = roundedBox({ kCardWidth - 2 * kRing, kFooterHeight }, ccBLACK, kFooterRadius, 70);
-    band->setPosition({ kCardWidth / 2, kRing + kFooterHeight / 2 });
-    card->addChild(band, 2);
-
-    auto name = CCLabelBMFont::create(def.name.c_str(), fonts::Name);
-    name->limitLabelWidth(inner, kNameScale, 0.3f);
-    name->setPosition(fromTop(kNameY));
-    card->addChild(name, 3);
-
-    // Image slot: black border around a white panel, with the augment's art
-    // on top. The inner radius is the outer one minus the border so the
-    // border looks the same thickness around the corners.
-    auto const imageCentre = fromTop(kImageTop + kImageHeight / 2);
-    auto imageFrame = roundedBox({ kImageWidth, kImageHeight }, ccBLACK, kImageRadius);
-    imageFrame->setPosition(imageCentre);
-    card->addChild(imageFrame, 2);
-    float const panelWidth = kImageWidth - 2 * kImageBorder;
-    float const panelHeight = kImageHeight - 2 * kImageBorder;
-    auto imageFill = roundedBox({ panelWidth, panelHeight }, ccWHITE, kImageRadius - kImageBorder);
-    imageFill->setPosition(imageCentre);
-    card->addChild(imageFill, 3);
-
-    // `resources/augments/<id>.png` (480x280, the slot at uhd; Geode makes the
-    // smaller ones). Built at runtime from the id, so a new augment needs no
-    // wiring here — and a missing file only leaves the panel empty.
-    auto artName = Mod::get()->expandSpriteName(fmt::format("{}.png", def.id));
-    if (auto art = CCSprite::create(artName.c_str())) {
-        auto size = art->getContentSize();
-        if (size.width > 0.f && size.height > 0.f) {
-            art->setScale(std::min(panelWidth / size.width, panelHeight / size.height));
-        }
-        art->setPosition(imageCentre);
-        card->addChild(art, 4);
-    }
-    else {
-        log::warn("Draft card '{}': no art at '{}'", def.id, artName);
-    }
-
-    // Description: wrapped here (see wrapText) at the card's inner width and
-    // shrunk in steps until it fits between the image box and the footer,
-    // then centred in that gap.
     int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
-    float const slotTop = kImageTop + kImageHeight + kDescMargin;
-    float const slotBottom = kCardHeight - kRing - kFooterHeight - kDescMargin;
-    float const slot = slotBottom - slotTop;
-    float descScale = kDescScale;
-    CCLabelBMFont* desc = nullptr;
-    for (;;) {
-        auto wrapped = wrapText(def.describe(nextLevel), fonts::Text, inner / descScale);
-        desc = CCLabelBMFont::create(
-            wrapped.c_str(), fonts::Text, kCCLabelAutomaticWidth, kCCTextAlignmentCenter
-        );
-        if (desc->getContentSize().height * descScale <= slot || descScale <= kDescMinScale + 1e-3f) break;
-        descScale -= 0.05f;
-    }
-    if (desc->getContentSize().height * descScale > slot) {
-        log::warn(
-            "Draft card '{}' description still overflows at scale {:.2f} ({:.0f} > {:.0f} pt)",
-            def.id, descScale, desc->getContentSize().height * descScale, slot
-        );
-    }
-    desc->setScale(descScale);
-    desc->setAnchorPoint({ 0.5f, 0.5f });
-    desc->setPosition(fromTop((slotTop + slotBottom) / 2));
-    card->addChild(desc, 3);
-
-    // Footer: level change on the left, level pips on the right.
-    std::string levelText = currentLevel == 0
-        ? "NEW"
-        : fmt::format("Lv {} → {}", currentLevel, nextLevel);
-    auto level = CCLabelBMFont::create(levelText.c_str(), fonts::Text);
-    level->setScale(kFooterScale);
-    level->setAnchorPoint({ 0.f, 0.5f });
-    level->setPosition({ kInset, band->getPositionY() });
-    card->addChild(level, 3);
-
-    // Level pips show the level held *now* (all empty on a new augment). Two
-    // labels because a label has one colour: gold held, grey remaining. Both
-    // hug the right edge.
-    std::string filled, empty;
-    for (int i = 0; i < currentLevel; i++) filled += "★";
-    for (int i = currentLevel; i < def.maxLevel; i++) empty += "☆";
-    auto emptyPips = CCLabelBMFont::create(empty.c_str(), fonts::Text);
-    emptyPips->setScale(kFooterScale);
-    emptyPips->setColor({ 150, 150, 150 });
-    emptyPips->setAnchorPoint({ 1.f, 0.5f });
-    emptyPips->setPosition({ kCardWidth - kInset, band->getPositionY() });
-    card->addChild(emptyPips, 3);
-    auto filledPips = CCLabelBMFont::create(filled.c_str(), fonts::Text);
-    filledPips->setScale(kFooterScale);
-    filledPips->setColor({ 255, 215, 60 });
-    filledPips->setAnchorPoint({ 1.f, 0.5f });
-    filledPips->setPosition({
-        kCardWidth - kInset - emptyPips->getContentSize().width * kFooterScale,
-        band->getPositionY()
-    });
-    card->addChild(filledPips, 3);
-    return card;
+    card::CardFace face;
+    face.description = def.describe(nextLevel);
+    face.footer = currentLevel == 0 ? "NEW" : fmt::format("Lv {} → {}", currentLevel, nextLevel);
+    face.pips = currentLevel;
+    return card::augmentCard(def, face);
 }
 
 void AugmentDraftPopup::visit() {

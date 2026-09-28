@@ -205,6 +205,67 @@ out of the bar (user screenshot, 2026-09-27). Decided with the user over four ro
 show the scale *at the player's current position*, so they move as nerve ramps
 up; 웨이브브레이커 adds `ACTIVE` while a player is in wave.
 
+**Debug-mode only since 2026-09-28**: the grey header and the augment rows
+are drawn only with the `debug-mode` setting on (the user wants them kept for
+debugging); in normal play the pause menu carries that information. The
+gauge, the progress-bar dots and the notices always show.
+
+## Pause menu (2026-09-28)
+
+On a run level the pause menu's practice button is replaced by the mod's
+round button (the AUG button's face, sized to the practice button) — a
+practice attempt is not a run attempt, so a run has no use for it; it stays,
+with ours beside it, only if the player is already in practice mode. The
+button opens the **run summary** (`RunInfoPopup`) in **GD's own menu
+colours** (round 7, after a CreatorLayer screenshot from the user, values
+sampled from it): the card (`card::framedPanel`) keeps the white rim, black
+ring, soft shadow and thin half-white inner stroke, around GD's menu blue as
+a vertical gradient (0/96/241 → 0/56/142); the stat chips and the tiles are
+**GD menu panels** (`card::gdPanel`) — white rim, black ring, a green body
+shaded left to right in two halves (upper 200/254/89 → 107/208/19, lower
+150/252/62 → 70/162/13, 49 % / rest) over a dark strip along the bottom
+(75/127/30 → 38/84/9), and a black 40 % shadow down-right that reads dark
+blue on the card. (Rounds 2–6 had a green gradient card with dark
+translucent chips and tiles; the user found the colours off.) Three stat chips on top, captions in English
+per the user — **Deaths** (this run), **Session Best** (this run's best,
+whole percent, not counting the attempt in progress), **Total Best** (the
+runs' record, caption and number both gold) — then `보유 증강 (N)` in white with an engraved
+rule to the right edge, and one tile per held augment in table order: name,
+the card art in the draft card's 120x70 slot, `Lv N` (gold when maxed) and
+level stars. The three chips are a centred row of 112x30 panels, 12 pt
+apart, with smaller text (caption 0.38, number 0.48 — round 7). No
+descriptions (user). Paddings are 14 pt from the ring, 8 pt between tiles,
+chips → section rule → grid 8 / 6 pt (round 5), and chip text is centred by
+its real label heights. A tile keeps 14 pt free at
+each side (its art slot is 104x61, the draft card's shape made smaller), so
+tiles read smaller with more side room, and four in a row fill the card's
+width exactly (round 5, user).
+
+**Tile detail** (2026-09-28, round 4): under the mouse a tile eases up to
+106 % — size only, the white-border highlight of rounds 4–6 went in round 7
+(polled each frame — cocos has no hover event; the hit area stays put) —
+and a click opens `AugmentInfoPopup`: the draft card itself
+(`card::augmentCard`, shared with the draft popup) centred at 1.1x (1.3 in
+round 4 filled the screen's height), with the text of what the augment
+does **at the level held** — `AugmentDef::describeAt(level)`, the initial
+sentences with that level's numbers from `formula::` (shield Lv3 "보호막이
+3개", cat Lv3 "3초마다 … 장애물 7개", missile Lv3 "5초마다 … 반경 4칸"),
+host-tested so the card and the game cannot disagree — `Lv N` in the
+footer (gold once maxed) and N stars. Close / Esc returns to the summary.
+
+**Level stars** (2026-09-28): the user's rounded star
+(`resources/ui/round-star.svg`, baked to `round-star.png` by
+`scripts/stargen.py` — white fill inside a black outline) tinted gold for
+levels held and grey for the rest, 3.8 pt radius, 7 pt apart (round 7),
+tipped 12° to the left (round 6), on the draft cards and the tiles alike
+(`card::stars`). Two drawn versions came first:
+ImcreSoojin's ★ glyph carries a stray mark above the star, and a
+CCDrawNode rounded star threw long spikes (round 4 screenshot). The tiles are drawn at full size and scaled as a whole; the grid
+takes the column count that gives the biggest tiles (full size at most, the
+fuller grid on a tie — 4 augments make 2x2) and the card grows with it up to
+292 pt, so it never scrolls: 3 augments sit at full size, 13 at ~55 %.
+Laid out after the user's references (Vampire Survivors-style upgrade grids).
+
 **Notices** (2026-09-27): the screen used to carry a big centred line for every
 event, which the user read as debug text and asked to have gone. What is left
 are four short Korean lines in the **bottom-left** corner (UI font, white with

@@ -1,4 +1,5 @@
 #include "AugmentDef.hpp"
+#include "Formulas.hpp"
 
 #include <cmath>
 
@@ -22,6 +23,50 @@ namespace {
 std::string const& AugmentDef::describe(int level) const {
     if (level <= 1 || levelUpDesc.empty()) return initialDesc;
     return levelUpDesc;
+}
+
+// The initial text's sentences with level `n`'s numbers from formula::, so
+// the detail card and the game cannot disagree.
+std::string AugmentDef::describeAt(int level) const {
+    if (level <= 1 || maxLevel <= 1) return initialDesc;
+    int const n = std::min(level, maxLevel);
+    if (id == ids::Shield) {
+        return "매 어템마다 보호막이 " + std::to_string(n) + "개 지급됩니다.\n보호막이 깨지면 "
+            + num(tune::NoclipSeconds) + "초간 노클립 상태로 전환됩니다.";
+    }
+    if (id == ids::SlowMo) {
+        return "게임 속도가 " + pct(1.f - formula::slowMoScale(n)) + "% 감소합니다.\nX를 눌러 토글할 수 있습니다.";
+    }
+    if (id == ids::StartPos) {
+        return "매 어템마다 Z를 눌러 체크포인트를 최대 " + std::to_string(n) + "번 찍을 수 있습니다.\n"
+            "해당 어템에 죽으면 체크포인트에서 부활합니다.";
+    }
+    if (id == ids::HazardHitbox) {
+        return "위험 요소(빨간 히트박스)의 크기가 " + pct(tune::HazardStep * n) + "% 감소합니다.";
+    }
+    if (id == ids::WaveHitbox) {
+        return "웨이브 모드일 때 플레이어 히트박스 크기가 " + pct(tune::WaveStep * n) + "% 감소합니다.";
+    }
+    if (id == ids::Cat) {
+        return "마법 고양이를 소환합니다.\n고양이는 " + num(formula::catInterval(n)) + "초마다 시야에 있는 장애물 "
+            + std::to_string(formula::catCount(n)) + "개를 랜덤으로 제거합니다.";
+    }
+    if (id == ids::Brake) {
+        return "C를 누르고 있으면 게임 속도가 " + pct(tune::BrakeCut) + "% 감소합니다.\n어템마다 최대 "
+            + num(formula::brakeBudget(n)) + "초씩 사용할 수 있습니다.";
+    }
+    if (id == ids::Missile) {
+        return num(formula::missileInterval(n)) + "초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다.\n반경 "
+            + num(formula::missileRadius(n) / tune::BlockUnits) + "칸 안의 위험 요소가 모두 제거됩니다.";
+    }
+    if (id == ids::Berserk) {
+        return "위험 요소가 파괴될 때마다 " + pct(formula::berserkChance(n)) + "% 확률로\n"
+            + num(formula::berserkSeconds(n)) + "초간 버서커 모드에 돌입합니다.\n"
+            "버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다.";
+    }
+    // A multi-level augment without its own sentence here: the initial text
+    // is still true, only its numbers are the first level's.
+    return initialDesc;
 }
 
 // Text is the design table (docs/DESIGN.md) with its numbers taken from

@@ -41,7 +41,12 @@ struct AugmentDef {
     // when maxLevel == 1.
     std::string levelUpDesc;
 
+    // Draft card text for drafting `level`: initial at 1, level-up after.
     std::string const& describe(int level) const;
+    // What the augment does *at* `level`, with that level's numbers (the
+    // pause menu's detail card): "보호막이 3개 지급됩니다". Level 1 (and any
+    // single-level augment) is the initial text.
+    std::string describeAt(int level) const;
 };
 
 std::vector<AugmentDef> const& allAugments();

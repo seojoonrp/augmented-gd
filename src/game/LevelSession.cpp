@@ -86,13 +86,21 @@ void LevelSession::refreshHud(bool force) {
     // A gauge-earned draft that is still waiting shows as a full bar with
     // DRAFT!; the free opening draft does not (the gauge really is at 0 then).
     m_hud->setGauge(mgr.gauge(), mgr.gaugeThreshold(), mgr.pendingGaugeDrafts() > 0);
+    if (m_marks) m_marks->setBest(best);
+
+    // The top-left readout (header + one row per augment) is debug-mode only
+    // since the pause menu shows the same things (user, 2026-09-28).
+    if (!AugmentManager::debugMode()) {
+        m_hud->setHeader("");
+        m_hud->setSlots({});
+        return;
+    }
     // `record` is every run's best on this level (Records.hpp), apart from
     // both this run's best and GD's normal one.
     m_hud->setHeader(fmt::format(
         "deaths {}   now {:.1f}%   best {:.1f}%   record {}%",
         mgr.deaths(), now, best, records::best(m_layer->m_level)
     ));
-    if (m_marks) m_marks->setBest(best);
 
     // One row per owned augment in table order. Names are the Korean
     // display names; the state text stays English (debug readout).

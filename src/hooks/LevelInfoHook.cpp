@@ -3,11 +3,11 @@
 // mark in it (resources/ui/aug-logo.png, the user's own art).
 
 #include "../game/AugmentManager.hpp"
+#include "../ui/AugButton.hpp"
 #include "../ui/RunResumePopup.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
-#include <Geode/ui/BasedButtonSprite.hpp>
 
 using namespace geode::prelude;
 using namespace augment;
@@ -30,10 +30,7 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge)) return false;
 
-        auto logo = CCSprite::create("aug-logo.png"_spr);
-        if (!logo) log::warn("AUG button: no logo sprite, the circle will be empty");
-        auto spr = CircleButtonSprite::create(logo, CircleBaseColor::Green, CircleBaseSize::Medium);
-        spr->setTopRelativeScale(kLogoScale);
+        auto spr = augButtonSprite(CircleBaseSize::Medium, kLogoScale);
         auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AugLevelInfoLayer::onAugment));
         btn->setID("augment-button"_spr);
 

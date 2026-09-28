@@ -90,7 +90,8 @@ resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gi
 resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
 resources/ui/            aug-logo.png (the mark inside the round AUG button); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
-  AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup
+  AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup;
+                         describeAt(level) = the effect text with that level's numbers (detail card)
   Formulas.hpp           level → effect (slowMoScale, nerveBoost, hazard/waveScale, cat*, draftCardCount)
   RunState.*             one run: gauge economy (GaugeRule injected), levels, pending drafts, slow-mo toggle
 src/game/                Geode glue
@@ -119,8 +120,12 @@ src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-fram
 src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (round AUG button),
                          HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
                          (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time()),
-                         GdRecordHook (savePercentage / showNewBest blocked on run attempts, end-screen quote)
-src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
+                         GdRecordHook (savePercentage / showNewBest blocked on run attempts, end-screen quote),
+                         PauseLayerHook (run button in place of practice → RunInfoPopup)
+src/ui/                  Fonts.hpp, CardStyle.hpp (rim/panel/art slot), AugButton.hpp (round mark button),
+                         AugmentCard (the card itself, shared), AugmentDraftPopup (cards, reveal from visit()),
+                         RunInfoPopup (pause-menu run summary: stat chips + tile grid, hover ring, click →
+                         AugmentInfoPopup = the card at the held level's text), RunHud (bottom gauge, debug-mode rows,
                          bottom-left notices), ProgressMarks (dots on GD's bar), CatNode (square + white magic circles), MissileNode (reticle / drop / blast, world space, white),
                          BerserkNode (screen frame + smash bursts), BerserkAura (fire on the player, object layer under the icon)
 tests/core_tests.cpp     host tests, plain asserts (scripts/test.ps1)

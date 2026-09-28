@@ -91,6 +91,38 @@ void testTable() {
     CHECK(&fore.describe(2) == &fore.initialDesc);
 }
 
+// describeAt(): the detail card's text carries that level's numbers.
+void testDescribeAt() {
+    auto at = [](char const* id, int level) { return findAugment(id)->describeAt(level); };
+    // Level 1 and single-level augments read exactly like the draft card.
+    for (auto const& d : allAugments()) {
+        CHECK(d.describeAt(1) == d.initialDesc);
+        CHECK(d.describeAt(0) == d.initialDesc);
+        if (d.maxLevel == 1) CHECK(d.describeAt(3) == d.initialDesc);
+        // Every level has a text, and the numbers differ from level 1's.
+        for (int lv = 2; lv <= d.maxLevel; lv++) CHECK(d.describeAt(lv) != d.initialDesc);
+    }
+    CHECK(contains(at(ids::Shield, 3), "보호막이 3개"));
+    CHECK(contains(at(ids::Shield, 3), "1.5초간"));
+    CHECK(contains(at(ids::SlowMo, 3), "15% 감소"));
+    CHECK(contains(at(ids::SlowMo, 3), "X를 눌러"));
+    CHECK(contains(at(ids::StartPos, 4), "최대 4번"));
+    CHECK(contains(at(ids::HazardHitbox, 5), "25% 감소"));
+    CHECK(contains(at(ids::WaveHitbox, 5), "50% 감소"));
+    CHECK(contains(at(ids::Cat, 3), "3초마다"));
+    CHECK(contains(at(ids::Cat, 3), "장애물 7개"));
+    CHECK(contains(at(ids::Cat, 4), "2.5초마다"));
+    CHECK(contains(at(ids::Brake, 2), "최대 14초씩"));
+    CHECK(contains(at(ids::Brake, 2), "60% 감소"));
+    CHECK(contains(at(ids::Missile, 3), "5초마다"));
+    CHECK(contains(at(ids::Missile, 3), "반경 4칸"));
+    CHECK(contains(at(ids::Missile, 2), "반경 3.5칸"));
+    CHECK(contains(at(ids::Berserk, 3), "5% 확률로"));
+    CHECK(contains(at(ids::Berserk, 3), "2초간"));
+    // Past the cap reads as the cap.
+    CHECK(at(ids::Shield, 9) == at(ids::Shield, 3));
+}
+
 // ---------------------------------------------------------------- formulas
 
 void testFormulas() {
@@ -459,6 +491,7 @@ void testEffectsAtLevels() {
 
 int main() {
     testTable();
+    testDescribeAt();
     testFormulas();
     testLifecycle();
     testGaugeNoFloor();
