@@ -167,29 +167,38 @@ not a code change.
 
 ## Mark and the AUG button (2026-09-27)
 
-The mark is the user's own drawing (2026-09-27, after a generated one they
-turned down): a level card tilted behind a white arrow pointing up, in the
-mod's line style — near-white fills, `#2D2D2D` strokes. Two exports:
-`logo.png` at the root (336, the drawing on sky blue `#37BAF4`) is what the
-Geode mod list shows, and `resources/ui/aug-logo.png` (128, transparent) is
-the glyph in the game. The glyph is the drawing cropped to its own bounds
-and padded 2 % into a square, because the button fits whatever it is given
-into a box and any margin inside the file only makes the mark smaller.
-The vector lives with the user (`Desktop/augmented-gd/logo`), not in the
-repo, so a new export is re-cropped the same way. Geode does **not** round
+The mark is the user's own drawing. First version (2026-09-27, after a
+generated one they turned down): a level card tilted behind a white arrow
+pointing up, near-white fills with `#2D2D2D` strokes. **Second version**
+(2026-09-29): a grey GD cube tilted behind a red arrow pointing up. Two
+exports: `logo.png` at the root (336) is what the Geode mod list shows, and
+`resources/ui/aug-logo.png` (**256** since the second version, transparent)
+is the glyph in the game. The glyph is the drawing cropped to its own bounds
+and padded 2 % into a square (`scripts/logocrop.py`), because the button
+fits whatever it is given to 65 % of the circle and any margin inside the
+file only makes the mark smaller (a raw 672 export, drawn in 72 % x 59 % of
+its canvas, came out small). 256 px, not the export's size: the buttons
+draw the glyph at ~125 (level page) to ~147 (pause menu) uhd pixels, GD's
+textures have no mipmaps, and shrinking more than 2x makes thin strokes
+jagged — a 336 export looked broken to the user. The vector lives with the
+user (`Desktop/augmented-gd/logo`), not in the repo; run each new export
+through `logocrop.py`. Geode does **not** round
 a logo's corners — `createModLogo` just scales the file — so the rounding
 in `logo.png` is the user's own (2026-09-27).
 
 On the level info screen that glyph sits in a round green button
-(`CircleButtonSprite`, Medium; the glyph fills the 65 % it is fitted to,
+(`CircleButtonSprite`; the glyph fills the 65 % it is fitted to,
 `setTopRelativeScale` left at 1.0 once the file's own padding came down to
-2 %). The button is **beside GD's copy button, on its row**:
-`LevelInfoHook::augmentButtonSpot` reads `copy-button` inside node-ids'
-`left-side-menu` and offsets 56 pt to its right, so the two read
-as a pair without ours joining the column's layout. A level with no copy
-button falls back to the column's mid-height, and no column at all to a
-fixed x = 78. Decided over three rounds with the user (vertically centred
-at 78, then 98, then this).
+2 %). **Since 2026-09-29** it is **halfway in size between its old Medium
+circle and GD's Play button** — `(46.75 + play width) / 2`, the Play
+button's width read at runtime from `m_playBtnMenu` — drawn from the Large
+circle (321 uhd px) scaled down, and it stands **left of the difficulty
+face, level with the Play button**: `LevelInfoHook::augmentButtonSpot`
+takes the Play button's height and `m_difficultySprite`'s left edge minus
+12 pt minus the radius. Fallbacks (no Play button: 66 % of the screen
+height; no difficulty sprite: x = 122) are logged. Before that it sat
+beside GD's copy button in the left column (three rounds: centred at x 78,
+then 98, then the copy-button row).
 
 ## HUD (v2, 2026-09-17)
 

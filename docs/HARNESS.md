@@ -37,6 +37,7 @@ retired.
 | `fetch-refs.ps1` | clones the reference mods into `refs/` at pinned commits, writes `refs/MANIFEST.md` | `refs/` is gitignored; `docs/refs/` is what is committed. |
 | `fontcharset.ps1` | rebuilds the `AugDebug` charset in `mod.json` from every string literal in `src/` | Concatenated literals are fine; comments are ignored. |
 | `fontgen.py` | bakes `AugName` / `AugText` (ImcreSoojin, white + black outline + shadow) sd/hd/uhd into `resources/fonts/gen/` | Windows `py -3` + Pillow + fonttools. Skips when the charset stamp is unchanged. Geode CLI's own `outline` key is a no-op. |
+| `logocrop.py <export.png>` | writes `resources/ui/aug-logo.png`: the export cropped to its drawing, padded 2 % into a square, resampled (premultiplied) to 256 px | One-off, run on each new export of the mark. The button fits the whole file to 65 % of the circle, so margin in the file shrinks the mark (a 672 px export drawn in 72 % of its canvas came out small, 2026-09-29); 256 keeps the in-game shrink under 2x (no mipmaps). |
 | `stargen.py` | bakes `resources/ui/round-star.png` (96 px uhd, white fill + 7 px black outline, tinted in game) from the user's `resources/ui/round-star.svg` | One-off, **not** run by `build.ps1`; rerun after changing the SVG. No SVG renderer is installed, so it parses the path itself — `M` + relative `c` only, anything else raises. Pillow, 4x supersampling. |
 
 ## Docs

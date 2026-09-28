@@ -13,13 +13,18 @@ using namespace geode::prelude;
 using namespace augment;
 
 namespace {
-    // The button rides beside GD's copy button, on its row (the user's ask,
-    // 2026-09-27): one button width to its right, so the two read as a pair
-    // without ours joining the column and being laid out by it.
-    constexpr float kGapFromCopy = 56.f;
-    // No copy button on this level (node-ids only names one when GD made it):
-    // stand this far right of the column instead, at mid-height.
-    constexpr float kFallbackX = 78.f;
+    // Left of the difficulty face, level with GD's Play button (user,
+    // 2026-09-29; it sat beside the copy button in the left column before).
+    // The gap is from the face's edge; a difficulty name under the face
+    // reaches ~5 pt further out, which the gap clears.
+    constexpr float kGapFromDifficulty = 12.f;
+    // Size: halfway between the Medium circle it used to be (187 uhd px =
+    // 46.75 pt wide) and GD's Play button, drawn from the Large circle (321
+    // uhd px = 80 pt) so the texture only ever shrinks.
+    constexpr float kMediumWidth = 46.75f;
+    constexpr float kFallbackPlayWidth = 74.f;
+    // No difficulty sprite to stand beside: roughly where it would put us.
+    constexpr float kFallbackX = 122.f;
     // On top of the 65 % of the circle the glyph is fitted to. 1.2 was a
     // round too big once the file's own padding came down to 2 %, so the
     // user settled on the plain fit.
@@ -34,37 +39,52 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
     bool init(GJGameLevel* level, bool challenge) {
         if (!LevelInfoLayer::init(level, challenge)) return false;
 
-        auto spr = augButtonSprite(CircleBaseSize::Medium, kLogoScale);
+        CCNode* playBtn = nullptr;
+        if (m_playBtnMenu) {
+            playBtn = m_playBtnMenu->getChildByID("play-button");
+            if (!playBtn) playBtn = m_playBtnMenu->getChildByType<CCMenuItemSpriteExtra>(0);
+        }
+        float const playWidth = playBtn ? playBtn->getScaledContentSize().width : kFallbackPlayWidth;
+        float const width = (kMediumWidth + playWidth) / 2;
+
+        auto spr = augButtonSprite(CircleBaseSize::Large, kLogoScale);
+        spr->setScale(width / spr->getContentSize().width);
         auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AugLevelInfoLayer::onAugment));
         btn->setID("augment-button"_spr);
 
         auto menu = CCMenu::create();
         menu->setID("augment-menu"_spr);
-        menu->setPosition(this->augmentButtonSpot());
+        menu->setPosition(this->augmentButtonSpot(playBtn, width / 2));
         menu->addChild(btn);
         this->addChild(menu);
-        log::info("AUG button: circle at ({:.0f}, {:.0f})", menu->getPositionX(), menu->getPositionY());
+        log::info(
+            "AUG button: {:.0f} pt wide (play button {:.0f}{}), centre ({:.0f}, {:.0f})",
+            width, playWidth, playBtn ? "" : ", not found", menu->getPositionX(), menu->getPositionY()
+        );
 
         return true;
     }
 
-    // Beside GD's copy button, in this layer's space. node-ids names that
-    // button inside `left-side-menu`; without either (an old node-ids, or a
-    // level GD gives no copy button) the fallback is the column's own row.
-    CCPoint augmentButtonSpot() {
-        float midY = CCDirector::get()->getWinSize().height / 2;
-        auto column = this->getChildByID("left-side-menu");
-        if (!column) {
-            log::info("AUG button: no left-side-menu, using the fallback spot");
-            return { kFallbackX, midY };
+    // Left of the difficulty face, at the Play button's height, in this
+    // layer's space.
+    CCPoint augmentButtonSpot(CCNode* playBtn, float radius) {
+        auto const winSize = CCDirector::get()->getWinSize();
+        float y = winSize.height * 0.66f;
+        if (playBtn && playBtn->getParent()) {
+            y = this->convertToNodeSpace(playBtn->getParent()->convertToWorldSpace(playBtn->getPosition())).y;
         }
-        auto copyBtn = column->getChildByID("copy-button");
-        if (!copyBtn) {
-            log::info("AUG button: no copy-button on this level, using the column's mid-height");
-            return { column->getPositionX() + kGapFromCopy, midY };
+        else {
+            log::info("AUG button: no play button, using a fixed height");
         }
-        auto spot = this->convertToNodeSpace(column->convertToWorldSpace(copyBtn->getPosition()));
-        return { spot.x + kGapFromCopy, spot.y };
+        if (!m_difficultySprite || !m_difficultySprite->getParent()) {
+            log::info("AUG button: no difficulty sprite, using the fallback x");
+            return { kFallbackX, y };
+        }
+        auto const box = m_difficultySprite->boundingBox();
+        auto const left = this->convertToNodeSpace(
+            m_difficultySprite->getParent()->convertToWorldSpace({ box.getMinX(), box.getMidY() })
+        );
+        return { left.x - kGapFromDifficulty - radius, y };
     }
 
     void onAugment(CCObject*) {
