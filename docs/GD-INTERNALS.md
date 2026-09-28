@@ -294,6 +294,40 @@ Practice" sets `m_isPracticeMode = false` there to make a practice clear count
 (`refs/qolmod/src/Hacks/Level/PracticeComplete.cpp:44-52`). So whichever way
 DESIGN.md decides, it is a one-line hook. **(from refs, unverified here)**
 
+**Used since 2026-09-28** (run clears are not GD clears, `PlayLayerHook.cpp`
+`AugPlayLayer::levelComplete`). Our `runAttempt()` reads `m_isTestMode`, so
+inside the borrowed stretch the record checks ask `records::hiddenFromGd()`,
+which a `records::HideFromGd` guard keeps true. **Verified in game
+2026-09-28** ("다 잘 되는듯"): the clear is not saved and the end screen
+still carries a quote our `EndLevelLayer` hook rewrites (it logs the child
+IDs if node-ids' `complete-message` / `end-text` is ever missing).
+
+## Normal-mode best and New Best! (`savePercentage` / `showNewBest`)
+
+On a normal-mode death past the level's `m_normalPercent`, GD saves through
+`GJGameLevel::savePercentage(int percent, bool isPracticeMode, int clicks,
+int attempts, bool isChkValid)` (`win 0x16c8b0`) and pops
+`PlayLayer::showNewBest(bool newReward, int orbs, int diamonds, bool demonKey,
+bool noRetry, bool noTitle)` (`win 0x3a9550`); both `win ok`. qolmod's safe
+mode blocks exactly these two (plus the test-mode clear) to keep a level's
+progress untouched (`refs/qolmod/src/SafeMode/Hooks.cpp:31-78`), CBF the same
+(`refs/click-between-frames/src/main.cpp:241-253`, `:538-547`). We block both
+during run attempts (`src/hooks/GdRecordHook.cpp`) and call `showNewBest(false,
+0, 0, false, false, false)` ourselves when the runs' record is beaten.
+**Verified in game 2026-09-28**: GD's normal percent stays put and our own
+popup shows. Still not isolated: whether the popup prints the live percent or
+`m_level->m_normalPercent` — `records::showNewBest` sets the latter to the
+record for the length of the call and puts the normal one back, which covers
+both, so keep that swap; whether orbs are awarded anywhere outside
+`savePercentage` (watch the orb count on a rated level).
+`getCurrentPercentInt()` is `win inline` (not callable); we truncate
+`getCurrentPercent()`.
+
+`GJGameLevel` keeps `m_levelType` (`GJLevelType::Main` 1 / `Editor` 2 /
+`Saved` 3 / `SearchResult` 4) and `m_M_ID` (local id; editor levels all have
+`m_levelID` 0). Main and online level ids overlap, so a per-level key needs
+the type. Whether `m_M_ID` is stable across restarts is unverified.
+
 ## Keyboard input on Windows (Geode 5)
 
 Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):

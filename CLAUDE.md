@@ -101,6 +101,8 @@ src/game/                Geode glue
   DraftSession.*         draft::showNext / isOpen / abandon — popup, director pause, cursor, chaining
   Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters);
                          time = base (slow-mo) with an override layer (brake)
+  Records.*              the runs' own per-level record (Geode saved values) + records::hiddenFromGd()
+                         (run attempts never reach GD's normal best / New Best! / clear)
 src/augments/            one file per augment behind Augment.hpp (all hooks default to no-op):
   Augment.hpp            onLevelInit (before PlayLayer::init) / onLevelReady / onObjectAdded / onBeforeReset→resume? /
                          onAttemptStart(fromCheckpoint) / onCheckpointPlaced→snapshot / onCheckpointRespawn→restore /
@@ -116,7 +118,8 @@ src/input/Hotkeys.*      Hotkey enum, hotkeys::route (draft-open guard, per-fram
                          raw KeyboardInputEvent listener at priority -1, debug number keys
 src/hooks/               PlayLayerHook (lifecycle only, dispatches to the session), LevelInfoHook (round AUG button),
                          HazardHitboxHook (hazard::isTarget + GameObject rect/OBB hooks), PlayerHitboxHook
-                         (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time())
+                         (getObjectRect(w,h) for the wave player), SchedulerHook (dt * scales::time()),
+                         GdRecordHook (savePercentage / showNewBest blocked on run attempts, end-screen quote)
 src/ui/                  Fonts.hpp, AugmentDraftPopup (cards, reveal from visit()), RunHud (bottom gauge, rows,
                          bottom-left notices), ProgressMarks (dots on GD's bar), CatNode (square + white magic circles), MissileNode (reticle / drop / blast, world space, white),
                          BerserkNode (screen frame + smash bursts), BerserkAura (fire on the player, object layer under the icon)

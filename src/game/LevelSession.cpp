@@ -1,5 +1,6 @@
 #include "LevelSession.hpp"
 #include "AugmentManager.hpp"
+#include "Records.hpp"
 #include "../augments/Augments.hpp"
 #include "../ui/ProgressMarks.hpp"
 #include "../ui/RunHud.hpp"
@@ -85,7 +86,12 @@ void LevelSession::refreshHud(bool force) {
     // A gauge-earned draft that is still waiting shows as a full bar with
     // DRAFT!; the free opening draft does not (the gauge really is at 0 then).
     m_hud->setGauge(mgr.gauge(), mgr.gaugeThreshold(), mgr.pendingGaugeDrafts() > 0);
-    m_hud->setHeader(fmt::format("deaths {}   now {:.1f}%   best {:.1f}%", mgr.deaths(), now, best));
+    // `record` is every run's best on this level (Records.hpp), apart from
+    // both this run's best and GD's normal one.
+    m_hud->setHeader(fmt::format(
+        "deaths {}   now {:.1f}%   best {:.1f}%   record {}%",
+        mgr.deaths(), now, best, records::best(m_layer->m_level)
+    ));
     if (m_marks) m_marks->setBest(best);
 
     // One row per owned augment in table order. Names are the Korean
@@ -143,6 +149,7 @@ void LevelSession::onAttemptStart(bool fromCheckpoint) {
         log::info("Attempt start {:.2f} s after the death", since);
     }
     m_deathCounted = false;
+    m_runCleared = false;
     // The reward sequence belongs to the attempt that died.
     if (m_hud) m_hud->settleGauge();
     for (auto& a : m_augments) a->onAttemptStart(*this, fromCheckpoint);

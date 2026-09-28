@@ -5,6 +5,7 @@
 #include "../game/AugmentManager.hpp"
 #include "../game/DraftSession.hpp"
 #include "../game/LevelSession.hpp"
+#include "../game/Records.hpp"
 #include "../game/Scales.hpp"
 #include "../input/Hotkeys.hpp"
 #include "../ui/ProgressMarks.hpp"
@@ -14,6 +15,8 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/utils/Keyboard.hpp>
+
+#include <optional>
 
 using namespace geode::prelude;
 using namespace augment;
@@ -153,6 +156,13 @@ class $modify(AugPlayLayer, PlayLayer) {
             anticheat ? " (anticheat!)" : "", m_gameState.m_isDualMode
         );
 
+        // GD's own save and New Best! were kept out of this death
+        // (GdRecordHook.cpp); the runs' record takes their place. Every
+        // death counts here, a checkpoint respawn's too: the record is how
+        // far a run got, not what the gauge has settled.
+        int whole = static_cast<int>(percent);
+        if (records::submit(m_level, whole)) records::showNewBest(this, whole);
+
         auto& mgr = AugmentManager::get();
         // The augments hear the death first, because startpos answers there
         // whether a checkpoint brings this attempt back: a death the run
@@ -225,17 +235,39 @@ class $modify(AugPlayLayer, PlayLayer) {
     }
 
     void levelComplete() {
-        PlayLayer::levelComplete();
-        scales::resetTime();
-        if (auto s = this->session(); s && s->runAttempt()) {
-            AugmentManager::get().endRun();
+        auto s = this->session();
+        bool run = s && s->runAttempt();
+        // A clear with augments is not a GD clear (user, 2026-09-28): GD
+        // skips saving progress while m_isTestMode is on — CBF's safe mode,
+        // `refs/click-between-frames/src/main.cpp:241-249` — and the runs'
+        // record keeps the 100 instead. runAttempt() reads the flag, hence
+        // the HideFromGd for GdRecordHook's checks inside the call.
+        std::optional<records::HideFromGd> hide;
+        bool wasTestMode = m_isTestMode;
+        if (run) {
+            hide.emplace();
+            s->markRunCleared();
+            records::submit(m_level, 100);
+            m_isTestMode = true;
+            log::info("levelComplete: run clear, test mode borrowed so GD saves nothing");
         }
+        PlayLayer::levelComplete();
+        m_isTestMode = wasTestMode;
+        hide.reset();
+
+        scales::resetTime();
+        if (run) AugmentManager::get().endRun();
     }
 
     void onQuit() {
+        auto s = this->session();
+        // The session is gone by the time GD's onQuit runs; if GD saves
+        // anything there, it must still not see a run attempt.
+        std::optional<records::HideFromGd> hide;
+        if (s && s->runAttempt()) hide.emplace();
         // Never leave the next scene frozen or slowed down, and never let the
         // hazard scale leak into the editor or the next level.
-        if (auto s = this->session()) s->onQuit();
+        if (s) s->onQuit();
         scales::resetAll();
         draft::abandon();
         AugmentManager::get().endLevel();

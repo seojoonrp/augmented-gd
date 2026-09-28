@@ -7,12 +7,35 @@ cleared. Dying keeps your augments; clearing ends the run.
 
 - Started from the level info screen (`AUG` button → Start). One run per level
   ID at a time; starting again on the same level offers Continue / Restart.
-- Ends on `levelComplete`. Leaving the level does **not** end it.
+- Ends on `levelComplete`. Leaving the level does **not** end it. While a run
+  is on, *any* entry into that level is a run level (GD's own Play button
+  too), so there is no normal play of it until the run ends.
 - Practice / test-mode attempts never count and get no augments.
-- Level clears made with augments currently **count as normal GD clears**.
-  Decided 2026-09-16: ignore for now; revisit before any public release.
-  Mechanism when we do: flip `m_isTestMode` / `m_isPracticeMode` around
-  `PlayLayer::levelComplete()` (see `docs/GD-INTERNALS.md` "Does a clear count?").
+- **Run attempts never touch GD's own records** (2026-09-28, user: a run on a
+  level with no record wrote its percent into GD's). No normal percent is
+  saved, GD's New Best! does not fire, and a clear with augments is not a GD
+  clear — `levelComplete` runs with `m_isTestMode` borrowed, and the end
+  screen's quote reads "Cleared with augments!" (English is fine there; the
+  user dropped a second "Normal progress is not saved." sentence). GD's attempt counter still counts.
+  Records GD already holds from earlier runs cannot be told apart and stay.
+
+## Records (2026-09-28)
+
+Three bests, kept apart:
+
+| best | scope | what it drives |
+|---|---|---|
+| GD's normal best | GD's own | untouched by runs |
+| run best (`RunState::bestPercent`) | one run | the gauge's new-best bonus (gold `+X`), the gold dot |
+| **run record** (`src/game/Records.hpp`) | per level, all runs, Geode saved values (survives restarts) | GD's **New Best!** popup when beaten |
+
+The record is a whole percent, compared like GD (4.1 → 4.4 is not one). It is
+checked on **every** death, a checkpoint respawn's included — it is how far a
+run got, not what the gauge has settled — so on such a death New Best! can
+show while the gold `+X` waits for the end of the life. A clear with augments
+sets it to 100 (no popup; the end screen shows instead). The popup is GD's own
+`showNewBest` with no rewards (no orbs, no diamonds). The HUD header shows it
+as `record N%`.
 - Public release note (2026-09-16): `$GEODE_SDK/AGENTS.md` states the Geode
   index does not accept AI-written mods. Private use is unaffected; any index
   submission is the user's call.
@@ -204,7 +227,6 @@ the dead icon.
 ## Not decided yet
 
 - Draft gauge numbers (40 / +10 / bonus ×1.0) are first guesses; tune by test.
-- Whether augmented clears should be recorded as GD clears.
 - Remaining augments and systems: candidates, difficulty tiers, rejected ideas
   and build order are in `ROADMAP.md` (2026-09-16).
 - Run persistence across game restarts (currently in-memory only).

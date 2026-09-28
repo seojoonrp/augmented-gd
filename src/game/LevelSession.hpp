@@ -52,6 +52,10 @@ public:
     bool runLevel() const;
     // Normal-mode only: practice/test attempts don't count and get no augments.
     bool runAttempt() const;
+    // The run was cleared on this layer: set at levelComplete, read by the
+    // end screen, dropped at the next reset (a replay is a normal attempt).
+    bool runCleared() const { return m_runCleared; }
+    void markRunCleared() { m_runCleared = true; }
     float percent() const;
     // 0..1; what nerve scales the hitbox shrinks by.
     float progress() const;
@@ -111,6 +115,7 @@ private:
     std::vector<std::unique_ptr<Augment>> m_augments;
     std::vector<GameObject*> m_objectsByX;
     bool m_deathCounted = false;
+    bool m_runCleared = false;
     std::chrono::steady_clock::time_point m_deathAt;   // for the death -> reset timing log
     float m_hudClock = 1.f;   // seconds since the last text rebuild; starts due
 };

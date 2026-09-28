@@ -148,7 +148,7 @@ Columns: levels · category · effect · what it reuses / needs · risk.
 
 | system | what | note |
 |---|---|---|
-| **Safe mode** | Augmented clears must not count as GD clears before any public release. Candidates: hook `GJGameLevel::savePercentage(int, bool, int, int, bool)` (`win 0x16c8b0`) and `GameStatsManager::completedLevel` (`win 0x1de3b0`) and skip when the finishing attempt was a run attempt. Alternative: set `m_isTestMode` for the duration of `levelComplete` (side effect: test-mode complete screen). | **Unverified.** Decide only after reading how an existing safe-mode Geode mod does it. |
+| **Safe mode** | **Built 2026-09-28** (`GdRecordHook.cpp`, `Records.cpp`, test-mode clear in `PlayLayerHook.cpp`; see DESIGN "Records"). Original note: Augmented clears must not count as GD clears before any public release. Candidates: hook `GJGameLevel::savePercentage(int, bool, int, int, bool)` (`win 0x16c8b0`) and `GameStatsManager::completedLevel` (`win 0x1de3b0`) and skip when the finishing attempt was a run attempt. Alternative: set `m_isTestMode` for the duration of `levelComplete` (side effect: test-mode complete screen). | **Unverified.** Decide only after reading how an existing safe-mode Geode mod does it. |
 
 ### T4
 

@@ -36,6 +36,12 @@ and HUD text it should produce (`scripts/logs.ps1` with every report).
 - **A life pays the gauge once** (2026-09-27): a death a checkpoint brings the
   player back from charges nothing and shows no reward; the death that restarts
   from 0 settles the whole life at its best percent — user: "잘 된다".
+- **Run records apart from GD's** (2026-09-28): run attempts never reach
+  `savePercentage` / GD's `showNewBest`, a run clear borrows `m_isTestMode`
+  (not a GD clear, end-screen quote `Cleared with augments!`), and the runs'
+  own per-level record (`Records.cpp`, `record N%` on the HUD) shows GD's
+  New Best! when beaten — user: "다 잘 되는듯". The quote's second sentence
+  was dropped after that round (rebuilt, not re-checked; cosmetic).
 
 ## Broken / unverified
 
