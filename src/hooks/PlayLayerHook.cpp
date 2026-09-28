@@ -57,7 +57,13 @@ class $modify(AugPlayLayer, PlayLayer) {
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         auto& mgr = AugmentManager::get();
         int levelID = level ? level->m_levelID.value() : 0;
-        bool run = level && mgr.isRunFor(levelID);
+        // Only an AUG-button entry makes a run level; the flag is spent
+        // whatever this load turns out to be.
+        bool const armed = mgr.takeRunEntry(levelID);
+        bool run = level && armed && mgr.isRunFor(levelID);
+        if (level && !armed && mgr.isRunFor(levelID)) {
+            log::info("PlayLayer::init: level {} has a run but was entered without AUG, playing normally", levelID);
+        }
 
         // The session exists before PlayLayer::init so the augments see the
         // objects it creates (hitbox scales must be in place for the first

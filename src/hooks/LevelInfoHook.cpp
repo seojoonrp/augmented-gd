@@ -24,6 +24,10 @@ namespace {
     // round too big once the file's own padding came down to 2 %, so the
     // user settled on the plain fit.
     constexpr float kLogoScale = 1.0f;
+
+    // Set while our own button runs GD's onPlay, so the onPlay hook can tell
+    // it from GD's Play button.
+    bool g_playingAsRun = false;
 }
 
 class $modify(AugLevelInfoLayer, LevelInfoLayer) {
@@ -71,7 +75,7 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
         // No run on this level yet: start one straight away.
         if (!mgr.isRunFor(levelID)) {
             mgr.startRun(m_level);
-            this->onPlay(nullptr);
+            this->playAsRun();
             return;
         }
 
@@ -80,10 +84,25 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
         auto popup = RunResumePopup::create(
             [this, level] {
                 AugmentManager::get().startRun(level);
-                this->onPlay(nullptr);
+                this->playAsRun();
             },
-            [this] { this->onPlay(nullptr); }
+            [this] { this->playAsRun(); }
         );
         if (popup) popup->show();
+    }
+
+    // GD's own play, with the next PlayLayer of this level armed as a run
+    // level (AugmentManager::armRunEntry).
+    void playAsRun() {
+        AugmentManager::get().armRunEntry(m_level->m_levelID.value());
+        g_playingAsRun = true;
+        this->onPlay(nullptr);
+        g_playingAsRun = false;
+    }
+
+    // GD's Play button: a normal attempt, whatever run the level has parked.
+    void onPlay(CCObject* sender) {
+        if (!g_playingAsRun) AugmentManager::get().disarmRunEntry();
+        LevelInfoLayer::onPlay(sender);
     }
 };

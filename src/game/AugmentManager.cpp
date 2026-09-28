@@ -45,6 +45,23 @@ void AugmentManager::startRun(GJGameLevel* level) {
     log::info("Run started on '{}' (id {}), opening draft queued", m_state.levelName(), m_state.levelID());
 }
 
+void AugmentManager::armRunEntry(int levelID) {
+    m_armedLevel = levelID;
+    log::info("Run entry armed for level {}", levelID);
+}
+
+void AugmentManager::disarmRunEntry() {
+    if (m_armedLevel == 0) return;
+    log::info("Run entry disarmed (level {} played without AUG)", m_armedLevel);
+    m_armedLevel = 0;
+}
+
+bool AugmentManager::takeRunEntry(int levelID) {
+    bool const armed = m_armedLevel != 0 && m_armedLevel == levelID;
+    m_armedLevel = 0;
+    return armed;
+}
+
 void AugmentManager::endRun() {
     draft::abandon();
     if (!m_state.active()) return;

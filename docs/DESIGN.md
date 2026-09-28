@@ -7,9 +7,13 @@ cleared. Dying keeps your augments; clearing ends the run.
 
 - Started from the level info screen (`AUG` button → Start). One run per level
   ID at a time; starting again on the same level offers Continue / Restart.
-- Ends on `levelComplete`. Leaving the level does **not** end it. While a run
-  is on, *any* entry into that level is a run level (GD's own Play button
-  too), so there is no normal play of it until the run ends.
+- Ends on `levelComplete`. Leaving the level does **not** end it.
+- **Only the AUG button enters a run** (2026-09-29, user: a run left mid-way
+  came back when the level was played normally). The AUG button (new run,
+  Continue or Restart) arms the next `PlayLayer` of that level
+  (`AugmentManager::armRunEntry`); GD's own Play button disarms, and any
+  way in that was not armed plays a normal attempt — no augments, GD's
+  records as usual — with the run parked until the next Continue.
 - Practice / test-mode attempts never count and get no augments.
 - **Run attempts never touch GD's own records** (2026-09-28, user: a run on a
   level with no record wrote its percent into GD's). No normal percent is
@@ -219,8 +223,9 @@ with ours beside it, only if the player is already in practice mode. The
 button opens the **run summary** (`RunInfoPopup`) in **GD's own menu
 colours** (round 7, after a CreatorLayer screenshot from the user, values
 sampled from it): the card (`card::framedPanel`) keeps the white rim, black
-ring, soft shadow and thin half-white inner stroke, around GD's menu blue as
-a vertical gradient (0/96/241 → 0/56/142); the stat chips and the tiles are
+ring and soft shadow around GD's menu blue as a vertical gradient
+(0/96/241 → 0/56/142) — the thin white inner stroke went in round 8, and
+the AUG resume prompt now sits on the same card; the stat chips and the tiles are
 **GD menu panels** (`card::gdPanel`) — white rim, black ring, a green body
 shaded left to right in two halves (upper 200/254/89 → 107/208/19, lower
 150/252/62 → 70/162/13, 49 % / rest) over a dark strip along the bottom

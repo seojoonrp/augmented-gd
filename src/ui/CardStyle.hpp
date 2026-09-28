@@ -1,7 +1,8 @@
 #pragma once
 
-// The GD-button card look shared by the draft cards and the AUG resume
-// popup: a white rim around GJ_button_01 (black ring + flat green).
+// The mod's UI pieces: the rim / ring measurements the draft card (white rim
+// around GJ_button_01) is built from, the art slot, level stars, and the
+// GD-menu-coloured popup card and panels (run summary, resume prompt).
 
 #include <Geode/Geode.hpp>
 #include <Geode/ui/NineSlice.hpp>
@@ -75,23 +76,6 @@ inline cocos2d::CCNode* artSlot(std::string const& id, cocos2d::CCSize size, flo
 
 inline cocos2d::ccColor4F premul(cocos2d::ccColor3B c, float alpha = 1.f) {
     return { c.r / 255.f * alpha, c.g / 255.f * alpha, c.b / 255.f * alpha, alpha };
-}
-
-// Outline of a rounded rectangle, counter-clockwise; convex, so drawPolygon's
-// fan fills it correctly.
-inline std::vector<cocos2d::CCPoint> roundedRectPoints(cocos2d::CCRect rect, float radius, int segments = 6) {
-    float const r = std::min({ radius, rect.size.width / 2, rect.size.height / 2 });
-    float const minX = rect.getMinX() + r, maxX = rect.getMaxX() - r;
-    float const minY = rect.getMinY() + r, maxY = rect.getMaxY() - r;
-    cocos2d::CCPoint const centres[4] = { { maxX, maxY }, { minX, maxY }, { minX, minY }, { maxX, minY } };
-    std::vector<cocos2d::CCPoint> points;
-    for (int corner = 0; corner < 4; corner++) {
-        for (int i = 0; i <= segments; i++) {
-            float const a = (corner + static_cast<float>(i) / segments) * 1.5707963f;
-            points.push_back({ centres[corner].x + r * std::cos(a), centres[corner].y + r * std::sin(a) });
-        }
-    }
-    return points;
 }
 
 // A GD menu tile, after CreatorLayer's buttons (colours sampled from the
@@ -209,20 +193,17 @@ inline cocos2d::CCNode* stars(int filled, int total, float radius, float spacing
     return node;
 }
 
-// The summary card (RunInfoPopup): the draft cards' white rim and black ring
-// around GD's menu blue (the vertical gradient behind CreatorLayer, sampled
-// from the user's screenshot 2026-09-28: 0/96/241 at the top of the screen,
-// 0/49/124 at the bottom — the card is a bit shorter, so it stops short of
-// the darkest), with a soft shadow and a thin light stroke inside the ring.
-// `size` = the ring's outer edge; anchored at its centre.
+// The mod's popup card (run summary, resume prompt): the draft cards' white
+// rim and black ring around GD's menu blue (the vertical gradient behind
+// CreatorLayer, sampled from the user's screenshot 2026-09-28: 0/96/241 at
+// the top of the screen, 0/49/124 at the bottom — a card is shorter, so it
+// stops short of the darkest), with a soft shadow. `size` = the ring's outer
+// edge; anchored at its centre. (A top highlight went in round 3 and a thin
+// white inner stroke in round 8, both at the user's word.)
 inline cocos2d::CCNode* framedPanel(cocos2d::CCSize size) {
     constexpr float kRingRadius = 6.5f;
     constexpr cocos2d::ccColor3B kTop = { 0, 96, 241 };
     constexpr cocos2d::ccColor3B kBottom = { 0, 56, 142 };
-    // Thin, fairly white, close to the ring (round 5: more opaque, further out).
-    constexpr float kStrokeInset = 2.5f;
-    constexpr float kStrokeWidth = 0.35f;
-    constexpr float kStrokeAlpha = 0.5f;
 
     auto node = cocos2d::CCNode::create();
     node->setContentSize(size);
@@ -243,36 +224,6 @@ inline cocos2d::CCNode* framedPanel(cocos2d::CCSize size) {
     auto fill = gradientBox(body, kTop, kBottom, kRingRadius - Ring);
     fill->setPosition(centre);
     node->addChild(fill, 3);
-
-    auto deco = cocos2d::CCDrawNode::create();
-    float const bx = Ring, by = Ring;
-    auto stroke = roundedRectPoints(
-        { bx + kStrokeInset, by + kStrokeInset, body.width - 2 * kStrokeInset, body.height - 2 * kStrokeInset },
-        kRingRadius - Ring
-    );
-    deco->drawPolygon(
-        stroke.data(), static_cast<unsigned int>(stroke.size()),
-        premul({ 0, 0, 0 }, 0.f), kStrokeWidth, premul({ 255, 255, 255 }, kStrokeAlpha)
-    );
-    // (A 1 pt highlight under the top edge went in round 3: the user read it
-    // as a stray line.)
-    node->addChild(deco, 4);
-    return node;
-}
-
-// Rim + green body, `size` = the body; origin bottom-left of the body.
-inline cocos2d::CCNode* panel(cocos2d::CCSize size) {
-    auto node = cocos2d::CCNode::create();
-    node->setContentSize(size);
-    node->setAnchorPoint({ 0.5f, 0.5f });
-    cocos2d::CCPoint const centre{ size.width / 2, size.height / 2 };
-    auto rim = roundedBox({ size.width + 2 * Rim, size.height + 2 * Rim }, { 255, 255, 255 }, RimRadius);
-    rim->setPosition(centre);
-    node->addChild(rim, 0);
-    auto body = geode::NineSlice::create("GJ_button_01.png");
-    body->setContentSize(size);
-    body->setPosition(centre);
-    node->addChild(body, 1);
     return node;
 }
 

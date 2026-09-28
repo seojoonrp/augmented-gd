@@ -9,13 +9,14 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    // A green card (the draft cards' look) floating over the dimmed level
-    // info screen, the two buttons under it.
+    // The run summary's blue card (card::framedPanel) floating over the
+    // dimmed level info screen, the two buttons inside it along the bottom
+    // (user, 2026-09-28: it was green with the buttons under it).
     constexpr float kCardWidth = 340.f;
     constexpr float kPadTop = 20.f;       // card top -> title top
-    constexpr float kPadBottom = 22.f;    // message bottom -> card bottom
+    constexpr float kPadBottom = 16.f;    // buttons bottom -> card bottom
     constexpr float kTitleGap = 14.f;     // title -> message
-    constexpr float kButtonGap = 16.f;    // card bottom -> buttons
+    constexpr float kButtonGap = 18.f;    // message -> buttons
     constexpr float kButtonSpacing = 16.f;
 
     constexpr float kTitleScale = 0.8f;
@@ -53,8 +54,7 @@ bool RunResumePopup::init(Callback onRestart, Callback onContinue) {
     float const titleH = title->getScaledContentSize().height;
     float const bodyH = body->getScaledContentSize().height;
     float const buttonH = std::max(restartSpr->getScaledContentSize().height, continueSpr->getScaledContentSize().height);
-    float const cardH = kPadTop + titleH + kTitleGap + bodyH + kPadBottom;
-    float const height = cardH + kButtonGap + buttonH;
+    float const height = kPadTop + titleH + kTitleGap + bodyH + kButtonGap + buttonH + kPadBottom;
 
     if (!Popup::init(kCardWidth, height)) return false;
     this->setID("run-resume-popup"_spr);
@@ -64,8 +64,8 @@ bool RunResumePopup::init(Callback onRestart, Callback onContinue) {
     this->setOpacity(160);
 
     float const cx = kCardWidth / 2;
-    auto panel = card::panel({ kCardWidth, cardH });
-    panel->setPosition({ cx, height - cardH / 2 });
+    auto panel = card::framedPanel({ kCardWidth, height });
+    panel->setPosition({ cx, height / 2 });
     m_mainLayer->addChild(panel, 0);
 
     float y = height - kPadTop;
@@ -82,13 +82,13 @@ bool RunResumePopup::init(Callback onRestart, Callback onContinue) {
     float const rw = restartSpr->getScaledContentSize().width;
     float const cw = continueSpr->getScaledContentSize().width;
     float const rowLeft = cx - (rw + kButtonSpacing + cw) / 2;
-    float const by = buttonH / 2;
+    float const by = kPadBottom + buttonH / 2;
     restartBtn->setPosition({ rowLeft + rw / 2, by });
     continueBtn->setPosition({ rowLeft + rw + kButtonSpacing + cw / 2, by });
     m_buttonMenu->addChild(restartBtn);
     m_buttonMenu->addChild(continueBtn);
 
-    log::info("RunResumePopup: card {}x{}, popup height {}", kCardWidth, cardH, height);
+    log::info("RunResumePopup: card {}x{}, buttons inside", kCardWidth, height);
     return true;
 }
 

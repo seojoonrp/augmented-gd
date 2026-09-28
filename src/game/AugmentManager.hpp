@@ -43,6 +43,15 @@ public:
     void endRun();
     bool isRunActive() const { return m_state.active(); }
     bool isRunFor(int levelID) const { return m_state.isFor(levelID); }
+    // A run level is only one entered through the AUG button: it arms the
+    // next PlayLayer of that level, GD's own Play button disarms, and any
+    // other way in plays normally with the run parked for the next Continue
+    // (user, 2026-09-29: a run left mid-way came back on a normal Play).
+    void armRunEntry(int levelID);
+    void disarmRunEntry();
+    // For PlayLayer::init: true when the AUG button armed this level. Clears
+    // the flag either way, so it never outlives one level load.
+    bool takeRunEntry(int levelID);
     int levelID() const { return m_state.levelID(); }
     std::string const& levelName() const { return m_state.levelName(); }
 
@@ -112,6 +121,7 @@ private:
 
     RunState m_state;
     std::unique_ptr<LevelSession> m_session;
+    int m_armedLevel = 0;   // 0 = nothing armed
 };
 
 } // namespace augment
