@@ -36,6 +36,12 @@ float RunState::gaugeThreshold(GaugeRule const& rule) const {
     return std::min(cost, rule.thresholdMax);
 }
 
+float RunState::lastDraftCost(GaugeRule const& rule) const {
+    if (m_gaugeDrafts <= 0) return this->gaugeThreshold(rule);
+    float cost = rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts - 1);
+    return std::min(cost, rule.thresholdMax);
+}
+
 DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawning) {
     DeathResult r;
     if (!m_active) return r;

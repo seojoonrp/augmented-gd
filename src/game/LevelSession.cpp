@@ -46,6 +46,10 @@ void LevelSession::notice(std::string const& text) {
     if (m_hud) m_hud->notice(text);
 }
 
+void LevelSession::banner(std::string const& text) {
+    if (m_hud) m_hud->banner(text);
+}
+
 void LevelSession::rewardDeath(CCPoint at, float before, float cost, DeathResult const& r) {
     if (!m_hud) return;
     m_hud->playDeathReward(at, before, r.charge - r.bonus, r.bonus, cost);
@@ -83,9 +87,11 @@ void LevelSession::refreshHud(bool force) {
     // run's best does not count it until the life settles, but the readout
     // and the mark must not slide back to the checkpoint in the meantime.
     float best = std::max({ now, mgr.bestPercent(), mgr.lifeBest() });
-    // A gauge-earned draft that is still waiting shows as a full bar with
-    // DRAFT!; the free opening draft does not (the gauge really is at 0 then).
-    m_hud->setGauge(mgr.gauge(), mgr.gaugeThreshold(), mgr.pendingGaugeDrafts() > 0);
+    // A gauge-earned draft that is still waiting shows as a full bar reading
+    // its own cost, e.g. 30/30 (the threshold has already moved on); the free
+    // opening draft does not (the gauge really is at 0 then).
+    bool const draftWaiting = mgr.pendingGaugeDrafts() > 0;
+    m_hud->setGauge(mgr.gauge(), draftWaiting ? mgr.lastDraftCost() : mgr.gaugeThreshold(), draftWaiting);
     if (m_marks) m_marks->setBest(best);
 
     // The top-left readout (header + one row per augment) is debug-mode only

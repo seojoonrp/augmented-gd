@@ -42,7 +42,7 @@ class $modify(AugPlayLayer, PlayLayer) {
             log::info("ProgressBar not there yet at {}", where);
             return;
         }
-        s->hud()->attachGauge(m_progressBar, m_progressFill, m_percentageLabel);
+        s->hud()->attachGauge(m_percentageLabel);
         s->setMarks(ProgressMarks::create(m_progressBar, m_progressFill));
         log::info("Attached gauge + marks to the progress bar at {}", where);
     }

@@ -7,12 +7,11 @@
 
 namespace augment {
 
-// PlayLayer overlay: a draft gauge that mirrors GD's progress bar at the
-// bottom of the screen (same sprite, fills left to right) with "charge/cost"
-// in GD's percent font at its right end; a column at the far left with one
-// row per owned augment (placeholder icon box + name + state text — art
-// comes later); and short notice lines that fade out in the bottom-left
-// corner.
+// PlayLayer overlay: a draft gauge at the bottom centre (a rounded bar that
+// fills left to right, "DRAFT" over its left end and "charge/cost" over its
+// right end, in GD's percent font); a debug-mode column at the far left with
+// one row per owned augment; short notice lines that rise and sink near the
+// bottom-left corner; and a banner above the gauge (berserk).
 class RunHud : public cocos2d::CCNode {
 public:
     struct Slot {
@@ -22,17 +21,15 @@ public:
 
     static RunHud* create();
 
-    // Builds the gauge as a twin of GD's progress bar mirrored to the bottom
-    // edge: sprite frame, scale and fill inset copied from `progressBar` /
-    // `progressFill`, the readout's font and scale from `percentLabel`
-    // (PlayLayer::m_percentageLabel). All three may be null (hidden in
-    // settings); sensible fallbacks then.
-    void attachGauge(cocos2d::CCSprite* progressBar, cocos2d::CCSprite* progressFill, cocos2d::CCLabelBMFont* percentLabel);
-    // Gauge charge against the current cost; shown as "value/threshold" and
-    // as the fill ratio. `full` = a gauge-earned draft is waiting: the bar
-    // shows full and the readout says DRAFT! (the cost has already risen
-    // by then, so numbers would show the *next* cost). While a death
-    // reward plays this only records the target.
+    // Builds the gauge at the bottom centre: a rounded bar with "DRAFT" over
+    // its left end and the count over its right end, in the font of
+    // `percentLabel` (PlayLayer::m_percentageLabel, 90 % of its scale) —
+    // bigFont at 0.5 when that is null (hidden in settings).
+    void attachGauge(cocos2d::CCLabelBMFont* percentLabel);
+    // Gauge charge against a cost; shown as "value/threshold" and as the
+    // fill ratio. `full` = a gauge-earned draft is waiting: the bar shows
+    // full and `threshold` is that draft's cost, read as e.g. "30/30". While
+    // a death reward plays this only records the target.
     void setGauge(float value, float threshold, bool full);
     // Death reward sequence, driven by update() so it plays during GD's
     // death delay: "+normal" (and "+bonus" in gold when > 0) pop up beside
@@ -50,10 +47,13 @@ public:
     // One row per owned augment, top to bottom. Only rows whose text changed
     // are touched.
     void setSlots(std::vector<Slot> const& slots);
-    // One short player-facing line (Korean, UI font) in the bottom-left
-    // corner: it shows at once, holds and fades out. A second line while the
-    // first is up pushes it a line higher, three at most.
+    // One short player-facing line (Korean, UI font) near the bottom-left
+    // corner: it rises into place fading in, holds, then sinks fading out. A
+    // second line while the first is up pushes it a line higher, three at most.
     void notice(std::string const& text);
+    // One bigger line centred just above the draft gauge (berserk), with the
+    // same rise-and-fade in and out; a new one replaces the one showing.
+    void banner(std::string const& text);
 
 protected:
     bool init() override;
@@ -101,9 +101,16 @@ protected:
     void placeRewardText(RewardText& text, std::string const& str, cocos2d::CCPoint at, float dy, float born);
     void animateRewardText(RewardText& text);
 
-    cocos2d::CCSprite* m_gaugeBar = nullptr;     // GJ_progressBar_001 like GD's
-    cocos2d::CCLayerColor* m_gaugeFill = nullptr; // child of m_gaugeBar
-    cocos2d::CCLayerColor* m_gaugeGold = nullptr; // new-best segment right after the green one
+    cocos2d::CCNode* m_gaugeBar = nullptr;       // rim + track + fills, bottom centre
+    cocos2d::CCLabelBMFont* m_draftLabel = nullptr;   // "DRAFT" over the bar's left end
+    float m_gaugeTop = 0.f;                      // top of the gauge's labels (0 until attached)
+    // The fill: the green segment and the new-best (gold) one right after it,
+    // both rounded, redrawn by layoutFill() when a width or the tint moves.
+    cocos2d::CCDrawNode* m_gaugeFill = nullptr;   // child of m_gaugeBar
+    cocos2d::ccColor3B m_goldTint = { 255, 210, 60 };   // blends into green after a reward
+    float m_drawnGreen = -1.f;
+    float m_drawnGold = -1.f;
+    cocos2d::ccColor3B m_drawnTint = { 0, 0, 0 };
     cocos2d::CCLabelBMFont* m_gaugeLabel = nullptr;
     float m_trackLeft = 0.f;    // fill inset inside the bar sprite (bar units)
     float m_trackWidth = 0.f;
@@ -122,9 +129,25 @@ protected:
 
     cocos2d::CCLabelBMFont* m_header = nullptr;
     std::vector<SlotNodes> m_slots;
-    // Notice lines, reused round-robin (oldest first).
-    std::vector<cocos2d::CCLabelBMFont*> m_toasts;
+
+    // Notice lines, reused round-robin (oldest first), animated by
+    // stepToasts() from update() on real time.
+    struct Toast {
+        cocos2d::CCLabelBMFont* label = nullptr;
+        float age = -1.f;         // seconds since shown; < 0 = idle
+        float line = 0.f;         // stack line it belongs on (0 = bottom)
+        float lineShown = 0.f;    // eased toward `line`
+    };
+    std::vector<Toast> m_toasts;
     std::size_t m_nextToast = 0;
+    void stepToasts(float dt);
+
+    struct Banner {
+        cocos2d::CCLabelBMFont* label = nullptr;
+        float age = -1.f;
+    };
+    Banner m_banner;
+    void stepBanner(float dt);
 };
 
 } // namespace augment

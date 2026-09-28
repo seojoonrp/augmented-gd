@@ -68,8 +68,9 @@ in whole percents (4.1 → 4.4 is none; the user found `NEW BEST +0` annoying,
 2026-09-20) while the best itself keeps its decimals for the HUD and the dot.
 When the bonus fires the HUD shows `NEW BEST` and a gold `+X` beside the dead
 icon (`RunHud::playDeathReward`); while a gauge-earned draft waits the gauge
-readout says `DRAFT!` instead of numbers (the cost has already risen, so
-`50/50` would show the *next* cost).
+is full and reads that draft's own cost over itself, e.g. `30/30`
+(`RunState::lastDraftCost` — the threshold has already risen to the next
+cost). It said `DRAFT!` until 2026-09-29, when the user asked for the numbers.
 
 **A life pays once** (2026-09-27): a death a checkpoint brings the player back
 from charges nothing. A life — one visit to the level from 0 % — is settled by
@@ -129,7 +130,7 @@ level. The id is the "코드" column and is what the hooks key on.
 | `cat` | 고양이 | 5 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 장애물 5개를 랜덤으로 제거합니다. | 고양이가 매번 장애물을 한 개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play, `5 + (lv−1)` random **hazards** (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. A placeholder square sits bottom-right and **casts a small magic circle** on each removed hazard (two rings, 4 rim ticks, one spinning triangle, r16 screen units, 0.55 s, **white** — plainer and white after the first look, user 2026-09-27) — it replaced the lasers the square used to fire (user 2026-09-27: "그냥 마법으로"). Real cat art later. |
 | `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. Running out is log-only (its notice went with the centre texts, 2026-09-27). Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
 | `missile` | 공습경보 | 5 | 6초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다. 반경 3칸 안의 위험 요소가 모두 제거됩니다. | 폭발 반경이 0.5칸 커지고, 미사일 쿨타임이 0.5초 감소합니다. | working (verified 2026-09-20, lead 300 "딱 괜찮은듯"). Every `6 − 0.5·(lv−1)` s of play a missile is aimed at a **random hazard** on screen and at least 300 units (~1 s at 1x) ahead of the player (was 150; the user found the impact landed where they already were, 2026-09-20 — aiming at a hazard, not a point, so every strike hits something; nothing in view → the strike stays armed and fires as soon as a hazard scrolls in). It drops for 0.35 s (world-space reticle + missile, `MissileNode` in `m_objectLayer`, **all white** since 2026-09-27 — the depth the orange carried is alpha now; the `MISSILE -n` notice is gone), then every hazard whose collision shape (AABB, or radius for saws) touches the blast circle of `3 + 0.5·(lv−1)` blocks is removed for the rest of the attempt — same `destroyObject()` flags and put-back as the cat (`HazardRemoval.hpp`). A reset mid-drop cancels the missile. |
-| `berserker` | 버서커 | 3 | 위험 요소가 파괴될 때마다 3% 확률로 2초간 버서커 모드에 돌입합니다. 버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다. | 버서커 모드 발동 확률이 1% 증가합니다. | built 2026-09-27, in-game test pending. Every hazard **an augment destroys** rolls `0.03 + 0.01·(level−1)` (3 / 4 / 5 %) to open a 2 s window; while it is open, `destroyPlayer` with a **hazard** object smashes that hazard (same `destroyObject()` flags and put-back as the cat and the missile) instead of killing the player. A smash is itself a destroyed hazard, so it rolls again and can refresh the window. Solids, slopes and a death GD names no object for (`object == nullptr`, e.g. suicide) still kill. The window is flat across levels (only the chance grows) and is **game** seconds (slow-mo stretches it, like the cat and missile timers); it closes on any reset. Retuned with the user 2026-09-27: 2 % / 3 s at Lv1 became 3 % / 2 s, and the red screen frame landed at 5 bands x 7.5 units, 0.33 alpha, pulse 0.72 +- 0.28 (the middle of three passes: 6 x 9 / 0.5 was "너무 과함", 4 x 6 / 0.2 too little). A `BerserkAura` (`src/ui/BerserkAura.hpp`) also puts a flickering fire crown on the player while the window is open, in the object layer at `player z - 1` so the icon draws on top. Asked before the shield (`Augment::hitPriority`) so a free smash never spends a charge. **Dependency:** nothing else destroys hazards, so without `cat` or `missile` it can never roll — the HUD row says `needs cat/missile`. |
+| `berserker` | 버서커 | 3 | 위험 요소가 파괴될 때마다 3% 확률로 2.5초간 버서커 모드에 돌입합니다. 버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다. | 버서커 모드 발동 확률이 1% 증가합니다. | built 2026-09-27, in-game test pending. Every hazard **an augment destroys** rolls `0.03 + 0.01·(level−1)` (3 / 4 / 5 %) to open a 2.5 s window (2 s until 2026-09-29); while it is open, `destroyPlayer` with a **hazard** object smashes that hazard (same `destroyObject()` flags and put-back as the cat and the missile) instead of killing the player. A smash is itself a destroyed hazard, so it rolls again and can refresh the window. Solids, slopes and a death GD names no object for (`object == nullptr`, e.g. suicide) still kill. The window is flat across levels (only the chance grows) and is **game** seconds (slow-mo stretches it, like the cat and missile timers); it closes on any reset. Retuned with the user 2026-09-27: 2 % / 3 s at Lv1 became 3 % / 2 s, and the red screen frame landed at 5 bands x 7.5 units, 0.33 alpha, pulse 0.72 +- 0.28 (the middle of three passes: 6 x 9 / 0.5 was "너무 과함", 4 x 6 / 0.2 too little); a notch stronger on 2026-09-29 (5 x 8 at 0.40), then eased back the same day (7.75 / 0.365, still a touch much) to 5 x 7.5 at 0.32 — just under where it started. The 버서커! announcement is a banner above the draft gauge (Notices, below). A `BerserkAura` (`src/ui/BerserkAura.hpp`) also puts a flickering fire crown on the player while the window is open, in the object layer at `player z - 1` so the icon draws on top. Asked before the shield (`Augment::hitPriority`) so a free smash never spends a charge. **Dependency:** nothing else destroys hazards, so without `cat` or `missile` it can never roll — the HUD row says `needs cat/missile`. |
 
 Definitions and tuning constants live in `src/core/AugmentDef.*` (the
 description text quotes the numbers as literals, so change both together);
@@ -170,7 +171,8 @@ not a code change.
 The mark is the user's own drawing. First version (2026-09-27, after a
 generated one they turned down): a level card tilted behind a white arrow
 pointing up, near-white fills with `#2D2D2D` strokes. **Second version**
-(2026-09-29): a grey GD cube tilted behind a red arrow pointing up. Two
+(2026-09-29): a grey GD cube tilted behind an arrow pointing up (red at
+first, white in the export that followed the same day). Two
 exports: `logo.png` at the root (336) is what the Geode mod list shows, and
 `resources/ui/aug-logo.png` (**256** since the second version, transparent)
 is the glyph in the game. The glyph is the drawing cropped to its own bounds
@@ -202,11 +204,22 @@ then 98, then the copy-button row).
 
 ## HUD (v2, 2026-09-17)
 
-Kept small so it stays out of the way. The **draft gauge** is a twin of
-GD's progress bar mirrored to the bottom edge (same sprite and scale, fill
-in the draft cards' green, eased) with `charge/cost` (e.g. `23/30`) in GD's
-percent font at its right end; while a gauge-earned draft waits it reads
-`DRAFT!` — the free opening draft does not fill it. At the far left, a grey
+Kept small so it stays out of the way. The **draft gauge** (redesigned
+2026-09-29 — it used to be a twin of GD's progress bar mirrored to the
+bottom edge, which the user found odd as a mirror of the percent bar) is
+its own rounded rectangle at the bottom centre: 240x14 (GD's bar is 210x16;
+18 in the first build, then 17, then 14 at the user's word),
+corner radius 5 (not a full pill), a white 1.25 pt rim around a black
+1 pt ring (the mod's panel frame; a black rim alone vanished on a dark
+level) around a see-through dark inside, the fill in the draft cards' green
+(eased) with rounded ends concentric with the bar's corners, 1 pt inside
+the black ring (the gold new-best segment is a rounded tail past it), its bottom edge
+7 pt above the screen's. Over it, in GD's percent font at 90 % of GD's
+readout scale: `DRAFT` left-aligned with the bar's left end and
+`charge/cost` (e.g. `23/30`) right-aligned with its right end, on one line;
+while a gauge-earned draft waits it reads that draft's cost, e.g. `30/30` —
+the free opening draft does not fill it. 240 keeps the bar's left end clear
+of the longest corner notice. At the far left, a grey
 header (deaths, live %, best %) and then one **row per owned augment**, top
 to bottom: a framed placeholder box where the icon will go, the Korean name,
 and its English per-attempt state. GD's own progress bar gets rimmed dots:
@@ -282,17 +295,26 @@ Laid out after the user's references (Vampire Survivors-style upgrade grids).
 
 **Notices** (2026-09-27): the screen used to carry a big centred line for every
 event, which the user read as debug text and asked to have gone. What is left
-are four short Korean lines in the **bottom-left** corner (UI font, white with
-the baked outline, scale 0.45), each shown at once, held ~1.1 s and faded over
-0.45 s; a second line while one is still up pushes it a line higher, three at
-most (`RunHud::notice`).
+are three short Korean lines near the **bottom-left** corner (UI font, white
+with the baked outline, scale 0.45, left edge x 12 / bottom line y 20 — a bit
+off the corner since 2026-09-29). Each rises 10 pt into place while fading
+in (0.32 s, ease-out cubic), holds 1.1 s, then sinks while fading out
+(0.38 s, ease-in cubic) — it used to pop in and fade (user, 2026-09-29); a
+second line while one is still up glides it a line higher, three at most
+(`RunHud::notice`, stepped by hand in `RunHud::update` on real time, so
+slow-mo and the brake do not drag it).
 
 | when | line |
 |---|---|
 | checkpoint placed or moved | 체크포인트가 설정되었습니다. |
 | respawned at a checkpoint | 체크포인트에서 부활합니다. |
 | shield absorbed a hit | 보호막이 깨졌습니다. |
-| berserk window opened (not a refresh) | 버서커! |
+
+**버서커!** (berserk window opened, not a refresh) is a **banner** instead
+(2026-09-29): red (255/64/48 tint over the baked white glyphs, so the
+outline stays black — a white rim as well was asked for and dropped), scale 0.7, centred just above the draft gauge (6 pt over the
+top of its labels), rising 14 pt with a fade in (0.3 s), held 0.9 s, sinking with a
+fade out (0.4 s) — `RunHud::banner`.
 
 Everything else that used to pop up (`CAT -n`, `MISSILE -n`, `SLOW-MO ON/OFF`,
 `BRAKE EMPTY`, `NEW BEST`, `NO CHECKPOINTS LEFT`, `CAN'T PLACE HERE`, the debug

@@ -11,10 +11,13 @@ namespace {
     // The frame is faked as a few nested bands (CCDrawNode has no gradients):
     // kBands rings of kBandWidth each, dimmer toward the middle of the screen.
     // Tuned in two passes with the user (2026-09-27): 6 x 9 units at 0.5 alpha
-    // was too much, 4 x 6 at 0.2 too little, so this sits in between.
+    // was too much, 4 x 6 at 0.2 too little, so this sits in between; a
+    // notch stronger on 2026-09-29 (7.5 wide at 0.33 before), then eased
+    // back the same day in two steps (8 / 0.40, then 7.75 / 0.365, each a
+    // touch much) to just under where it started.
     constexpr int kBands = 5;
     constexpr float kBandWidth = 7.5f;
-    constexpr float kFrameAlpha = 0.33f;
+    constexpr float kFrameAlpha = 0.32f;
     // The frame dims away over the window's last moments.
     constexpr float kFadeOutSeconds = 0.4f;
     constexpr float kPulseRate = 9.f;

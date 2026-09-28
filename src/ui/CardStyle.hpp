@@ -78,6 +78,23 @@ inline cocos2d::ccColor4F premul(cocos2d::ccColor3B c, float alpha = 1.f) {
     return { c.r / 255.f * alpha, c.g / 255.f * alpha, c.b / 255.f * alpha, alpha };
 }
 
+// Outline of a rounded rectangle, counter-clockwise; convex, so drawPolygon's
+// fan fills it correctly (the draft gauge).
+inline std::vector<cocos2d::CCPoint> roundedRectPoints(cocos2d::CCRect rect, float radius, int segments = 6) {
+    float const r = std::min({ radius, rect.size.width / 2, rect.size.height / 2 });
+    float const minX = rect.getMinX() + r, maxX = rect.getMaxX() - r;
+    float const minY = rect.getMinY() + r, maxY = rect.getMaxY() - r;
+    cocos2d::CCPoint const centres[4] = { { maxX, maxY }, { minX, maxY }, { minX, minY }, { maxX, minY } };
+    std::vector<cocos2d::CCPoint> points;
+    for (int corner = 0; corner < 4; corner++) {
+        for (int i = 0; i <= segments; i++) {
+            float const a = (corner + static_cast<float>(i) / segments) * 1.5707963f;
+            points.push_back({ centres[corner].x + r * std::cos(a), centres[corner].y + r * std::sin(a) });
+        }
+    }
+    return points;
+}
+
 // A GD menu tile, after CreatorLayer's buttons (colours sampled from the
 // user's screenshot, 2026-09-28): white rim, black ring, and a green body
 // shaded left to right in two halves, the upper lighter, over a dark strip

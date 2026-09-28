@@ -65,6 +65,8 @@ public:
     // (no-op without a HUD). Korean, and only for the four moments the
     // player is told about: see RunHud::notice.
     void notice(std::string const& text);
+    // A bigger line centred above the draft gauge (RunHud::banner); berserk.
+    void banner(std::string const& text);
     // Death reward on the HUD: numbers beside the dead icon (screen point
     // `at`), particles into the gauge, fill by `r` over the gauge as it
     // was (`before` / `cost`) — and the HUD text refreshed at once, so

@@ -71,6 +71,8 @@ public:
     // Cost of the next draft: the rising ramp (30, +5 per draft, stopping
     // at 100), the same in debug mode.
     float gaugeThreshold() const { return m_state.gaugeThreshold(this->gaugeRule()); }
+    // Cost of the gauge draft earned last; the HUD shows "cost/cost" while it waits.
+    float lastDraftCost() const { return m_state.lastDraftCost(this->gaugeRule()); }
     // The `debug-mode` setting: number keys grant augments and fill the gauge.
     static bool debugMode();
     // Debug: tops the gauge up to the threshold so the next death drafts.

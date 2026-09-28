@@ -88,7 +88,8 @@ mod.json                 id, GD/Geode versions, fonts (AugDebug generated, chars
                          fonts via resources.files, card art via resources.sprites), settings (keybinds, debug-mode)
 resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
 resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
-resources/ui/            aug-logo.png (the mark inside the round AUG button); logo.png at the root = mod list
+resources/ui/            aug-logo.png (the mark inside the round AUG button — every new export goes through
+                         scripts/logocrop.py, or its margin shrinks the mark); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
   AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup;
                          describeAt(level) = the effect text with that level's numbers (detail card)

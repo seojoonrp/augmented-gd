@@ -65,6 +65,10 @@ public:
     float lifeBest() const { return m_lifeBest; }
     // Cost of the next draft under `rule`: the ramp, capped at its ceiling.
     float gaugeThreshold(GaugeRule const& rule) const;
+    // Cost of the most recent gauge-earned draft — what the HUD shows as
+    // "30/30" while that draft waits (the threshold has already moved on);
+    // the current threshold before any was earned.
+    float lastDraftCost(GaugeRule const& rule) const;
     // Debug: tops the gauge up to the threshold. Returns the charge added.
     float fillGauge(GaugeRule const& rule);
     int deaths() const { return m_deaths; }

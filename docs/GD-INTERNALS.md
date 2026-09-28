@@ -488,7 +488,9 @@ Measured on this machine (log 2026-09-17, 569x320 window, default settings):
 - `m_percentageLabel`: `CCLabelBMFont` child of PlayLayer, right of the bar;
   `getFntFile()` (Geode inline) gives its font for a twin label.
 - A mirrored copy at `y = winHeight - y` lands at the bottom edge with the
-  same margin (what the draft gauge does).
+  same margin (what the draft gauge did until 2026-09-29; it is its own
+  rounded bar now, `RunHud::attachGauge`, and only borrows the percent
+  label's font and scale).
 - `CCLayerColor` children inside a `CCSprite` and a `CCDrawNode` both render
   fine there (verified in game).
 

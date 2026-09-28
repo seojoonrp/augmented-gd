@@ -109,7 +109,7 @@ namespace tune {
     // instead of dying. The window does not grow with the level.
     constexpr float BerserkChanceBase = 0.03f;
     constexpr float BerserkChanceStep = 0.01f;
-    constexpr float BerserkSeconds = 2.f;
+    constexpr float BerserkSeconds = 2.5f;   // was 2 (user, 2026-09-29)
 }
 
 } // namespace augment

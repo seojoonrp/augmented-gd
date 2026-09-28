@@ -203,8 +203,9 @@ private:
             "Berserk: {} for {:.1f}s at {:.1f}% (rolled {:.0f}% on 1 of {} destroyed)",
             again ? "refreshed" : "triggered", seconds, s.percent(), s.mgr().berserkChance() * 100.f, ofCount
         );
-        // Only entering the mode is announced; a refresh mid-window is not.
-        if (!again) s.notice("버서커!");
+        // Only entering the mode is announced, above the draft gauge rather
+        // than in the notice corner (user, 2026-09-29); a refresh is not.
+        if (!again) s.banner("버서커!");
     }
 
     // The flame's reach around a normal-size icon (30 units); scaled by

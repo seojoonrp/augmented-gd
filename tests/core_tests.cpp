@@ -79,7 +79,7 @@ void testTable() {
     CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5칸 커지고"));
     CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5초 감소"));
     CHECK(contains(findAugment(ids::Berserk)->initialDesc, "3% 확률로"));
-    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "2초간"));
+    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "2.5초간"));
     CHECK(contains(findAugment(ids::Berserk)->levelUpDesc, "1% 증가"));
 
     // describe(): initial for level 1, level-up text after, initial again
@@ -118,7 +118,7 @@ void testDescribeAt() {
     CHECK(contains(at(ids::Missile, 3), "반경 4칸"));
     CHECK(contains(at(ids::Missile, 2), "반경 3.5칸"));
     CHECK(contains(at(ids::Berserk, 3), "5% 확률로"));
-    CHECK(contains(at(ids::Berserk, 3), "2초간"));
+    CHECK(contains(at(ids::Berserk, 3), "2.5초간"));
     // Past the cap reads as the cap.
     CHECK(at(ids::Shield, 9) == at(ids::Shield, 3));
 }
@@ -174,8 +174,8 @@ void testFormulas() {
     CHECK_NEAR(formula::berserkChance(500), 1.f);   // a probability, so clamped
     // The window is flat across levels; only the chance grows.
     CHECK_NEAR(formula::berserkSeconds(0), 0.f);
-    CHECK_NEAR(formula::berserkSeconds(1), 2.f);
-    CHECK_NEAR(formula::berserkSeconds(3), 2.f);
+    CHECK_NEAR(formula::berserkSeconds(1), 2.5f);
+    CHECK_NEAR(formula::berserkSeconds(3), 2.5f);
 }
 
 // ---------------------------------------------------------------- run lifecycle
@@ -298,16 +298,20 @@ void testGaugeRamp() {
 void testGaugeThresholdCap() {
     auto s = freshRun();
     GaugeRule rule;
+    // Before any gauge draft, the "last cost" is simply the next one.
+    CHECK_NEAR(s.lastDraftCost(rule), 30.f);
     // Fourteen gauge drafts walk the ramp up to its ceiling.
     for (int i = 0; i < 14; i++) {
         CHECK_NEAR(s.gaugeThreshold(rule), 30.f + 5.f * static_cast<float>(i));
         s.fillGauge(rule);
         CHECK(s.onDeath(0.f, rule).earned == 1);
+        CHECK_NEAR(s.lastDraftCost(rule), 30.f + 5.f * static_cast<float>(i));
     }
     CHECK_NEAR(s.gaugeThreshold(rule), 100.f);
     s.fillGauge(rule);
     CHECK(s.onDeath(0.f, rule).earned == 1);
     CHECK_NEAR(s.gaugeThreshold(rule), 100.f);   // stays there
+    CHECK_NEAR(s.lastDraftCost(rule), 100.f);
     CHECK(s.draftsTaken() == 0);                 // queued, not taken
 }
 
@@ -321,6 +325,8 @@ void testGaugeMultiDraft() {
     CHECK(s.pendingDrafts() == 4);         // opening + these three
     CHECK(s.pendingGaugeDrafts() == 3);
     CHECK_NEAR(s.gaugeThreshold(rule), 45.f);
+    // The HUD's "cost/cost" while they wait is the last one earned.
+    CHECK_NEAR(s.lastDraftCost(rule), 40.f);
 
     auto t = freshRun();
     t.onDeath(60.f, rule);
