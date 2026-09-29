@@ -684,5 +684,6 @@ on the left, swap the colours or pass `{ -1.f, 0.f }`.
   arguments are read as the trigger's values, but no ref *calls* `shakeCamera`:
   the scale of `strength` and whether it honours a disable-shake option are
   **(unverified)**. The missile called it with (0.18, 1.5, 0.02) for one build; the user dropped the shake before trying it, so nothing calls it now.
+- Mod popup links (loader `ModMetadataImpl.cpp`, `ModPopup.cpp`, read 2026-09-29): the link row shows `links.homepage`, `links.source` (a GitHub icon when the host is github.com), `links.community` (Discord icon) and `support.md` (gift icon); a missing one is greyed out. `issues { info, url }` is only read by `geode::openIssueReportPopup`, which nothing in the 5.10.1 loader calls, so player-facing contact info belongs in `about.md`. `about.md` links go through a "Links are spooky!" confirm, then the browser; a `mailto:` link is **(unverified)**, so the email is plain text.
 - Settings: `Mod::get()->getSettingValue<T>("key")`, live updates with
   `listenForSettingChanges<T>("key", fn)` from `$on_mod(Loaded)` (CBF `main.cpp:707-737`).

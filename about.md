@@ -32,4 +32,8 @@ Augmented runs never count as real progress. A run attempt does not save a norma
 - Supports only English and Korean for now.
 - Windows only for now. Updates will be done soon!
 
+## Feedback
+
+Found a bug, have an idea for an augment, or a question? Open an issue on [GitHub](https://github.com/seojoonrp/augmented-gd/issues) or email **seojoonrp@gmail.com**.
+
 ## Gallery

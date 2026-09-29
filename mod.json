@@ -11,6 +11,13 @@
 	"version": "v1.0.0",
 	"developer": "selenophile",
 	"description": "Turn every level into a roguelite run. Die, draft an augment, get stronger, and finally beat it.",
+	"links": {
+		"source": "https://github.com/seojoonrp/augmented-gd"
+	},
+	"issues": {
+		"info": "Report bugs, ideas and questions on the GitHub issues page, or by email to seojoonrp@gmail.com.",
+		"url": "https://github.com/seojoonrp/augmented-gd/issues"
+	},
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
 	},
