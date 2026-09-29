@@ -675,5 +675,14 @@ on the left, swap the colours or pass `{ -1.f, 0.f }`.
   (death-tracker `DTLevelInfoLayer.cpp:6-35`, `DTPauseLayer.cpp:3-27` for `left-button-menu`).
 - In-level HUD that ignores the camera: add it to `m_uiLayer` (qolmod labels,
   `refs/qolmod/src/Labels/Hooks.cpp:9`).
+- Camera shake (2026-09-29, missile impact): `GJBaseGameLayer::shakeCamera(duration,
+  strength, interval)` is `win ok`. The Shake trigger's own fields are
+  `EffectGameObject::m_shakeStrength` / `m_shakeInterval`, and `GJGameState` keeps
+  `m_cameraShakeEnabled` / `m_cameraShakeDuration` / `m_cameraShakeStrength` /
+  `m_cameraShakeInterval`, read in `updateCamera` (qolmod's No Camera Shake clears
+  them there, `refs/qolmod/src/Hacks/Cosmetic/NoCameraShake.cpp:22-30`). So the
+  arguments are read as the trigger's values, but no ref *calls* `shakeCamera`:
+  the scale of `strength` and whether it honours a disable-shake option are
+  **(unverified)**. The missile called it with (0.18, 1.5, 0.02) for one build; the user dropped the shake before trying it, so nothing calls it now.
 - Settings: `Mod::get()->getSettingValue<T>("key")`, live updates with
   `listenForSettingChanges<T>("key", fn)` from `$on_mod(Loaded)` (CBF `main.cpp:707-737`).

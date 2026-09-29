@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 using namespace geode::prelude;
 
@@ -14,11 +15,54 @@ namespace {
     constexpr float kReticleWidth = 1.f;
     constexpr int kSegments = 48;
 
+    // The blast, in seconds from impact and fractions of the blast radius.
+    // White is the base (user 2026-09-27); the layers are told apart by
+    // alpha and timing: a flash over the cleared circle, a fireball that
+    // swells and collapses, a fast shockwave ring past the radius with a
+    // fainter one behind it, and sparks thrown out that arc down. Red is
+    // only an accent (user 2026-09-29, "never too much"): the fireball's
+    // soft halo, and the sparks cooling to it as they fade.
+    constexpr float kAccentR = 1.f;
+    constexpr float kAccentG = 0.2f;
+    constexpr float kAccentB = 0.15f;
+    constexpr float kFlashSeconds = 0.12f;
+    constexpr float kCoreGrowSeconds = 0.07f;
+    constexpr float kCoreSeconds = 0.32f;
+    constexpr float kCoreRadius = 0.36f;
+    constexpr float kWaveSeconds = 0.4f;
+    constexpr float kWaveReach = 1.3f;
+    constexpr float kEchoDelay = 0.06f;
+    constexpr float kEchoSeconds = 0.36f;
+    constexpr float kEchoReach = 0.95f;
+    // A spark's streak = where it was this long ago.
+    constexpr float kSparkLag = 0.045f;
+    constexpr float kSparkGravity = 300.f;
+
     // CCDrawNode wants premultiplied alpha.
     ccColor4F premul(float r, float g, float b, float a) {
         return { r * a, g * a, b * a, a };
     }
+    ccColor4F white(float a) { return premul(1.f, 1.f, 1.f, a); }
+    // White at 0, the accent red at 1.
+    ccColor4F toAccent(float mix, float a) {
+        return premul(
+            1.f + (kAccentR - 1.f) * mix, 1.f + (kAccentG - 1.f) * mix, 1.f + (kAccentB - 1.f) * mix, a
+        );
+    }
     ccColor4F const kNoFill = { 0.f, 0.f, 0.f, 0.f };
+
+    float easeOutCubic(float u) {
+        float v = 1.f - u;
+        return 1.f - v * v * v;
+    }
+
+    std::mt19937& rng() {
+        static std::mt19937 gen{ std::random_device{}() };
+        return gen;
+    }
+    float roll(float lo, float hi) {
+        return std::uniform_real_distribution<float>(lo, hi)(rng());
+    }
 }
 
 MissileNode* MissileNode::create() {
@@ -59,6 +103,12 @@ void MissileNode::detonate() {
     if (m_phase == Phase::Idle) return;
     m_phase = Phase::Blast;
     m_age = 0.f;
+    // Evenly spread with jitter, so the spray never comes out lopsided.
+    float turn = roll(0.f, 6.2832f);
+    for (int i = 0; i < SparkCount; i++) {
+        float angle = turn + 6.2832f * static_cast<float>(i) / SparkCount + roll(-0.25f, 0.25f);
+        m_sparks[i] = { { std::cos(angle), std::sin(angle) }, m_radius * roll(0.55f, 1.15f), roll(0.38f, 0.55f) };
+    }
     this->redraw();
 }
 
@@ -103,20 +153,70 @@ void MissileNode::redraw() {
         m_draw->drawCircle(pos, kBodyWidth * 1.3f, premul(1.f, 1.f, 1.f, 1.f), 0.f, kNoFill, 12);
     }
     else if (m_phase == Phase::Blast) {
-        // A filled disc that snaps out to the radius, then a ring that keeps
-        // growing a little as both fade.
-        float u = std::clamp(m_age / BlastSeconds, 0.f, 1.f);
-        float grow = std::min(1.f, u / 0.25f);
-        float discR = m_radius * (1.f - (1.f - grow) * (1.f - grow));
-        float fade = 1.f - u;
-        // All white now (user 2026-09-27), so the depth that the orange used
-        // to carry comes from the alphas instead: a soft disc, a bright core,
-        // a crisp ring. Filled drawCircle, never drawDot: GD's CCDrawNode
-        // draws a dot as a square quad, which is what made the blast look
-        // rectangular (user 2026-09-27).
-        m_draw->drawCircle(m_impact, discR, premul(1.f, 1.f, 1.f, 0.35f * fade), 0.f, kNoFill, kSegments);
-        m_draw->drawCircle(m_impact, discR * 0.45f, premul(1.f, 1.f, 1.f, 0.85f * fade), 0.f, kNoFill, kSegments);
-        m_draw->drawCircle(m_impact, m_radius * (1.f + 0.15f * u), kNoFill, 2.f, premul(1.f, 1.f, 1.f, fade), kSegments);
+        this->drawBlast();
+    }
+}
+
+void MissileNode::drawBlast() {
+    float t = m_age;
+    float r = m_radius;
+    // Filled drawCircle, never drawDot: GD's CCDrawNode draws a dot as a
+    // square quad, which is what made the first blast look rectangular
+    // (user 2026-09-27).
+
+    // Flash: the cleared circle lights up for an instant as the hazards go.
+    if (t < kFlashSeconds) {
+        float u = t / kFlashSeconds;
+        float fade = (1.f - u) * (1.f - u);
+        m_draw->drawCircle(m_impact, r * (0.85f + 0.15f * easeOutCubic(u)), white(0.45f * fade), 0.f, kNoFill, kSegments);
+    }
+
+    // Fireball: swells fast, then collapses as it fades; the white core
+    // sits on a soft red halo, so a thin red fringe shows round it.
+    if (t < kCoreSeconds) {
+        float coreR;
+        float alpha;
+        if (t < kCoreGrowSeconds) {
+            coreR = r * kCoreRadius * (0.4f + 0.6f * easeOutCubic(t / kCoreGrowSeconds));
+            alpha = 1.f;
+        }
+        else {
+            float v = (t - kCoreGrowSeconds) / (kCoreSeconds - kCoreGrowSeconds);
+            coreR = r * kCoreRadius * (1.f - 0.55f * v * v);
+            alpha = std::pow(1.f - v, 1.5f);
+        }
+        m_draw->drawCircle(m_impact, coreR * 1.5f, toAccent(1.f, 0.3f * alpha), 0.f, kNoFill, kSegments);
+        m_draw->drawCircle(m_impact, coreR, white(0.95f * alpha), 0.f, kNoFill, kSegments);
+    }
+
+    // Shockwave: a thick ring racing past the radius and thinning out, and
+    // a fainter echo just behind it.
+    if (t < kWaveSeconds) {
+        float u = t / kWaveSeconds;
+        float waveR = r * (0.3f + (kWaveReach - 0.3f) * easeOutCubic(u));
+        m_draw->drawCircle(m_impact, waveR, kNoFill, 0.4f + 2.2f * (1.f - u), white(std::pow(1.f - u, 1.3f)), kSegments);
+    }
+    if (t > kEchoDelay && t < kEchoDelay + kEchoSeconds) {
+        float u = (t - kEchoDelay) / kEchoSeconds;
+        float echoR = r * (0.15f + (kEchoReach - 0.15f) * easeOutCubic(u));
+        m_draw->drawCircle(m_impact, echoR, kNoFill, 0.3f + 1.f * (1.f - u), white(0.55f * (1.f - u)), kSegments);
+    }
+
+    // Sparks: thrown out fast, slowing, pulled down; each drawn as a streak
+    // from where it was kSparkLag ago, thinning as it fades and cooling from
+    // white to red (by then it is faint, so the red stays a hint).
+    auto sparkAt = [&](Spark const& sp, float at) {
+        float out = sp.reach * easeOutCubic(std::min(1.f, at / sp.life));
+        return CCPoint{ m_impact.x + sp.dir.x * out, m_impact.y + sp.dir.y * out - 0.5f * kSparkGravity * at * at };
+    };
+    for (auto const& sp : m_sparks) {
+        if (t >= sp.life) continue;
+        float u = t / sp.life;
+        CCPoint head = sparkAt(sp, t);
+        CCPoint tail = sparkAt(sp, std::max(0.f, t - kSparkLag));
+        // drawSegment normalizes the segment: a zero length is a NaN quad.
+        if (std::abs(head.x - tail.x) + std::abs(head.y - tail.y) < 0.5f) continue;
+        m_draw->drawSegment(tail, head, 0.3f + 1.1f * (1.f - u), toAccent(u, 0.95f * (1.f - u)));
     }
 }
 
