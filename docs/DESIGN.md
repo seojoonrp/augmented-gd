@@ -112,9 +112,16 @@ and scales their text by the same ratio so four still fit GD's 569 pt width.
 
 ## Augments (design table, applied 2026-09-17)
 
-Names and descriptions are Korean and shown verbatim on the cards: the
-*initial* text when drafting level 1, the *level-up* text for every later
-level. The id is the "코드" column and is what the hooks key on.
+Names and descriptions are shown verbatim on the cards, in the language the
+`language` setting picks (Text & fonts, below): the *initial* text when
+drafting level 1, the *level-up* text for every later level. The table has
+the Korean; the English is in `src/core/AugmentDef.cpp` next to it, with the
+same numbers from `tune::`. English names: shield **Shield**, slow-mo
+**Sloth**, startpos **Checkpoint**, foresight **Foresight**, unmirror
+**Unmirror**, hazard-hitbox **Threat Removal**, wave-hitbox **Wave Breaker**,
+nerve **Calm Nerves**, draft-count **Opportunity Cost**, cat **Cat**, brake
+**Brake**, missile **Air Raid**, berserker **Berserker**. The id is the "코드"
+column and is what the hooks key on.
 
 | id | name | max | initial | level-up | status |
 |---|---|---|---|---|---|
@@ -140,8 +147,11 @@ Shift+4 berserker).
 
 ## Text & fonts (decided 2026-09-17)
 
-In-game augment text and the four bottom-left notices are Korean; logs and
-the HUD's non-name words stay English. GD's fonts have no Hangul, so the mod ships its own
+Player-facing text (augment names and card texts, notices, the berserk
+banner, popup titles and messages) comes in English or Korean, chosen by the
+`language` setting at the top of the mod's settings (English by default,
+since 2026-09-29; Korean before that was the only language). Logs and the
+HUD's non-name words stay English. GD's fonts have no Hangul, so the mod ships its own
 (`resources/fonts/`). Player-facing UI (draft cards, popup title,
 notices) uses 아임크리수진 (`ImcreSoojin.ttf`) rendered GD-style — white
 glyphs, black outline, drop shadow — baked by `scripts/fontgen.py`. Debug

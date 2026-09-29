@@ -4,6 +4,7 @@
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"
 #include "../game/AugmentManager.hpp"
+#include "../game/Language.hpp"
 #include "../ui/ShieldNode.hpp"
 
 #include <Geode/Geode.hpp>
@@ -47,7 +48,7 @@ public:
         m_used++;
         m_noclipTimer = tune::NoclipSeconds;
         log::info("Shield broke ({} left), noclip for {}s", shields - 1, tune::NoclipSeconds);
-        s.notice("보호막이 깨졌습니다.");
+        s.notice(tr("Your shield broke.", "보호막이 깨졌습니다."));
         if (m_node) m_node->shatter();
         return true;
     }

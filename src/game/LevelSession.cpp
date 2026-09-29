@@ -1,5 +1,6 @@
 #include "LevelSession.hpp"
 #include "AugmentManager.hpp"
+#include "Language.hpp"
 #include "Records.hpp"
 #include "../augments/Augments.hpp"
 #include "../ui/ProgressMarks.hpp"
@@ -111,10 +112,11 @@ void LevelSession::refreshHud(bool force) {
     // One row per owned augment in table order. Names are the Korean
     // display names; the state text stays English (debug readout).
     std::vector<RunHud::Slot> slots;
+    Lang const lang = language();
     for (auto const& def : allAugments()) {
         if (mgr.levelOf(def.id) <= 0) continue;
         auto a = this->find(def.id);
-        slots.push_back({ def.name, a ? a->hudState(*this, def.id) : std::string() });
+        slots.push_back({ def.name.in(lang), a ? a->hudState(*this, def.id) : std::string() });
     }
     m_hud->setSlots(slots);
 }

@@ -1,6 +1,7 @@
 #include "RunResumePopup.hpp"
 #include "Fonts.hpp"
 #include "CardStyle.hpp"
+#include "../game/Language.hpp"
 
 #include <Geode/Geode.hpp>
 
@@ -39,11 +40,12 @@ bool RunResumePopup::init(Callback onRestart, Callback onContinue) {
     m_onContinue = std::move(onContinue);
 
     // Build the pieces first, then size the popup around them.
-    auto title = CCLabelBMFont::create("증강 모드", fonts::Name);
+    auto title = CCLabelBMFont::create(tr("Augment Mode", "증강 모드"), fonts::Name);
     title->setScale(kTitleScale);
 
     auto body = CCLabelBMFont::create(
-        "이전에 진행한 증강 세션이 있습니다.\n이어서 하시겠습니까?",
+        tr("You have a run in progress on this level.\nPick up where you left off?",
+           "이전에 진행한 증강 세션이 있습니다.\n이어서 하시겠습니까?"),
         fonts::Text, kCCLabelAutomaticWidth, kCCTextAlignmentCenter
     );
     body->setScale(kBodyScale);

@@ -17,7 +17,10 @@ namespace augment::card {
 constexpr float CardWidth = 140.f;
 constexpr float CardHeight = 210.f;
 
+// The texts come in the language the caller picked (game/Language.hpp).
 struct CardFace {
+    // The augment's name, across the top.
+    std::string name;
     // Wrapped at the card's inner width and shrunk in steps until it fits.
     std::string description;
     // Left end of the footer band: "NEW", "Lv 2 → 3", "Lv 3".

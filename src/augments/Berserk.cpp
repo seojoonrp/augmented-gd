@@ -16,6 +16,7 @@
 #include "HazardRemoval.hpp"
 #include "../game/LevelSession.hpp"
 #include "../game/AugmentManager.hpp"
+#include "../game/Language.hpp"
 #include "../hooks/HazardHitboxHook.hpp"
 #include "../ui/BerserkAura.hpp"
 #include "../ui/BerserkNode.hpp"
@@ -207,7 +208,7 @@ private:
         );
         // Only entering the mode is announced, above the draft gauge rather
         // than in the notice corner (user, 2026-09-29); a refresh is not.
-        if (!again) s.banner("버서커!");
+        if (!again) s.banner(tr("BERSERK!", "버서커!"));
     }
 
     // The flame's reach around a normal-size icon (30 units); scaled by

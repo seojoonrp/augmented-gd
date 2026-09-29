@@ -15,6 +15,7 @@
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"
 #include "../game/AugmentManager.hpp"
+#include "../game/Language.hpp"
 #include "../ui/ProgressMarks.hpp"
 
 #include <Geode/Geode.hpp>
@@ -93,7 +94,7 @@ public:
             "Respawned from checkpoint ({}/{} placed this attempt, next death restarts from 0)",
             m_placed, s.levelOf(ids::StartPos)
         );
-        s.notice("체크포인트에서 부활합니다.");
+        s.notice(tr("Back at the checkpoint.", "체크포인트에서 부활합니다."));
     }
 
     // The dot on GD's progress bar follows the live placement; ProgressMarks
@@ -181,7 +182,7 @@ private:
                 "Checkpoint placed ({}/{}){} at {:.1f}%, GD array {}", m_placed, lvl,
                 replaced ? ", replaces the previous one" : "", s.percent(), this->gdCount(s)
             );
-            s.notice("체크포인트가 설정되었습니다.");
+            s.notice(tr("Checkpoint placed.", "체크포인트가 설정되었습니다."));
         }
         else {
             // GD refused (its own conditions, e.g. mid-dash). Nothing is shown

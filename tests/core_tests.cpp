@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 #include <random>
 #include <set>
 #include <string>
@@ -40,68 +41,122 @@ RunState freshRun() {
 
 // ---------------------------------------------------------------- table
 
+// Every Hangul syllable block; an English text must have none (a pasted
+// Korean phrase would draw fine and read wrong).
+bool hasHangul(std::string const& s) {
+    // UTF-8 lead bytes 0xEA-0xED cover U+A000-U+DFFF, which holds the block.
+    for (unsigned char c : s) {
+        if (c >= 0xEA && c <= 0xED) return true;
+    }
+    return false;
+}
+
 void testTable() {
     auto const& defs = allAugments();
     CHECK(defs.size() == 13);
     std::set<std::string> ids;
     for (auto const& d : defs) {
         CHECK(!d.id.empty());
-        CHECK(!d.name.empty());
         CHECK(d.maxLevel >= 1);
-        CHECK(!d.initialDesc.empty());
-        CHECK((d.maxLevel == 1) == d.levelUpDesc.empty());
+        // Both languages, all the way through.
+        for (auto const* text : { &d.name, &d.initialDesc }) {
+            CHECK(!text->en.empty());
+            CHECK(!text->ko.empty());
+        }
+        CHECK((d.maxLevel == 1) == d.levelUpDesc.en.empty());
+        CHECK((d.maxLevel == 1) == d.levelUpDesc.ko.empty());
+        CHECK(!hasHangul(d.name.en) && !hasHangul(d.initialDesc.en) && !hasHangul(d.levelUpDesc.en));
+        CHECK(hasHangul(d.name.ko) && hasHangul(d.initialDesc.ko));
         ids.insert(d.id);
     }
     CHECK(ids.size() == defs.size());
     CHECK(findAugment(ids::Cat) != nullptr);
     CHECK(findAugment("nope") == nullptr);
-    CHECK(augmentName("nope") == "nope");
-    CHECK(augmentName(ids::Shield) == "결계인가?");
+    CHECK(augmentName("nope", Lang::English) == "nope");
+    CHECK(augmentName(ids::Shield, Lang::Korean) == "결계인가?");
+    CHECK(augmentName(ids::Shield, Lang::English) == "Shield");
+    CHECK(augmentName(ids::Missile, Lang::English) == "Air Raid");
 
     // Numbers on the cards come from tune::, formatted the way the design
     // table writes them.
-    CHECK(contains(findAugment(ids::Shield)->initialDesc, "1.5초간"));
-    CHECK(contains(findAugment(ids::SlowMo)->initialDesc, "5% 감소"));
-    CHECK(contains(findAugment(ids::SlowMo)->levelUpDesc, "5% 더 감소"));
-    CHECK(contains(findAugment(ids::HazardHitbox)->initialDesc, "5% 감소"));
-    CHECK(contains(findAugment(ids::WaveHitbox)->initialDesc, "10% 감소"));
-    CHECK(contains(findAugment(ids::Nerve)->initialDesc, "각각 X% 증가"));
-    CHECK(contains(findAugment(ids::DraftCount)->initialDesc, "4개씩"));
-    CHECK(contains(findAugment(ids::Cat)->initialDesc, "4초마다"));
-    CHECK(contains(findAugment(ids::Cat)->initialDesc, "장애물 5개"));
-    CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "2개 더"));
-    CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "0.5초 감소"));
-    CHECK(contains(findAugment(ids::Brake)->initialDesc, "60% 감소"));
-    CHECK(contains(findAugment(ids::Brake)->initialDesc, "최대 7초씩"));
-    CHECK(contains(findAugment(ids::Brake)->levelUpDesc, "7초 더"));
-    CHECK(contains(findAugment(ids::Missile)->initialDesc, "6초마다"));
-    CHECK(contains(findAugment(ids::Missile)->initialDesc, "반경 3칸"));
-    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "1칸 커지고"));
-    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5초 감소"));
-    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "3% 확률로"));
-    CHECK(contains(findAugment(ids::Berserk)->initialDesc, "2.5초간"));
-    CHECK(contains(findAugment(ids::Berserk)->levelUpDesc, "1% 증가"));
+    auto ko = [](char const* id) { return findAugment(id)->initialDesc.ko; };
+    auto koUp = [](char const* id) { return findAugment(id)->levelUpDesc.ko; };
+    CHECK(contains(ko(ids::Shield), "1.5초간"));
+    CHECK(contains(ko(ids::SlowMo), "5% 감소"));
+    CHECK(contains(koUp(ids::SlowMo), "5% 더 감소"));
+    CHECK(contains(ko(ids::HazardHitbox), "5% 감소"));
+    CHECK(contains(ko(ids::WaveHitbox), "10% 감소"));
+    CHECK(contains(ko(ids::Nerve), "각각 X% 증가"));
+    CHECK(contains(ko(ids::DraftCount), "4개씩"));
+    CHECK(contains(ko(ids::Cat), "4초마다"));
+    CHECK(contains(ko(ids::Cat), "장애물 5개"));
+    CHECK(contains(koUp(ids::Cat), "2개 더"));
+    CHECK(contains(koUp(ids::Cat), "0.5초 감소"));
+    CHECK(contains(ko(ids::Brake), "60% 감소"));
+    CHECK(contains(ko(ids::Brake), "최대 7초씩"));
+    CHECK(contains(koUp(ids::Brake), "7초 더"));
+    CHECK(contains(ko(ids::Missile), "6초마다"));
+    CHECK(contains(ko(ids::Missile), "반경 3칸"));
+    CHECK(contains(koUp(ids::Missile), "1칸 커지고"));
+    CHECK(contains(koUp(ids::Missile), "0.5초 감소"));
+    CHECK(contains(ko(ids::Berserk), "3% 확률로"));
+    CHECK(contains(ko(ids::Berserk), "2.5초간"));
+    CHECK(contains(koUp(ids::Berserk), "1% 증가"));
+
+    // The English texts quote the same numbers, with their units.
+    auto en = [](char const* id) { return findAugment(id)->initialDesc.en; };
+    auto enUp = [](char const* id) { return findAugment(id)->levelUpDesc.en; };
+    CHECK(contains(en(ids::Shield), "noclip for 1.5 seconds"));
+    CHECK(contains(en(ids::SlowMo), "5% slower"));
+    CHECK(contains(enUp(ids::SlowMo), "another 5% slower"));
+    CHECK(contains(en(ids::HazardHitbox), "shrink by 5%"));
+    CHECK(contains(en(ids::WaveHitbox), "shrinks by 10%"));
+    CHECK(contains(en(ids::Nerve), "[Threat Removal]"));
+    CHECK(contains(en(ids::Nerve), "[Wave Breaker]"));
+    CHECK(contains(en(ids::DraftCount), "4 cards"));
+    CHECK(contains(en(ids::Cat), "Every 4 seconds"));
+    CHECK(contains(en(ids::Cat), "removes 5 random hazards"));
+    CHECK(contains(enUp(ids::Cat), "2 more hazards"));
+    CHECK(contains(enUp(ids::Cat), "0.5 seconds"));
+    CHECK(contains(en(ids::Brake), "by 60%"));
+    CHECK(contains(en(ids::Brake), "Up to 7 seconds"));
+    CHECK(contains(enUp(ids::Brake), "7 seconds longer"));
+    CHECK(contains(en(ids::Missile), "Every 6 seconds"));
+    CHECK(contains(en(ids::Missile), "within 3 blocks"));
+    CHECK(contains(enUp(ids::Missile), "grows by 1 block and"));
+    CHECK(contains(enUp(ids::Missile), "0.5 seconds sooner"));
+    CHECK(contains(en(ids::Berserk), "3% chance"));
+    CHECK(contains(en(ids::Berserk), "2.5 seconds of berserk"));
+    CHECK(contains(enUp(ids::Berserk), "up by 1%"));
 
     // describe(): initial for level 1, level-up text after, initial again
-    // when there is no level-up text.
+    // when there is no level-up text; in the language asked for.
     auto const& slow = *findAugment(ids::SlowMo);
-    CHECK(&slow.describe(1) == &slow.initialDesc);
-    CHECK(&slow.describe(2) == &slow.levelUpDesc);
+    CHECK(&slow.describe(1, Lang::Korean) == &slow.initialDesc.ko);
+    CHECK(&slow.describe(2, Lang::Korean) == &slow.levelUpDesc.ko);
+    CHECK(&slow.describe(2, Lang::English) == &slow.levelUpDesc.en);
     auto const& fore = *findAugment(ids::Foresight);
-    CHECK(&fore.describe(2) == &fore.initialDesc);
+    CHECK(&fore.describe(2, Lang::English) == &fore.initialDesc.en);
 }
 
 // describeAt(): the detail card's text carries that level's numbers.
 void testDescribeAt() {
-    auto at = [](char const* id, int level) { return findAugment(id)->describeAt(level); };
     // Level 1 and single-level augments read exactly like the draft card.
-    for (auto const& d : allAugments()) {
-        CHECK(d.describeAt(1) == d.initialDesc);
-        CHECK(d.describeAt(0) == d.initialDesc);
-        if (d.maxLevel == 1) CHECK(d.describeAt(3) == d.initialDesc);
-        // Every level has a text, and the numbers differ from level 1's.
-        for (int lv = 2; lv <= d.maxLevel; lv++) CHECK(d.describeAt(lv) != d.initialDesc);
+    for (auto lang : { Lang::English, Lang::Korean }) {
+        for (auto const& d : allAugments()) {
+            auto const& initial = d.initialDesc.in(lang);
+            CHECK(d.describeAt(1, lang) == initial);
+            CHECK(d.describeAt(0, lang) == initial);
+            if (d.maxLevel == 1) CHECK(d.describeAt(3, lang) == initial);
+            // Every level has a text, and the numbers differ from level 1's.
+            for (int lv = 2; lv <= d.maxLevel; lv++) {
+                CHECK(d.describeAt(lv, lang) != initial);
+                CHECK(hasHangul(d.describeAt(lv, lang)) == (lang == Lang::Korean));
+            }
+        }
     }
+
+    auto at = [](char const* id, int level) { return findAugment(id)->describeAt(level, Lang::Korean); };
     CHECK(contains(at(ids::Shield, 3), "보호막이 3개"));
     CHECK(contains(at(ids::Shield, 3), "1.5초간"));
     CHECK(contains(at(ids::SlowMo, 3), "15% 감소"));
@@ -123,6 +178,23 @@ void testDescribeAt() {
     // Past the cap reads as the cap.
     CHECK(at(ids::Shield, 9) == at(ids::Shield, 3));
     CHECK(at(ids::StartPos, 5) == at(ids::StartPos, 3));
+
+    auto atEn = [](char const* id, int level) { return findAugment(id)->describeAt(level, Lang::English); };
+    CHECK(contains(atEn(ids::Shield, 3), "Get 3 shields"));
+    CHECK(contains(atEn(ids::Shield, 3), "noclip for 1.5 seconds"));
+    CHECK(contains(atEn(ids::SlowMo, 3), "15% slower"));
+    CHECK(contains(atEn(ids::StartPos, 3), "up to 3 times"));
+    CHECK(contains(atEn(ids::HazardHitbox, 5), "by 25%"));
+    CHECK(contains(atEn(ids::WaveHitbox, 5), "by 50%"));
+    CHECK(contains(atEn(ids::Cat, 3), "Every 3 seconds"));
+    CHECK(contains(atEn(ids::Cat, 3), "removes 9 random"));
+    CHECK(contains(atEn(ids::Cat, 4), "Every 2.5 seconds"));
+    CHECK(contains(atEn(ids::Brake, 2), "Up to 14 seconds"));
+    CHECK(contains(atEn(ids::Missile, 3), "Every 5 seconds"));
+    CHECK(contains(atEn(ids::Missile, 3), "within 5 blocks"));
+    CHECK(contains(atEn(ids::Missile, 2), "within 4 blocks"));
+    CHECK(contains(atEn(ids::Berserk, 3), "5% chance"));
+    CHECK(atEn(ids::Shield, 9) == atEn(ids::Shield, 3));
 }
 
 // ---------------------------------------------------------------- formulas

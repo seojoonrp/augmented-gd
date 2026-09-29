@@ -32,10 +32,17 @@
 		]
 	},
 	"settings": {
+		"language": {
+			"type": "string",
+			"name": "Language",
+			"description": "Language of the augment cards, notices and run menus. Text already on screen switches the next time it is shown.",
+			"default": "English",
+			"one-of": ["English", "Korean"]
+		},
 		"keybind-slowmo": {
 			"type": "keybind",
 			"name": "Toggle Slow-Mo",
-			"description": "Toggles the Slow-Mo augment on/off during a run.",
+			"description": "Toggles the Sloth augment's slow-mo on/off during a run.",
 			"default": "X",
 			"category": "gameplay",
 			"priority": -5

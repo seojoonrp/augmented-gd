@@ -117,7 +117,7 @@ CCNode* augmentCard(AugmentDef const& def, CardFace const& face) {
     band->setPosition({ CardWidth / 2, Ring + kFooterHeight / 2 });
     card->addChild(band, 2);
 
-    auto name = CCLabelBMFont::create(def.name.c_str(), fonts::Name);
+    auto name = CCLabelBMFont::create(face.name.c_str(), fonts::Name);
     name->limitLabelWidth(inner, kNameScale, 0.3f);
     name->setPosition(fromTop(kNameY));
     card->addChild(name, 3);

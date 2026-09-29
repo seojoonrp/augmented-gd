@@ -2,6 +2,7 @@
 #include "AugmentInfoPopup.hpp"
 #include "CardStyle.hpp"
 #include "Fonts.hpp"
+#include "../game/Language.hpp"
 
 #include <Geode/Geode.hpp>
 
@@ -154,7 +155,7 @@ bool RunInfoPopup::init(Info info) {
     }
 
     float const sectionY = cardH - kPad - kStatHeight - kSectionGap - kSectionHeight / 2;
-    auto section = CCLabelBMFont::create(fmt::format("보유 증강 ({})", n).c_str(), fonts::Text);
+    auto section = CCLabelBMFont::create(fmt::format("{} ({})", tr("Augments held", "보유 증강"), n).c_str(), fonts::Text);
     section->setScale(kSectionScale);
     section->setAnchorPoint({ 0.f, 0.5f });
     section->setPosition({ kPad, sectionY });
@@ -173,7 +174,7 @@ bool RunInfoPopup::init(Info info) {
 
     float const gridTop = cardH - kHeaderHeight;
     if (n == 0) {
-        auto none = CCLabelBMFont::create("아직 획득한 증강이 없습니다.", fonts::Text);
+        auto none = CCLabelBMFont::create(tr("No augments yet.", "아직 획득한 증강이 없습니다."), fonts::Text);
         none->setScale(kEmptyScale);
         none->setPosition({ cx, gridTop - kEmptyHeight / 2 });
         m_mainLayer->addChild(none, 1);
@@ -255,7 +256,7 @@ CCNode* RunInfoPopup::createTile(Held const& held) {
     tile->addChild(box, 0);
 
     float y = kTileHeight - kTilePad;
-    auto name = CCLabelBMFont::create(def.name.c_str(), fonts::Name);
+    auto name = CCLabelBMFont::create(def.name.in(language()).c_str(), fonts::Name);
     name->limitLabelWidth(kTileWidth - 2 * kTilePadX, kTileNameScale, 0.3f);
     name->setPosition({ kTileWidth / 2, y - kTileNameHeight / 2 });
     tile->addChild(name, 1);

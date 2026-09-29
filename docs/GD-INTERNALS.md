@@ -452,6 +452,24 @@ Facts (all read from loader source, `$GEODE_SDK/loader/src` / `include`):
 - `CCNode::getPosition()` in Geode's cocos headers resolves ambiguously when
   assigned into a `CCPoint` with `=` (clang: "operand types CCPoint and void");
   use `getPositionX()/Y()` or keep the point you set.
+- **Where Hangul cannot go** (read from loader source, 2026-09-29): the mod's
+  settings page and the mod page (`about.md`, `MDTextArea`: chatFont body,
+  bigFont / goldFont headings, `loader/src/ui/nodes/MDTextArea.cpp`) are drawn
+  with GD's fonts, so text there is ASCII only — the `language` setting's
+  choices read `English` / `Korean`. `MDTextArea` also has no tables (md4c is
+  run without `MD_FLAG_TABLES`), and an image is a sprite name
+  (`modid/file.png?scale=…` or `?width=…`, `frame:` for sheet frames); one
+  that fails to load prints its alt text instead.
+- **Language setting**: a `"type": "string"` setting with `"one-of"` is an
+  enum stepped with arrows (`refs/geode-docs/mods/settings.md:229-244`).
+  `StringSettingV3::getValue()` returns a `ZStringView` of its own string, so
+  `getSettingValue<std::string_view>(key)` compares without a copy
+  (`src/game/Language.cpp` `language`). English in the baked ImcreSoojin fonts
+  is fine: the charset always carries 32-126 (`scripts/fontcharset.ps1`), and
+  a Latin letter is ~2/3 of a Hangul one (`a` 40 vs `가` 60 xadvance at uhd
+  64 px). Every English card text fits at the card's default 0.5 scale
+  (replayed `wrapText` + `CCLabelBMFont`'s width rule on the `.fnt` metrics,
+  2026-09-29; unseen in game).
 - Pretendard (OFL) is installed per-user at
   `%LOCALAPPDATA%\Microsoft\Windows\Fonts\Pretendard-*.ttf`; static TTFs, so no
   variable-font question. License text is shipped in `resources/fonts/`.

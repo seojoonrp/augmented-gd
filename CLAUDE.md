@@ -71,13 +71,17 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
    (Windows paths, `\n` in strings) goes in a script file in the scratchpad via
    `Write`, then `python file.py`.
 9. Don't commit; the user commits. Don't change mod ID / name.
-10. In-game augment text is Korean (names, descriptions, popup title) and must
-    use the mod fonts in `src/ui/Fonts.hpp`; GD's fonts draw nothing for Hangul.
-    Player-facing UI = `fonts::Name` / `fonts::Text` (ImcreSoojin, outlined);
-    debug readouts (HUD lines) = `fonts::Debug` (Pretendard). Logs and HUD
-    wording stay English; the four bottom-left notices are Korean (2026-09-27).
-    New Korean literals need no extra step: `build.ps1` regenerates the charset
-    and re-bakes the fonts.
+10. Player-facing text comes in **English and Korean**, picked by the `language`
+    setting (2026-09-29): every new line needs both. Augment names / card texts
+    are `LocalText { en, ko }` in `AugmentDef.cpp` (host tests check both exist
+    and that English has no Hangul); any other line is `tr("English", "한국어")`
+    (`src/game/Language.hpp`) where it is shown. Both languages use the mod fonts
+    in `src/ui/Fonts.hpp`; GD's fonts draw nothing for Hangul (the mod's settings
+    page and `about.md` are GD fonts: ASCII only there). Player-facing UI =
+    `fonts::Name` / `fonts::Text` (ImcreSoojin, outlined); debug readouts (HUD
+    lines) = `fonts::Debug` (Pretendard). Logs and debug HUD wording stay
+    English. New Korean literals need no extra step: `build.ps1` regenerates the
+    charset and re-bakes the fonts.
 11. Docs cite our own sources as `` `path/File.cpp` `symbol` `` or `File.cpp::symbol`,
     never by line number (`check.ps1` warns). Line numbers are fine for `refs/` (pinned).
 
@@ -85,14 +89,15 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
 
 ```
 mod.json                 id, GD/Geode versions, fonts (AugDebug generated, charset from src/; baked UI
-                         fonts via resources.files, card art via resources.sprites), settings (keybinds, debug-mode)
+                         fonts via resources.files, card art via resources.sprites), settings (language, keybinds, debug-mode)
 resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
 resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
 resources/ui/            aug-logo.png (the mark inside the round AUG button — every new export goes through
                          scripts/logocrop.py, or its margin shrinks the mark); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
-  AugmentDef.*           table: ids::*, Korean names, maxLevel, descriptions built from tune:: at startup;
-                         describeAt(level) = the effect text with that level's numbers (detail card)
+  Lang.hpp               Lang { English, Korean } + LocalText { en, ko }
+  AugmentDef.*           table: ids::*, names (en + ko), maxLevel, descriptions built from tune:: at startup;
+                         describe(level, lang) / describeAt(level, lang) = card text / that level's numbers (detail card)
   Formulas.hpp           level → effect (slowMoScale, nerveBoost, hazard/waveScale, cat*, draftCardCount)
   RunState.*             one run: gauge economy (GaugeRule injected), levels, pending drafts, slow-mo toggle
 src/game/                Geode glue
@@ -104,6 +109,7 @@ src/game/                Geode glue
   DraftSession.*         draft::showNext / isOpen / abandon — popup, director pause, cursor, chaining
   Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters);
                          time = base (slow-mo) with an override layer (brake)
+  Language.*             language() from the `language` setting, tr(en, ko) for lines outside the table
   Records.*              the runs' own per-level record (Geode saved values) + records::hiddenFromGd()
                          (run attempts never reach GD's normal best / New Best! / clear)
 src/augments/            one file per augment behind Augment.hpp (all hooks default to no-op):

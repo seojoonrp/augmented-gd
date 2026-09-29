@@ -3,6 +3,8 @@
 // Static augment table + tuning constants. No Geode headers: src/core is
 // compiled on the host by scripts/test.ps1 as well as into the mod.
 
+#include "Lang.hpp"
+
 #include <string>
 #include <vector>
 
@@ -28,31 +30,33 @@ namespace ids {
 
 // Static definition of one augment. Runtime state (current level, etc.)
 // lives in RunState, not here.
+// Every text comes in English and Korean (Lang.hpp) and is drawn with the
+// mod's own fonts (GD's fonts have no Hangul), so never feed one to a
+// bigFont/goldFont/chatFont label.
 struct AugmentDef {
     std::string id;
-    // Display name, Korean. Drawn with the mod's own font (GD's fonts have no
-    // Hangul), so never feed it to a bigFont/goldFont/chatFont label.
-    std::string name;
+    // Display name.
+    LocalText name;
     int maxLevel = 1;
     // Shown on the card when drafting level 1. Built from tune:: at startup
     // so the numbers on the card and in the code cannot drift apart.
-    std::string initialDesc;
+    LocalText initialDesc;
     // Shown when drafting level 2+ (same text for every level-up). Empty
     // when maxLevel == 1.
-    std::string levelUpDesc;
+    LocalText levelUpDesc;
 
     // Draft card text for drafting `level`: initial at 1, level-up after.
-    std::string const& describe(int level) const;
+    std::string const& describe(int level, Lang lang) const;
     // What the augment does *at* `level`, with that level's numbers (the
-    // pause menu's detail card): "보호막이 3개 지급됩니다". Level 1 (and any
-    // single-level augment) is the initial text.
-    std::string describeAt(int level) const;
+    // pause menu's detail card): "Get 3 shields every attempt." Level 1
+    // (and any single-level augment) is the initial text.
+    std::string describeAt(int level, Lang lang) const;
 };
 
 std::vector<AugmentDef> const& allAugments();
 AugmentDef const* findAugment(std::string const& id);
 // Display name for an id; falls back to the id itself.
-std::string augmentName(std::string const& id);
+std::string augmentName(std::string const& id, Lang lang);
 
 // Tuning constants shared by hooks and by the card descriptions.
 namespace tune {

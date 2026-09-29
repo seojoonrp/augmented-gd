@@ -1,5 +1,6 @@
 #include "AugmentInfoPopup.hpp"
 #include "AugmentCard.hpp"
+#include "../game/Language.hpp"
 
 #include <Geode/Geode.hpp>
 
@@ -34,8 +35,10 @@ bool AugmentInfoPopup::init(AugmentDef const& def, int level) {
     m_bgSprite->setVisible(false);
     this->setOpacity(kOverlayOpacity);
 
+    Lang const lang = language();
     card::CardFace face;
-    face.description = def.describeAt(level);
+    face.name = def.name.in(lang);
+    face.description = def.describeAt(level, lang);
     face.footer = fmt::format("Lv {}", level);
     if (level >= def.maxLevel) face.footerColor = kGold;
     face.pips = level;

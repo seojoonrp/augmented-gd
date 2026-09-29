@@ -2,6 +2,7 @@
 #include "AugmentCard.hpp"
 #include "Fonts.hpp"
 #include "../game/AugmentManager.hpp"
+#include "../game/Language.hpp"
 
 #include <Geode/Geode.hpp>
 
@@ -76,7 +77,7 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
     // box, so hide the popup's own background and darken the overlay.
     m_bgSprite->setVisible(false);
     this->setOpacity(160);
-    this->setTitle("증강 선택", fonts::Name, kTitleScale);
+    this->setTitle(tr("Choose an Augment", "증강 선택"), fonts::Name, kTitleScale);
 
     // No way out but picking a card: drop the close button.
     m_closeBtn->removeFromParentAndCleanup(true);
@@ -128,8 +129,10 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
 // a new augment).
 CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     int const nextLevel = std::min(currentLevel + 1, def.maxLevel);
+    Lang const lang = language();
     card::CardFace face;
-    face.description = def.describe(nextLevel);
+    face.name = def.name.in(lang);
+    face.description = def.describe(nextLevel, lang);
     face.footer = currentLevel == 0 ? "NEW" : fmt::format("Lv {} → {}", currentLevel, nextLevel);
     face.pips = currentLevel;
     return card::augmentCard(def, face);
