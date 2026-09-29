@@ -540,6 +540,39 @@ start at the top). Seen in game 2026-09-28 — the user approved the tiles
 ("훨낫다") without calling out a flipped shade; if they ever come out darker
 on the left, swap the colours or pass `{ -1.f, 0.f }`.
 
+## Performance and build notes (2026-09-29 optimization pass)
+
+- **`setupHasCompleted` = the level's objects exist.** node-ids: RobTop
+  calls it from `PlayLayer::init` for local levels and only later, once the
+  delayed object creation (`processCreateObjectsFromSetup` →
+  `createObjectsFromSetupFinished`, both `win ok`) is done, for online ones
+  (`refs/node-ids/src/PlayLayer.cpp:69-81`). **(from refs)** The object
+  index (`LevelSession::warmObjectIndex`) is built there, behind the loading
+  screen; the lazy build on first use stays as the fallback.
+- **Linker: `geode build` is RelWithDebInfo**, and clang's `-g` makes lld-link
+  run with `/DEBUG`, which implies `/OPT:NOREF` — every function pulled in
+  from Geode's static libraries (arc / asp unity objects, bindings) stayed in
+  the DLL. `CMakeLists.txt` adds `LINKER:/OPT:REF`: `.text` 4.59 → 4.12 MB,
+  DLL 7.59 → 6.97 MB, PDB kept. All ten `ModifyDerive<Aug…>::apply` hook
+  registrations are still in the PDB after it (symbol diff, 2026-09-29); a
+  Release link does the same and qolmod ships Release on Windows
+  (`refs/qolmod/.github/workflows/build.yml:43`). The rest of the DLL is
+  referenced Geode code — `/OPT:ICF` on top changed nothing (same `.text`).
+  **(verified by build; in game unverified)**
+- **Keybind settings without a copy:** `KeybindSettingV3::getValue()` returns
+  `std::vector<Keybind> const&`, and `SettingTypeForValueType` has a
+  `std::span<Keybind const>` entry (`Geode/loader/SettingV3.hpp`), so
+  `getSettingValue<std::span<Keybind const>>(key)` views the setting's own
+  list — the raw key listener runs for every key event in the game.
+- **Toggling our hooks off when idle was considered and dropped.** Geode can
+  (`Hook::setAutoEnable(false)` in `onModify`, then `enable()` /
+  `disable()`), but its docs ask mods not to
+  (`refs/geode-docs/tutorials/modify.md:175`), `disable()` can free the
+  handler of a function that is on the stack, and our GameObject hooks
+  already return after one compare when their augment is off.
+- `CCRect::intersectsRect` is an inline constexpr in Geode's cocos headers
+  (touching edges count), so culling by it costs nothing extra.
+
 ## Misc
 
 - Node IDs on `LevelInfoLayer` (node-ids): `left-side-menu`, `right-side-menu`, `back-menu`.

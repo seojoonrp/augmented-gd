@@ -49,7 +49,13 @@ class $modify(AugPlayLayer, PlayLayer) {
 
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
-        if (this->isRunLevel()) this->attachToProgressBar("setupHasCompleted");
+        auto s = this->session();
+        if (!s || !s->runLevel()) return;
+        this->attachToProgressBar("setupHasCompleted");
+        // The level's objects all exist now (GD calls this once they are
+        // created, node-ids `refs/node-ids/src/PlayLayer.cpp:69-81`), and
+        // the loading screen hides the index build.
+        s->warmObjectIndex();
     }
 
     // ---------------------------------------------------------------- setup

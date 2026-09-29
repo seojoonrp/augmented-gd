@@ -26,6 +26,8 @@
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/utils/Keyboard.hpp>
 
+#include <span>
+
 using namespace geode::prelude;
 
 namespace augment::hotkeys {
@@ -39,9 +41,11 @@ unsigned g_lastFrame[HotkeyCount][2] = {};
 bool g_lastHandled[HotkeyCount][2] = {};
 
 // getSettingValue does the typeinfo cast for us; an empty result means the
-// setting couldn't be resolved, so fall back to the mod.json default.
+// setting couldn't be resolved, so fall back to the mod.json default. A span
+// views the setting's own list (this runs for every key event in the game;
+// the vector form copied the list each time).
 bool keybindMatches(char const* settingKey, enumKeyCodes fallback, Keybind const& pressed) {
-    auto binds = Mod::get()->getSettingValue<std::vector<Keybind>>(settingKey);
+    auto binds = Mod::get()->getSettingValue<std::span<Keybind const>>(settingKey);
     if (binds.empty()) return pressed == Keybind(fallback, KeyboardModifier::None);
     return std::ranges::contains(binds, pressed);
 }

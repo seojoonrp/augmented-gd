@@ -4,6 +4,9 @@
 
 #include <Geode/ui/NineSlice.hpp>
 
+#include <string>
+#include <unordered_map>
+
 using namespace geode::prelude;
 
 namespace augment::card {
@@ -30,15 +33,35 @@ namespace {
     constexpr float kPipRadius = 3.8f;    // outline included
     constexpr float kPipSpacing = 7.f;
 
-    // Word-wrap by measuring words with throwaway labels. CCLabelBMFont's
-    // width argument never wrapped our fonts in game (Pretendard or the baked
+    // Label widths for one font, in label units: one probe label re-set per
+    // string (setString reuses its glyph sprites; a fresh label per word
+    // built every glyph again), and each width kept, because the card's
+    // shrink loop wraps the same text again at every step.
+    class TextMeasure {
+    public:
+        explicit TextMeasure(char const* font) : m_probe(CCLabelBMFont::create("", font)) {}
+
+        float width(std::string const& s) {
+            if (auto it = m_widths.find(s); it != m_widths.end()) return it->second;
+            float w = 0.f;
+            if (m_probe) {
+                m_probe->setString(s.c_str());
+                w = m_probe->getContentSize().width;
+            }
+            m_widths.emplace(s, w);
+            return w;
+        }
+
+    private:
+        Ref<CCLabelBMFont> m_probe;
+        std::unordered_map<std::string, float> m_widths;
+    };
+
+    // Word-wrap by measuring words (TextMeasure). CCLabelBMFont's width
+    // argument never wrapped our fonts in game (Pretendard or the baked
     // ImcreSoojin, 2026-09-17), so the label gets explicit newlines instead.
     // `maxWidth` is in label units (pre-scale). Existing newlines are kept.
-    std::string wrapText(std::string const& text, char const* font, float maxWidth) {
-        auto measure = [&](std::string const& s) {
-            auto probe = CCLabelBMFont::create(s.c_str(), font);
-            return probe ? probe->getContentSize().width : 0.f;
-        };
+    std::string wrapText(std::string const& text, TextMeasure& measure, float maxWidth) {
         std::string out;
         size_t paraStart = 0;
         while (paraStart <= text.size()) {
@@ -52,7 +75,7 @@ namespace {
                 auto word = text.substr(wordStart, wordEnd - wordStart);
                 if (!word.empty()) {
                     auto candidate = line.empty() ? word : line + " " + word;
-                    if (!line.empty() && measure(candidate) > maxWidth) {
+                    if (!line.empty() && measure.width(candidate) > maxWidth) {
                         out += line + '\n';
                         line = word;
                     }
@@ -112,8 +135,9 @@ CCNode* augmentCard(AugmentDef const& def, CardFace const& face) {
     float const slot = slotBottom - slotTop;
     float descScale = kDescScale;
     CCLabelBMFont* desc = nullptr;
+    TextMeasure measure(fonts::Text);
     for (;;) {
-        auto wrapped = wrapText(face.description, fonts::Text, inner / descScale);
+        auto wrapped = wrapText(face.description, measure, inner / descScale);
         desc = CCLabelBMFont::create(
             wrapped.c_str(), fonts::Text, kCCLabelAutomaticWidth, kCCTextAlignmentCenter
         );

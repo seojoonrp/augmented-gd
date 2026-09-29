@@ -138,20 +138,13 @@ private:
         if (m_node) m_node->detonate();
 
         int removed = 0;
-        auto& objs = s.objectsByX();
-        float lo = centre.x - radius - kScanPad;
-        float hi = centre.x + radius + kScanPad;
-        auto it = std::lower_bound(objs.begin(), objs.end(), lo, [](GameObject* o, float x) {
-            return o->getPositionX() < x;
-        });
-        for (; it != objs.end() && (*it)->getPositionX() <= hi; ++it) {
-            auto obj = *it;
-            if (!hazard::isTarget(obj) || obj == layer->m_anticheatSpike) continue;
-            if (obj->m_isDisabled || obj->m_isDisabled2) continue;
-            if (!hazard::touchesCircle(obj, centre, radius)) continue;
+        s.forEachObjectInX(centre.x - radius - kScanPad, centre.x + radius + kScanPad, [&](GameObject* obj) {
+            if (!hazard::isTarget(obj) || obj == layer->m_anticheatSpike) return;
+            if (obj->m_isDisabled || obj->m_isDisabled2) return;
+            if (!hazard::touchesCircle(obj, centre, radius)) return;
             m_removed.take(obj);
             removed++;
-        }
+        });
         log::info(
             "Missile: impact at ({:.0f}, {:.0f}) r{:.0f} removed {} hazards at {:.1f}% ({} removed this attempt)",
             centre.x, centre.y, radius, removed, s.percent(), m_removed.size()

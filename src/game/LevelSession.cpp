@@ -38,7 +38,7 @@ float LevelSession::progress() const {
     return this->percent() / 100.f;
 }
 
-int LevelSession::levelOf(std::string const& id) const {
+int LevelSession::levelOf(std::string_view id) const {
     return this->mgr().levelOf(id);
 }
 
@@ -121,16 +121,28 @@ void LevelSession::refreshHud(bool force) {
 
 std::vector<GameObject*>& LevelSession::objectsByX() {
     if (m_objectsByX.empty() && m_layer->m_objects) {
+        // Each x is read once up front: sorting on getPositionX() itself
+        // costs two virtual calls per comparison, ~n log n of them.
+        std::vector<std::pair<float, GameObject*>> keyed;
+        keyed.reserve(m_layer->m_objects->count());
         for (auto obj : CCArrayExt<GameObject*>(m_layer->m_objects)) {
             if (obj->m_objectType == GameObjectType::Decoration || obj->m_isDecoration) continue;
-            m_objectsByX.push_back(obj);
+            keyed.emplace_back(obj->getPositionX(), obj);
         }
-        std::sort(m_objectsByX.begin(), m_objectsByX.end(), [](GameObject* a, GameObject* b) {
-            return a->getPositionX() < b->getPositionX();
-        });
+        std::sort(keyed.begin(), keyed.end(), [](auto const& a, auto const& b) { return a.first < b.first; });
+        m_objectsByX.reserve(keyed.size());
+        for (auto const& entry : keyed) m_objectsByX.push_back(entry.second);
         log::info("Tracking {} non-decoration objects by x", m_objectsByX.size());
     }
     return m_objectsByX;
+}
+
+void LevelSession::warmObjectIndex() {
+    // The augments that scan objectsByX().
+    constexpr char const* kScanners[] = { ids::Foresight, ids::Cat, ids::Missile };
+    if (!m_objectsByX.empty() || !this->runLevel()) return;
+    if (std::ranges::none_of(kScanners, [&](char const* id) { return this->owns(id); })) return;
+    this->objectsByX();
 }
 
 // ---------------------------------------------------------------- fan-out
@@ -209,6 +221,9 @@ void LevelSession::onPause() {
 
 void LevelSession::onGranted(std::string const& id, int level) {
     for (auto& a : m_augments) a->onGranted(*this, id, level);
+    // A pick lands behind the draft popup; a scanner drafted now indexes
+    // the level there instead of on its first sweep.
+    this->warmObjectIndex();
 }
 
 bool LevelSession::onHotkey(Hotkey which, bool down) {

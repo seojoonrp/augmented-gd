@@ -69,14 +69,14 @@ void testTable() {
     CHECK(contains(findAugment(ids::DraftCount)->initialDesc, "4개씩"));
     CHECK(contains(findAugment(ids::Cat)->initialDesc, "4초마다"));
     CHECK(contains(findAugment(ids::Cat)->initialDesc, "장애물 5개"));
-    CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "한 개 더"));
+    CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "2개 더"));
     CHECK(contains(findAugment(ids::Cat)->levelUpDesc, "0.5초 감소"));
     CHECK(contains(findAugment(ids::Brake)->initialDesc, "60% 감소"));
     CHECK(contains(findAugment(ids::Brake)->initialDesc, "최대 7초씩"));
     CHECK(contains(findAugment(ids::Brake)->levelUpDesc, "7초 더"));
     CHECK(contains(findAugment(ids::Missile)->initialDesc, "6초마다"));
     CHECK(contains(findAugment(ids::Missile)->initialDesc, "반경 3칸"));
-    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5칸 커지고"));
+    CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "1칸 커지고"));
     CHECK(contains(findAugment(ids::Missile)->levelUpDesc, "0.5초 감소"));
     CHECK(contains(findAugment(ids::Berserk)->initialDesc, "3% 확률로"));
     CHECK(contains(findAugment(ids::Berserk)->initialDesc, "2.5초간"));
@@ -106,21 +106,23 @@ void testDescribeAt() {
     CHECK(contains(at(ids::Shield, 3), "1.5초간"));
     CHECK(contains(at(ids::SlowMo, 3), "15% 감소"));
     CHECK(contains(at(ids::SlowMo, 3), "X를 눌러"));
-    CHECK(contains(at(ids::StartPos, 4), "최대 4번"));
+    CHECK(contains(at(ids::StartPos, 3), "최대 3번"));
+    CHECK(findAugment(ids::StartPos)->maxLevel == 3);
     CHECK(contains(at(ids::HazardHitbox, 5), "25% 감소"));
     CHECK(contains(at(ids::WaveHitbox, 5), "50% 감소"));
     CHECK(contains(at(ids::Cat, 3), "3초마다"));
-    CHECK(contains(at(ids::Cat, 3), "장애물 7개"));
+    CHECK(contains(at(ids::Cat, 3), "장애물 9개"));
     CHECK(contains(at(ids::Cat, 4), "2.5초마다"));
     CHECK(contains(at(ids::Brake, 2), "최대 14초씩"));
     CHECK(contains(at(ids::Brake, 2), "60% 감소"));
     CHECK(contains(at(ids::Missile, 3), "5초마다"));
-    CHECK(contains(at(ids::Missile, 3), "반경 4칸"));
-    CHECK(contains(at(ids::Missile, 2), "반경 3.5칸"));
+    CHECK(contains(at(ids::Missile, 3), "반경 5칸"));
+    CHECK(contains(at(ids::Missile, 2), "반경 4칸"));
     CHECK(contains(at(ids::Berserk, 3), "5% 확률로"));
     CHECK(contains(at(ids::Berserk, 3), "2.5초간"));
     // Past the cap reads as the cap.
     CHECK(at(ids::Shield, 9) == at(ids::Shield, 3));
+    CHECK(at(ids::StartPos, 5) == at(ids::StartPos, 3));
 }
 
 // ---------------------------------------------------------------- formulas
@@ -145,7 +147,8 @@ void testFormulas() {
 
     CHECK(formula::catCount(0) == 0);
     CHECK(formula::catCount(1) == 5);
-    CHECK(formula::catCount(5) == 9);
+    CHECK(formula::catCount(2) == 7);
+    CHECK(formula::catCount(5) == 13);
     CHECK_NEAR(formula::catInterval(0), 0.f);
     CHECK_NEAR(formula::catInterval(1), 4.f);
     CHECK_NEAR(formula::catInterval(5), 2.f);
@@ -157,7 +160,8 @@ void testFormulas() {
     CHECK_NEAR(formula::missileInterval(50), tune::MissileMinInterval);
     CHECK_NEAR(formula::missileRadius(0), 0.f);
     CHECK_NEAR(formula::missileRadius(1), 90.f);
-    CHECK_NEAR(formula::missileRadius(5), 150.f);
+    CHECK_NEAR(formula::missileRadius(2), 120.f);
+    CHECK_NEAR(formula::missileRadius(5), 210.f);
 
     CHECK(formula::draftCardCount(false) == 3);
     CHECK(formula::draftCardCount(true) == 4);
@@ -480,12 +484,12 @@ void testEffectsAtLevels() {
     CHECK_NEAR(s.hazardScale(1.f), 0.9f);
     CHECK_NEAR(s.nerveBoost(0.5f), 1.5f);
     s.grant(ids::Cat); s.grant(ids::Cat);
-    CHECK(s.catCount() == 6);
+    CHECK(s.catCount() == 7);
     CHECK_NEAR(s.catInterval(), 3.5f);
     CHECK_NEAR(s.missileRadius(), 0.f);
     s.grant(ids::Missile); s.grant(ids::Missile); s.grant(ids::Missile);
     CHECK_NEAR(s.missileInterval(), 5.f);
-    CHECK_NEAR(s.missileRadius(), 120.f);
+    CHECK_NEAR(s.missileRadius(), 150.f);
     CHECK_NEAR(s.berserkChance(), 0.f);
     CHECK_NEAR(s.berserkSeconds(), 0.f);
     s.grant(ids::Berserk); s.grant(ids::Berserk);

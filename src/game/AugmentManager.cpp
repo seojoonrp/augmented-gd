@@ -113,7 +113,17 @@ float AugmentManager::debugFillGauge() {
 
 std::vector<AugmentDef const*> AugmentManager::rollDraft(size_t count) const {
     static std::mt19937 rng{ std::random_device{}() };
-    return m_state.rollDraft(count, rng);
+    auto choices = m_state.rollDraft(count, rng);
+    // What was in the hat: every augment below its max level, so a maxed one
+    // is the only kind that may be missing from the offers.
+    int draftable = 0;
+    std::string maxed;
+    for (auto const& def : allAugments()) {
+        if (m_state.levelOf(def.id) < def.maxLevel) draftable++;
+        else maxed += (maxed.empty() ? "" : ", ") + def.id;
+    }
+    log::info("Draft roll: {} of {} draftable (maxed: {})", choices.size(), draftable, maxed.empty() ? "none" : maxed);
+    return choices;
 }
 
 void AugmentManager::applyPick(std::string const& id) {

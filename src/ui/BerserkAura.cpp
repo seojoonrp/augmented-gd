@@ -69,7 +69,7 @@ bool BerserkAura::init() {
     return true;
 }
 
-void BerserkAura::tick(float dt, std::vector<Flame> const& flames, bool on) {
+void BerserkAura::tick(float dt, std::span<Flame const> flames, bool on) {
     if (on && !m_on) {
         m_onAge = 0.f;
         m_offAge = -1.f;
@@ -93,7 +93,7 @@ void BerserkAura::reset() {
     m_draw->clear();
 }
 
-void BerserkAura::redraw(std::vector<Flame> const& flames) {
+void BerserkAura::redraw(std::span<Flame const> flames) {
     m_draw->clear();
 
     // Amplitude: fades in when the window opens, out when it closes.

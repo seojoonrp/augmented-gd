@@ -98,7 +98,8 @@ src/core/                pure C++, host-tested (tests/core_tests.cpp)
 src/game/                Geode glue
   AugmentManager.*       singleton: RunState + settings + logging; owns the LevelSession
                          (beginLevel / endLevel; session() checks PlayLayer::get(), hooks use sessionFor(this))
-  LevelSession.*         one PlayLayer of a run level: the Augment objects, HUD + progress marks, objectsByX(),
+  LevelSession.*         one PlayLayer of a run level: the Augment objects, HUD + progress marks, objectsByX()
+                         (scan it with forEachObjectInX; warmObjectIndex builds it at load / after a pick),
                          death-once, debug grants, refreshHud (10 Hz); fans lifecycle events out in table order
   DraftSession.*         draft::showNext / isOpen / abandon — popup, director pause, cursor, chaining
   Scales.*               scales::time / hazard / wave globals the hot hooks read (inline getters, logging setters);

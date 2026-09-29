@@ -13,9 +13,11 @@
 
 #include <Geode/Geode.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class PlayLayer;
@@ -59,8 +61,8 @@ public:
     float percent() const;
     // 0..1; what nerve scales the hitbox shrinks by.
     float progress() const;
-    int levelOf(std::string const& id) const;
-    bool owns(std::string const& id) const { return this->levelOf(id) > 0; }
+    int levelOf(std::string_view id) const;
+    bool owns(std::string_view id) const { return this->levelOf(id) > 0; }
     // One short player-facing line in the HUD's bottom-left corner
     // (no-op without a HUD). Korean, and only for the four moments the
     // player is told about: see RunHud::notice.
@@ -73,8 +75,23 @@ public:
     // nothing waits for the next attempt.
     void rewardDeath(cocos2d::CCPoint at, float before, float cost, DeathResult const& r);
 
-    // Non-decoration objects sorted by x, built on first use (foresight, cat).
+    // Non-decoration objects sorted by x, built on first use (foresight, cat,
+    // missile) unless warmObjectIndex() got to it first.
     std::vector<GameObject*>& objectsByX();
+    // fn(obj) for every indexed object from x = lo on, stopping at the first
+    // one past hi — the scan the index exists for.
+    template <class Fn>
+    void forEachObjectInX(float lo, float hi, Fn&& fn) {
+        auto& objs = this->objectsByX();
+        auto it = std::lower_bound(objs.begin(), objs.end(), lo, [](GameObject* o, float x) {
+            return o->getPositionX() < x;
+        });
+        for (; it != objs.end() && (*it)->getPositionX() <= hi; ++it) fn(*it);
+    }
+    // Builds the index now if an augment that scans it is owned, so the
+    // build (a sort of every object in the level) happens behind the loading
+    // screen or a draft popup rather than on a frame of play.
+    void warmObjectIndex();
 
     // --- fan-out to the augments (see Augment.hpp for when each fires) ---
     void onLevelInit();

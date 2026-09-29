@@ -182,15 +182,17 @@ private:
         if (!m_aura) return;
         auto layer = s.layer();
 
-        std::vector<BerserkAura::Flame> flames;
+        // One per live player, two at most (dual).
+        BerserkAura::Flame flames[2];
+        std::size_t count = 0;
         auto add = [&](PlayerObject* p) {
             if (!p || p->m_isDead) return;
-            flames.push_back({ p->getPosition(), kAuraSize * p->m_vehicleSize, p->m_isGoingLeft });
+            flames[count++] = { p->getPosition(), kAuraSize * p->m_vehicleSize, p->m_isGoingLeft };
         };
         add(layer->m_player1);
         if (layer->m_gameState.m_isDualMode) add(layer->m_player2);
 
-        m_aura->tick(dt, flames, live && m_left > 0.f);
+        m_aura->tick(dt, { flames, count }, live && m_left > 0.f);
     }
 
     // Opens the window, or refreshes it when one is already running.

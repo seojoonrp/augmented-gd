@@ -50,6 +50,12 @@ void setHazard(float scale) {
 void setWave(float scale) {
     if (std::abs(g_wave - scale) < 0.001f) return;
     g_wave = scale;
+    // With nerve this moves every few frames (HitboxScales republishes it
+    // per frame), so the log keeps to 0.01 steps like the hazard scale's;
+    // a line per 0.001 was hundreds per attempt, each one a write.
+    static float s_logged = 1.f;
+    if (std::abs(scale - s_logged) < 0.01f && scale != 1.f) return;
+    s_logged = scale;
     log::info("WaveHitbox: player hitbox scale -> {:.2f}", scale);
 }
 

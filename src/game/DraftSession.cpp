@@ -67,7 +67,12 @@ void showNext() {
         close();
         return;
     }
-    log::info("Draft: showing {} cards, {} more pending", choices.size(), mgr.pendingDrafts());
+    // The offer itself, not just the pick: "never offered" reports can only
+    // be told from bad luck with it (user, 2026-09-29: startpos seemed to
+    // vanish after a restart; the roll was fine on the host).
+    std::string offered;
+    for (auto def : choices) offered += (offered.empty() ? "" : ", ") + def->id;
+    log::info("Draft: showing {} cards ({}), {} more pending", choices.size(), offered, mgr.pendingDrafts());
 
     auto popup = AugmentDraftPopup::create(choices, onPick);
     if (!popup) return;

@@ -119,6 +119,8 @@ protected:
     float m_gaugeShown = 0.f;   // 0..1, eased toward m_gaugeTarget every frame
     float m_goldShown = 0.f;    // 0..1, where the gold segment ends (>= m_gaugeShown)
     float m_gaugeTarget = 0.f;
+    float m_gaugeValue = -1.f;  // last setGauge's arguments (-1 = never set)
+    float m_gaugeCost = -1.f;
     bool m_gaugeFull = false;   // last setGauge said a draft is waiting
     std::string m_gaugeText;    // last setGauge readout; applied once no reward runs
 

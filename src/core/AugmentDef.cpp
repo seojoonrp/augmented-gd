@@ -80,7 +80,7 @@ std::vector<AugmentDef> const& allAugments() {
         { ids::SlowMo, "나무늘보", 3,
             "게임 속도가 " + pct(tune::SlowMoStep) + "% 감소합니다.\nX를 눌러 토글할 수 있습니다.",
             "게임 속도가 " + pct(tune::SlowMoStep) + "% 더 감소합니다." },
-        { ids::StartPos, "스타트포스", 5,
+        { ids::StartPos, "스타트포스", 3,
             "매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다.\n해당 어템에 죽으면 체크포인트에서 부활합니다.",
             "체크포인트를 한 번 더 찍을 수 있습니다." },
         { ids::Foresight, "사륜안", 1,

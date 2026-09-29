@@ -18,6 +18,10 @@ namespace augment {
 
 namespace {
 
+// Past the screen edge a box still counts as on screen: its outline is drawn
+// centred on the edge and anti-aliased, so one just outside can still show.
+constexpr float kViewPad = 4.f;
+
 class Foresight : public Augment {
 public:
     Foresight() : Augment({ ids::Foresight }) {}
@@ -27,6 +31,24 @@ public:
     }
 
 private:
+    // The screen in object-layer coordinates (the draw node's space): the
+    // bounding box of its four corners, so camera zoom, offset and rotation
+    // all count, like hazard::viewAhead.
+    static CCRect visibleRect(PlayLayer* layer) {
+        auto const win = CCDirector::get()->getWinSize();
+        CCPoint const corners[] = { { 0.f, 0.f }, { win.width, 0.f }, { 0.f, win.height }, { win.width, win.height } };
+        auto const first = layer->m_objectLayer->convertToNodeSpace(corners[0]);
+        float minX = first.x, maxX = first.x, minY = first.y, maxY = first.y;
+        for (auto const& corner : corners) {
+            auto const p = layer->m_objectLayer->convertToNodeSpace(corner);
+            minX = std::min(minX, p.x);
+            maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y);
+            maxY = std::max(maxY, p.y);
+        }
+        return { minX - kViewPad, minY - kViewPad, maxX - minX + 2 * kViewPad, maxY - minY + 2 * kViewPad };
+    }
+
     void draw(LevelSession& s) {
         auto layer = s.layer();
         if (!layer->m_objectLayer || !layer->m_objects) return;
@@ -65,30 +87,32 @@ private:
                     return ccColor4F{ 0.f, 1.f, 0.f, 1.f };
             }
         };
-        auto drawObject = [&](GameObject* obj, ccColor4F color) {
-            if (obj->m_objectRadius > 0.f) {
-                node->drawCircle(obj->getPosition(), obj->m_objectRadius, noFill, kBorder, color, 32);
-            }
-            else {
-                node->drawRect(obj->getObjectRect(), noFill, kBorder, color);
-            }
-        };
 
-        // Objects within roughly one screen ahead / a bit behind the player.
+        // Objects within roughly one screen ahead / a bit behind the player,
+        // at any height; of those, only the boxes that reach the screen are
+        // drawn. Every box is a polygon rebuilt each frame, and the window
+        // holds far more than the screen does on a tall or zoomed-in level.
+        CCRect const view = visibleRect(layer);
         float px = layer->m_player1->getPositionX();
-        float const lo = px - 240.f, hi = px + 720.f;
-        auto& objs = s.objectsByX();
-        auto it = std::lower_bound(objs.begin(), objs.end(), lo, [](GameObject* o, float x) {
-            return o->getPositionX() < x;
-        });
-        for (; it != objs.end() && (*it)->getPositionX() <= hi; ++it) {
-            auto obj = *it;
-            if (!obj->isVisible() || obj->m_isHide) continue;
+        s.forEachObjectInX(px - 240.f, px + 720.f, [&](GameObject* obj) {
+            if (!obj->isVisible() || obj->m_isHide) return;
             // Disabled = removed by the cat (or toggled off by the level); GD
             // skips these in collision, so no box.
-            if (obj->m_isDisabled || obj->m_isDisabled2) continue;
-            if (auto color = colorFor(obj->m_objectType)) drawObject(obj, *color);
-        }
+            if (obj->m_isDisabled || obj->m_isDisabled2) return;
+            auto color = colorFor(obj->m_objectType);
+            if (!color) return;
+            if (obj->m_objectRadius > 0.f) {
+                auto const& centre = obj->getPosition();
+                float const r = obj->m_objectRadius;
+                if (!view.intersectsRect({ centre.x - r, centre.y - r, 2 * r, 2 * r })) return;
+                node->drawCircle(centre, r, noFill, kBorder, *color, 32);
+            }
+            else {
+                auto const& rect = obj->getObjectRect();
+                if (!view.intersectsRect(rect)) return;
+                node->drawRect(rect, noFill, kBorder, *color);
+            }
+        });
 
         // Player: yellow outer box plus the smaller inner box GD uses for
         // solid collisions.

@@ -58,17 +58,12 @@ View viewAhead(PlayLayer* layer, float lead) {
 std::vector<GameObject*> hazardsInView(LevelSession& s, View const& view) {
     auto layer = s.layer();
     std::vector<GameObject*> found;
-    auto& objs = s.objectsByX();
-    auto it = std::lower_bound(objs.begin(), objs.end(), view.lo, [](GameObject* o, float x) {
-        return o->getPositionX() < x;
-    });
-    for (; it != objs.end() && (*it)->getPositionX() <= view.hi; ++it) {
-        auto obj = *it;
-        if (!isTarget(obj) || obj == layer->m_anticheatSpike) continue;
-        if (obj->m_isDisabled || obj->m_isDisabled2) continue;
-        if (!view.contains(obj, layer->m_objectLayer)) continue;
+    s.forEachObjectInX(view.lo, view.hi, [&](GameObject* obj) {
+        if (!isTarget(obj) || obj == layer->m_anticheatSpike) return;
+        if (obj->m_isDisabled || obj->m_isDisabled2) return;
+        if (!view.contains(obj, layer->m_objectLayer)) return;
         found.push_back(obj);
-    }
+    });
     return found;
 }
 

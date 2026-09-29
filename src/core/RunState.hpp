@@ -8,9 +8,11 @@
 #include "AugmentDef.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace augment {
@@ -36,6 +38,10 @@ struct DeathResult {
 
 class RunState {
 public:
+    // Augment id -> level. The transparent comparator lets the per-frame
+    // lookups by `ids::` literal skip building a std::string each time.
+    using Levels = std::map<std::string, int, std::less<>>;
+
     // --- lifecycle ---
     // Queues the free opening draft (not gauge-earned).
     void start(int levelID, std::string levelName);
@@ -86,9 +92,9 @@ public:
     int pendingGaugeDrafts() const { return m_pendingGaugeDrafts; }
 
     // --- augments ---
-    int levelOf(std::string const& id) const;
-    bool has(std::string const& id) const { return this->levelOf(id) > 0; }
-    std::map<std::string, int> const& augments() const { return m_levels; }
+    int levelOf(std::string_view id) const;
+    bool has(std::string_view id) const { return this->levelOf(id) > 0; }
+    Levels const& augments() const { return m_levels; }
     // Any augment below its max level?
     bool anyDraftable() const;
     // Up to `count` random augments that are not yet maxed.
@@ -139,7 +145,7 @@ private:
     int m_pendingDrafts = 0;
     int m_pendingGaugeDrafts = 0;
 
-    std::map<std::string, int> m_levels;
+    Levels m_levels;
     bool m_slowMoEnabled = true;
 };
 

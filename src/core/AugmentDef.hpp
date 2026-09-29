@@ -75,7 +75,7 @@ namespace tune {
     // Cat at level n removes CatBaseCount + CatCountStep * (n - 1) hazards in
     // view every CatBaseInterval - CatIntervalStep * (n - 1) seconds.
     constexpr int CatBaseCount = 5;
-    constexpr int CatCountStep = 1;
+    constexpr int CatCountStep = 2;   // was 1 (user, 2026-09-29)
     constexpr float CatBaseInterval = 4.f;
     constexpr float CatIntervalStep = 0.5f;
     constexpr float CatMinInterval = 0.5f;
@@ -102,7 +102,7 @@ namespace tune {
     constexpr float MissileIntervalStep = 0.5f;
     constexpr float MissileMinInterval = 1.f;
     constexpr float MissileBaseRadius = 3.f * BlockUnits;
-    constexpr float MissileRadiusStep = 0.5f * BlockUnits;
+    constexpr float MissileRadiusStep = 1.f * BlockUnits;   // was 0.5 blocks (user, 2026-09-29)
     // Berserker: every destroyed hazard (cat, missile, or a berserk smash
     // itself) rolls BerserkChanceBase + BerserkChanceStep * (level - 1) to
     // open a BerserkSeconds window in which touching a hazard destroys it

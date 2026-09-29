@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class GJGameLevel;
@@ -86,9 +87,9 @@ public:
     float lifeBest() const { return m_state.lifeBest(); }
 
     // --- augments ---
-    int levelOf(std::string const& id) const { return m_state.levelOf(id); }
-    bool has(std::string const& id) const { return m_state.has(id); }
-    std::map<std::string, int> const& augments() const { return m_state.augments(); }
+    int levelOf(std::string_view id) const { return m_state.levelOf(id); }
+    bool has(std::string_view id) const { return m_state.has(id); }
+    RunState::Levels const& augments() const { return m_state.augments(); }
     std::vector<AugmentDef const*> rollDraft(size_t count) const;
     size_t draftCardCount() const { return m_state.draftCardCount(); }
     // Picking an augment increments its level (or adds it at level 1).

@@ -111,10 +111,12 @@ private:
         }
         if (!m_node) return;
 
-        std::vector<ShieldNode::Bubble> bubbles;
+        // One per live player, two at most (dual).
+        ShieldNode::Bubble bubbles[2];
+        std::size_t count = 0;
         auto wrap = [&](PlayerObject* p) {
             if (!p || p->m_isDead) return;
-            bubbles.push_back({ p->getPosition(), kBubbleRadius * p->m_vehicleSize });
+            bubbles[count++] = { p->getPosition(), kBubbleRadius * p->m_vehicleSize };
         };
         wrap(layer->m_player1);
         if (layer->m_gameState.m_isDualMode) wrap(layer->m_player2);
@@ -122,7 +124,7 @@ private:
         // A charge is ready and we're not inside the post-hit noclip window;
         // with charges left the bubble comes back when the window ends.
         bool up = s.runAttempt() && m_noclipTimer <= 0.f && s.levelOf(ids::Shield) - m_used > 0;
-        m_node->tick(dt, bubbles, up);
+        m_node->tick(dt, { bubbles, count }, up);
     }
 
     // Around a normal-size icon (30 units); scaled by m_vehicleSize for mini.

@@ -46,10 +46,13 @@ public:
     }
 
     void onObjectAdded(LevelSession&, GameObject* obj) override {
+        m_added++;
+        if (!hazard::isTarget(obj)) return;
+        m_hazards.push_back(obj);
         // Dirtying makes sure anything GD cached during addObject is
         // recomputed through the hooks.
         float s = m_hazardApplied;
-        if (s < 1.f && hazard::isTarget(obj)) {
+        if (s < 1.f) {
             if (obj->m_objectRadius > 0.f) obj->m_objectRadius *= s;
             obj->m_isObjectRectDirty = true;
             obj->m_isOrientedBoxDirty = true;
@@ -127,22 +130,44 @@ private:
         if (std::abs(want - m_hazardApplied) < 0.001f) return;
 
         int hazards = 0, radii = 0;
-        if (auto objects = s.layer()->m_objects) {
-            // Radii are multiplied in place, so a change is applied as a ratio.
-            float ratio = want / m_hazardApplied;
-            for (auto obj : CCArrayExt<GameObject*>(objects)) {
-                if (!hazard::isTarget(obj)) continue;
-                hazards++;
-                if (obj->m_objectRadius > 0.f) {
-                    obj->m_objectRadius *= ratio;
-                    radii++;
-                }
-                obj->m_isObjectRectDirty = true;
-                obj->m_isOrientedBoxDirty = true;
+        // Radii are multiplied in place, so a change is applied as a ratio.
+        float ratio = want / m_hazardApplied;
+        for (auto obj : this->levelHazards(s)) {
+            hazards++;
+            if (obj->m_objectRadius > 0.f) {
+                obj->m_objectRadius *= ratio;
+                radii++;
             }
+            obj->m_isObjectRectDirty = true;
+            obj->m_isOrientedBoxDirty = true;
         }
         m_hazardApplied = want;
         log::info("HazardHitbox: scale {:.2f} applied to {} hazards ({} circular)", want, hazards, radii);
+    }
+
+    // Every hazard in m_objects, which a re-apply has to reach. nerve
+    // re-applies every 0.01 of scale, and walking the whole level for them
+    // touched every object (decoration included, often most of a level) each
+    // time, so the hazards are kept as PlayLayer::addObject hands them over.
+    // Should m_objects hold a different number of objects than came through
+    // there, the list is rebuilt from m_objects, i.e. the old walk.
+    std::vector<GameObject*> const& levelHazards(LevelSession& s) {
+        auto objects = s.layer()->m_objects;
+        std::size_t const count = objects ? objects->count() : 0;
+        if (count != m_added) {
+            m_hazards.clear();
+            if (objects) {
+                for (auto obj : CCArrayExt<GameObject*>(objects)) {
+                    if (hazard::isTarget(obj)) m_hazards.push_back(obj);
+                }
+            }
+            log::info(
+                "HazardHitbox: {} objects in the level but {} came through addObject, hazard list rebuilt ({})",
+                count, m_added, m_hazards.size()
+            );
+            m_added = count;
+        }
+        return m_hazards;
     }
 
     // Visual half of wave-hitbox: the icon shrinks with the rect. GD draws the
@@ -179,6 +204,9 @@ private:
 
     // The hazard scale every object currently in the level carries.
     float m_hazardApplied = 1.f;
+    // Objects PlayLayer::addObject has handed over, and the hazards among them.
+    std::size_t m_added = 0;
+    std::vector<GameObject*> m_hazards;
     // The wave scale each player's node currently carries (1 = GD's own).
     float m_visualApplied[2] = { 1.f, 1.f };
 };

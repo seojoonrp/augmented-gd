@@ -42,7 +42,7 @@ bool ShieldNode::init() {
     return true;
 }
 
-void ShieldNode::tick(float dt, std::vector<Bubble> const& bubbles, bool up) {
+void ShieldNode::tick(float dt, std::span<Bubble const> bubbles, bool up) {
     if (up && !m_up) m_upAge = 0.f;
     m_up = up;
     if (m_up) m_upAge += dt;
@@ -65,7 +65,7 @@ void ShieldNode::reset() {
     m_draw->clear();
 }
 
-void ShieldNode::redraw(std::vector<Bubble> const& bubbles) {
+void ShieldNode::redraw(std::span<Bubble const> bubbles) {
     m_draw->clear();
     for (auto const& b : bubbles) {
         if (m_up) {

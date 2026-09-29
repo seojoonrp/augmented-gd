@@ -102,7 +102,7 @@ void RunState::dropPendingDrafts() {
     m_pendingGaugeDrafts = 0;
 }
 
-int RunState::levelOf(std::string const& id) const {
+int RunState::levelOf(std::string_view id) const {
     auto it = m_levels.find(id);
     return it == m_levels.end() ? 0 : it->second;
 }

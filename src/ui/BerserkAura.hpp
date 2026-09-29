@@ -2,7 +2,7 @@
 
 #include <Geode/Geode.hpp>
 
-#include <vector>
+#include <span>
 
 namespace augment {
 
@@ -29,13 +29,13 @@ public:
 
     // `on` = the berserk window is open. Going false fades the flame out
     // rather than cutting it.
-    void tick(float dt, std::vector<Flame> const& flames, bool on);
+    void tick(float dt, std::span<Flame const> flames, bool on);
     // Attempt reset: nothing drawn, no fade left over.
     void reset();
 
 protected:
     bool init() override;
-    void redraw(std::vector<Flame> const& flames);
+    void redraw(std::span<Flame const> flames);
 
     bool m_on = false;
     float m_age = 0.f;      // drives the flicker and the swirl

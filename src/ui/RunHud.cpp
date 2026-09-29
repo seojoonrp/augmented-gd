@@ -307,6 +307,11 @@ void RunHud::attachGauge(CCLabelBMFont* percentLabel) {
 }
 
 void RunHud::setGauge(float value, float threshold, bool full) {
+    // The session refreshes this ten times a second; the gauge only moves
+    // on deaths and picks.
+    if (value == m_gaugeValue && threshold == m_gaugeCost && full == m_gaugeFull) return;
+    m_gaugeValue = value;
+    m_gaugeCost = threshold;
     m_gaugeFull = full;
     m_gaugeTarget = full ? 1.f : threshold > 0.f ? std::clamp(value / threshold, 0.f, 1.f) : 0.f;
     m_gaugeText = full
