@@ -8,9 +8,6 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    constexpr float kMargin = 14.f;      // from the screen's bottom-right corner
-    constexpr float kHalf = 16.f;        // square half-size
-
     constexpr float kSigilSeconds = 0.55f;
     // Small on purpose (a GD block is ~30 units, so this sits just inside one).
     constexpr float kSigilRadius = 16.f;
@@ -25,9 +22,6 @@ namespace {
     constexpr int kStarStep = 1;
     constexpr int kSegments = 24;
     constexpr float kTau = 6.2831853f;
-
-    constexpr ccColor4F kBodyFill = { 1.f, 0.75f, 0.9f, 1.f };   // the CAT notice's pink
-    constexpr ccColor4F kBodyBorder = { 0.f, 0.f, 0.f, 1.f };
 
     // CCDrawNode wants premultiplied alpha.
     ccColor4F premul(float r, float g, float b, float a) {
@@ -53,19 +47,12 @@ CatNode* CatNode::create() {
 bool CatNode::init() {
     if (!CCNode::init()) return false;
 
-    auto winSize = CCDirector::get()->getWinSize();
-    // This node's origin is the square's centre; the sigils convert each
-    // target's world position into this space, so it does not matter to them.
+    // The sigils convert each target's world position into this node's
+    // space, so where it sits does not matter to them.
     this->setAnchorPoint({ 0.f, 0.f });
     this->setContentSize({ 0.f, 0.f });
-    this->setPosition({ winSize.width - kMargin - kHalf, kMargin + kHalf });
+    this->setPosition({ 0.f, 0.f });
     this->setID("cat"_spr);
-
-    m_body = CCDrawNode::create();
-    CCPoint corners[4] = { { -kHalf, -kHalf }, { kHalf, -kHalf }, { kHalf, kHalf }, { -kHalf, kHalf } };
-    m_body->drawPolygon(corners, 4, kBodyFill, 1.f, kBodyBorder);
-    m_body->setID("body");
-    this->addChild(m_body, 1);
 
     m_sigils = CCDrawNode::create();
     m_sigils->setID("sigils");
@@ -80,16 +67,6 @@ void CatNode::castAt(std::vector<GameObject*> const& targets) {
         if (obj) m_active.push_back({ obj, 0.f });
     }
     if (targets.empty()) return;
-
-    // Casting recoil: a quick pop, then settle. Actions run during play (the
-    // scheduler is only stopped for drafts).
-    m_body->stopAllActions();
-    m_body->setScale(1.f);
-    m_body->runAction(CCSequence::create(
-        CCScaleTo::create(0.05f, 1.3f),
-        CCEaseOut::create(CCScaleTo::create(0.2f, 1.f), 2.f),
-        nullptr
-    ));
     this->redrawSigils();
 }
 
@@ -105,7 +82,7 @@ void CatNode::redrawSigils() {
     for (auto& s : m_active) {
         auto obj = s.target.data();
         if (!obj || !obj->getParent()) continue;
-        // Object -> screen -> this node (whose origin is the square's centre).
+        // Object -> screen -> this node.
         CCPoint world = obj->getParent()->convertToWorldSpace({ obj->getPositionX(), obj->getPositionY() });
         CCPoint at = m_sigils->convertToNodeSpace(world);
 
@@ -116,7 +93,7 @@ void CatNode::redrawSigils() {
         float fade = 1.f - u * u;
         float spin = s.age * kSpinRate;
         float inner = r * kInnerRatio;
-        // White (user 2026-09-27); the pink stays on the corner square only.
+        // White (user 2026-09-27).
         auto ink = [fade](float a) { return premul(1.f, 1.f, 1.f, a * fade); };
 
         m_sigils->drawCircle(at, r, kNoFill, kRingWidth, ink(0.9f), kSegments);

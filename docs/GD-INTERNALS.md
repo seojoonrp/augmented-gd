@@ -591,9 +591,76 @@ on the left, swap the colours or pass `{ -1.f, 0.f }`.
 - `CCRect::intersectsRect` is an inline constexpr in Geode's cocos headers
   (touching edges count), so culling by it costs nothing extra.
 
+## Sound effects (2026-09-29)
+
+- GD's own effects are loose files in `Resources/` (durations read from the Ogg
+  headers): achievement_01 1.8 s, buyItem01 / 03 1.3 s, chest07 2.0, chest08
+  2.6, chestClick 0.26, chestLand 1.1, chestOpen01 0.7, counter003 0.14,
+  crystal01 1.5, door001 / 01 / 02, endStart_02 4.3, explode_11 1.85 (the
+  player's death: never use it for anything else), gold01 0.6, gold02 1.2,
+  grunt01-03, highscoreGet02 1.5, magicExplosion 2.0, playSound_01 1.3,
+  quitSound_01 1.2, reward01 1.9, secretKey 2.4, unlockGauntlet 3.9,
+  unlockPath 5.2. GD 2.2's SFX library is downloaded on demand, so not
+  something to rely on.
+- `FMODAudioEngine::playEffect(path)` / `(path, speed, unknown, volume)` are
+  `win ok`; GD's own Play button calls `playEffect("playSound_01.ogg", 1, 0,
+  .3)` (bindings `inline/LevelInfoLayer.cpp:59`). Both go through
+  `playEffectAdvanced`, which can queue a sound that is still loading
+  (`queuePlayEffect`, `preloadEffectAsync`) and start it from
+  `updateQueuedEffects`, i.e. from the engine's scheduled update — which a
+  draft's `CCDirector::pause()` stops. **(from bindings; the wait itself is
+  unverified.)** So `src/game/Sfx.cpp` `play` plays through FMOD directly,
+  xdBot's clickbot pattern (`refs/xdbot/src/hacks/clickbot.cpp:93-160`):
+  `m_system->createSound(fullPath, FMOD_DEFAULT, nullptr, &sound)` once,
+  then `playSound(sound, nullptr, paused, &channel)` + `setVolume` +
+  `setPitch`. Volume = gain x `m_sfxVolume` (GD's SFX slider; inline
+  `getEffectsVolume()` returns it). The master group carries our game speed
+  (Scales.cpp), so a menu sound sets its channel pitch to 1 / the master's.
+  **(unverified in game)** that a channel started during the director
+  pause is heard at once (FMOD mixes on its own thread; `System::update` is
+  for callbacks and virtual voices).
+- Decoding offline: GD's `fmod.dll` exports FMOD's C API, so a 64-bit
+  Python can load it with ctypes and decode anything FMOD reads (mp3, ogg,
+  wav) with `FMOD_System_Create(&sys, 0x00020223)` → `SetOutput(NOSOUND_NRT)`
+  → `Init` → `CreateSound(path, 2D | OPENONLY | ACCURATETIME)` →
+  `Sound_ReadData` (PCM16 for mp3). Verified 2026-09-29 by
+  `scripts/sfxcut.py` (the user's mp3s carried 20-50 ms of encoder delay
+  before the first sound).
+- Paths: `CCFileUtils::get()->fullPathForFilename(name, true)` (CBF's
+  pattern for a `_spr` file) finds GD's `Resources/` files, texture-pack
+  replacements and our `resources.files` alike.
+
+## Closing a popup from its own visit(), pausing from the HUD (2026-09-29)
+
+- While a draft is up the director is paused, so nothing scheduled runs:
+  the pick's 1 s send-off is stepped from `AugmentDraftPopup::visit`, and
+  the popup closes from there too. That removes it from the scene while
+  the scene walks its children: cocos2d-x 2.2's `CCNode::visit` indexes
+  its child array afresh each step, so a removal only makes it skip the
+  next child for one frame, provided the node being visited stays alive —
+  hence `retain()` + `autorelease()` first (the pool drains in
+  `CCDisplayLinkDirector::mainLoop` after `drawScene`, paused or not), and
+  `visit()` returns without drawing. **(from cocos2d-x 2.2 source; GD's
+  fork unverified)** `Loader::queueInMainThread` was not used: it is
+  presumably run from the scheduler, which the pause stops.
+- Pausing mid-level for our own popup (built for a HUD button on
+  2026-09-29 and removed unrun the same day: GD hides the cursor in levels,
+  so the button could not be clicked; kept here for the next attempt):
+  `UILayer::onPause(nullptr)` (`win
+  0x4cdf50`, GD's pause button) then the `PauseLayer` found among the
+  running scene's children (xdBot `refs/xdbot/src/global.cpp:336-345`),
+  hidden with `setVisible(false)`; resuming is `PauseLayer::onResume(nullptr)`
+  (`win 0x37e380`, xdBot's renderer does the same). **(from refs, unverified
+  here)** Whether a click on a HUD button also reaches GD's jump input (or
+  Click Between Frames, which reads the mouse itself) is **(unverified)**;
+  qolmod's start-pos switcher is a `CCMenu` in `m_uiLayer` clicked mid-level.
+- `CCSprite::setOpacity` does not reach its children unless
+  `setCascadeOpacityEnabled(true)` (`CCNodeRGBA`, `Geode/cocos/base_nodes/CCNode.h`);
+  a `CircleButtonSprite`'s mark is such a child.
+
 ## Misc
 
-- Node IDs on `LevelInfoLayer` (node-ids): `left-side-menu`, `right-side-menu`, `back-menu`.
+- Node IDs on `LevelInfoLayer` (node-ids): `left-side-menu`, `right-side-menu` (`delete-button` unless daily, `refresh-button`, `info-button` = comments, `leaderboards-button`, `like-button`, `rate-button`; `refs/node-ids/src/LevelInfoLayer.cpp:93-138`), `back-menu`, `play-menu` / `play-button`.
 - `Popup::init` puts the close button inside `m_buttonMenu`; remove it before
   applying a layout to that menu.
 - `CCDirector::pause()` drops the frame interval to 1/4 s; restore it with

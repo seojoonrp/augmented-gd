@@ -28,7 +28,8 @@
 		],
 		"files": [
 			"resources/fonts/gen/*.fnt",
-			"resources/fonts/gen/*.png"
+			"resources/fonts/gen/*.png",
+			"resources/sfx/*.wav"
 		]
 	},
 	"settings": {
@@ -38,6 +39,12 @@
 			"description": "Language of the augment cards, notices and run menus. Text already on screen switches the next time it is shown.",
 			"default": "English",
 			"one-of": ["English", "Korean"]
+		},
+		"sound-effects": {
+			"type": "bool",
+			"name": "Sound effects",
+			"description": "The mod's own sounds: a draft appearing, hovering and picking a card, the missile and the cat. They follow GD's SFX volume.",
+			"default": true
 		},
 		"keybind-slowmo": {
 			"type": "keybind",

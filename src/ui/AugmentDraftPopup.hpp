@@ -35,20 +35,40 @@ protected:
     cocos2d::CCNode* createCard(AugmentDef const& def, int currentLevel);
     void onCard(cocos2d::CCObject* sender);
     void stepReveal();
+    // Once the cards have landed: the card under the mouse rises a little
+    // (polled like the run summary's tiles, RunInfoPopup::visit; the menu
+    // item and its hit area stay put) and a tick plays as it is entered.
+    void stepHover();
+    // After a pick: the chosen card's send-off, then the popup closes and
+    // the pick goes through (finishPick). True once it has closed.
+    bool stepPick();
+    void finishPick();
 
     struct RevealCard {
+        cocos2d::CCNode* item = nullptr;    // the menu item: fixed footprint, hit area
         cocos2d::CCNode* visual = nullptr;
         cocos2d::CCPoint from;  // menu-row centre, in the item's coordinates
         cocos2d::CCPoint to;    // resting position, in the item's coordinates
         float fromRotation = 0.f;
+        float lift = 0.f;       // hover rise above `to`, eased
+        // Where the pick's animation starts from (hover lift included).
+        cocos2d::CCPoint pickFrom;
+        float pickFromScale = 1.f;
     };
 
     std::vector<AugmentDef const*> m_choices;
     PickCallback m_onPick;
     std::vector<RevealCard> m_reveal;
     std::chrono::steady_clock::time_point m_revealStart;
+    std::chrono::steady_clock::time_point m_lastHover;
+    std::chrono::steady_clock::time_point m_pickStart;
     bool m_revealing = false;
+    bool m_picking = false;
+    int m_hovered = -1;
+    int m_picked = -1;
     float m_cardScale = 1.f;
+    // The ring that flashes out from the chosen card; in its holder.
+    cocos2d::CCDrawNode* m_pickRing = nullptr;
 };
 
 } // namespace augment

@@ -11,6 +11,7 @@
 #include "HazardRemoval.hpp"
 #include "../game/LevelSession.hpp"
 #include "../game/AugmentManager.hpp"
+#include "../game/Sfx.hpp"
 #include "../hooks/HazardHitboxHook.hpp"
 #include "../ui/MissileNode.hpp"
 
@@ -136,6 +137,7 @@ private:
         float radius = m_strike.radius;
         m_strike = {};
         if (m_node) m_node->detonate();
+        sfx::play(sfx::Cue::MissileImpact);
 
         int removed = 0;
         s.forEachObjectInX(centre.x - radius - kScanPad, centre.x + radius + kScanPad, [&](GameObject* obj) {

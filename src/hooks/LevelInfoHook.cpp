@@ -18,11 +18,12 @@ namespace {
     // The gap is from the face's edge; a difficulty name under the face
     // reaches ~5 pt further out, which the gap clears.
     constexpr float kGapFromDifficulty = 12.f;
-    // Size: halfway between the Medium circle it used to be (187 uhd px =
-    // 46.75 pt wide) and GD's Play button, drawn from the Large circle (321
-    // uhd px = 80 pt) so the texture only ever shrinks.
-    constexpr float kMediumWidth = 46.75f;
-    constexpr float kFallbackPlayWidth = 74.f;
+    // Size: as wide as GD's buttons down the right edge (comments, like,
+    // rate; node-ids' `right-side-menu`), measured from the first one found
+    // (user, 2026-09-29: halfway to the Play button was a bit big). Drawn
+    // from the Large circle (321 uhd px = 80 pt) so the texture only shrinks.
+    constexpr char const* kSideButtons[] = { "info-button", "like-button", "rate-button", "leaderboards-button" };
+    constexpr float kFallbackSideWidth = 45.f;   // unverified guess, used only if none is found
     // No difficulty sprite to stand beside: roughly where it would put us.
     constexpr float kFallbackX = 122.f;
     // On top of the 65 % of the circle the glyph is fitted to. 1.2 was a
@@ -44,8 +45,8 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
             playBtn = m_playBtnMenu->getChildByID("play-button");
             if (!playBtn) playBtn = m_playBtnMenu->getChildByType<CCMenuItemSpriteExtra>(0);
         }
-        float const playWidth = playBtn ? playBtn->getScaledContentSize().width : kFallbackPlayWidth;
-        float const width = (kMediumWidth + playWidth) / 2;
+        char const* sideFrom = nullptr;
+        float const width = this->sideButtonWidth(sideFrom);
 
         auto spr = augButtonSprite(CircleBaseSize::Large, kLogoScale);
         spr->setScale(width / spr->getContentSize().width);
@@ -58,11 +59,26 @@ class $modify(AugLevelInfoLayer, LevelInfoLayer) {
         menu->addChild(btn);
         this->addChild(menu);
         log::info(
-            "AUG button: {:.0f} pt wide (play button {:.0f}{}), centre ({:.0f}, {:.0f})",
-            width, playWidth, playBtn ? "" : ", not found", menu->getPositionX(), menu->getPositionY()
+            "AUG button: {:.0f} pt wide (as {}), centre ({:.0f}, {:.0f}){}",
+            width, sideFrom ? sideFrom : "the fallback, no side button found",
+            menu->getPositionX(), menu->getPositionY(), playBtn ? "" : ", play button not found"
         );
 
         return true;
+    }
+
+    // Width of GD's buttons down the right edge; `from` names the one measured.
+    float sideButtonWidth(char const*& from) {
+        if (auto menu = this->getChildByID("right-side-menu")) {
+            for (auto id : kSideButtons) {
+                if (auto btn = menu->getChildByID(id)) {
+                    from = id;
+                    return btn->getScaledContentSize().width * menu->getScale();
+                }
+            }
+        }
+        from = nullptr;
+        return kFallbackSideWidth;
     }
 
     // Left of the difficulty face, at the Play button's height, in this
