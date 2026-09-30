@@ -4,6 +4,17 @@
 
 A [Geode](https://geode-sdk.org) mod for Geometry Dash that turns any level into a roguelite run: die, draft an augment, get stronger, and keep going until you beat it.
 
+## Installing
+
+Augmented GD isn't on the Geode index, so it's installed by hand. Windows only (Geometry Dash 2.2081).
+
+1. Install [Geode](https://geode-sdk.org) if you haven't yet.
+2. Download `selenophile.augmented-gd.geode` from the [latest release](https://github.com/seojoonrp/augmented-gd/releases/latest).
+3. Put the file in the `geode/mods` folder inside your Geometry Dash folder. On Steam: right-click Geometry Dash, then **Manage > Browse local files**.
+4. Restart the game.
+
+It needs the **Node IDs** mod. If the mod list says _Missing dependencies_, install Node IDs from Geode's in-game Download tab and restart.
+
 ## How a run works
 
 1. Open an online level and press the round button next to the difficulty face. The run starts with a free draft.
