@@ -39,12 +39,12 @@ Found a bug, have an idea for an augment, or a question? Open an issue on [GitHu
 
 ## Gallery
 
-![Start a run](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/0-start.jpg)
+![Start a run](selenophile.augmented-gd/0-start.png?width=300)
 
-![Draft an augment](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/1-draft.jpg)
+![Draft an augment](selenophile.augmented-gd/1-draft.png?width=300)
 
-![Check your augments](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/2-record.jpg)
+![Check your augments](selenophile.augmented-gd/2-record.png?width=300)
 
-![Ingame image - Bloodbath](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/3-bloodbath.png)
+![Ingame image - Bloodbath](selenophile.augmented-gd/3-bloodbath.png?width=300)
 
-![Ingame image - Retention](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/4-retention.png)
+![Ingame image - Retention](selenophile.augmented-gd/4-retention.png?width=300)

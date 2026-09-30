@@ -29,7 +29,8 @@
 		},
 		"sprites": [
 			"resources/augments/*.png",
-			"resources/ui/*.png"
+			"resources/ui/*.png",
+			"resources/gallery/*.png"
 		],
 		"files": [
 			"resources/fonts/gen/*.fnt",
