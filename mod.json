@@ -87,19 +87,6 @@
 			"default": "C",
 			"category": "gameplay",
 			"priority": -5
-		},
-		"debug-mode": {
-			"type": "bool",
-			"name": "Debug mode",
-			"description": "Testing aid. Keys 1-9 grant one level of the matching augment (table order: shield, slow-mo, startpos, foresight, unmirror, hazard-hitbox, wave-hitbox, nerve, draft-count; Shift+1 = cat, Shift+2 = brake, Shift+3 = missile, Shift+4 = berserker), and key 0 fills the draft gauge (the draft still happens on death). The draft cost is the normal one (20, +5 every third draft, stopping at 70).",
-			"default": false
-		},
-		"debug-readout": {
-			"type": "bool",
-			"name": "Debug readout",
-			"description": "With debug mode on, show the run's numbers and each augment's state in the top-left corner. Turn it off for clean screenshots.",
-			"default": false,
-			"enable-if": "debug-mode"
 		}
 	}
 }

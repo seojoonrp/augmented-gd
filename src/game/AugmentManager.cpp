@@ -12,6 +12,13 @@ using namespace geode::prelude;
 
 namespace augment {
 
+namespace {
+    // Debug keys and the top-left readout, off in release builds. To test with
+    // them, set this to true and add the bool settings `debug-mode` and
+    // `debug-readout` back to mod.json.
+    constexpr bool kDebugBuild = false;
+}
+
 AugmentManager& AugmentManager::get() {
     static AugmentManager instance;
     return instance;
@@ -71,7 +78,7 @@ void AugmentManager::endRun() {
 }
 
 bool AugmentManager::debugMode() {
-    return Mod::get()->getSettingValue<bool>("debug-mode");
+    return kDebugBuild && Mod::get()->getSettingValue<bool>("debug-mode");
 }
 
 GaugeRule AugmentManager::gaugeRule() const {

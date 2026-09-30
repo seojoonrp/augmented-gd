@@ -64,7 +64,8 @@ public:
     float gaugeThreshold() const { return m_state.gaugeThreshold(this->gaugeRule()); }
     // the HUD shows "cost/cost" while that draft waits
     float lastDraftCost() const { return m_state.lastDraftCost(this->gaugeRule()); }
-    // `debug-mode` setting: number keys grant augments / fill the gauge
+    // number keys grant augments / fill the gauge. always false in release
+    // builds (kDebugBuild in the .cpp)
     static bool debugMode();
     // tops the gauge up so the next death drafts; returns what it added
     float debugFillGauge();

@@ -83,11 +83,12 @@ new-best bonus pays new ground twice and is capped at `100 * mult` per run, so
 it can't be farmed either. The rising threshold keeps late-run drafts from
 flooding in.
 
-**Debug mode** (`debug-mode` setting): number keys 1-9 grant augments in table
-order, Shift+1-4 the 10th onwards (cat, brake, missile, berserker), 0 fills
-the gauge to the threshold (the draft still comes on the next death). The
-top-left readout (run numbers, each augment's state) needs `debug-readout`
-on top of it, so debug mode can be used for screenshots.
+**Debug mode** (dev builds only, off in releases: `kDebugBuild` in
+`AugmentManager.cpp`, plus the `debug-mode` / `debug-readout` settings put back
+in `mod.json`): number keys 1-9 grant augments in table order, Shift+1-4 the
+10th onwards (cat, brake, missile, berserker), 0 fills the gauge to the
+threshold (the draft still comes on the next death). The top-left readout
+(run numbers, each augment's state) needs `debug-readout` on top of it.
 
 ## Draft
 
