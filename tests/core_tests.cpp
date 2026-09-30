@@ -1,5 +1,4 @@
-// Host-side tests for src/core (no Geode, no GD). Run with scripts/test.ps1.
-// Plain asserts on purpose: nothing to install, nothing to fetch.
+// Host tests for src/core. Plain asserts, nothing to fetch.
 
 #include "core/AugmentDef.hpp"
 #include "core/Formulas.hpp"
@@ -41,10 +40,9 @@ RunState freshRun() {
 
 // ---------------------------------------------------------------- table
 
-// Every Hangul syllable block; an English text must have none (a pasted
-// Korean phrase would draw fine and read wrong).
+// English text must have none: a pasted Korean phrase would render fine and read wrong
 bool hasHangul(std::string const& s) {
-    // UTF-8 lead bytes 0xEA-0xED cover U+A000-U+DFFF, which holds the block.
+    // UTF-8 lead bytes 0xEA-0xED = U+A000-U+DFFF, which holds the syllable block
     for (unsigned char c : s) {
         if (c >= 0xEA && c <= 0xED) return true;
     }
@@ -58,7 +56,6 @@ void testTable() {
     for (auto const& d : defs) {
         CHECK(!d.id.empty());
         CHECK(d.maxLevel >= 1);
-        // Both languages, all the way through.
         for (auto const* text : { &d.name, &d.initialDesc }) {
             CHECK(!text->en.empty());
             CHECK(!text->ko.empty());
@@ -67,7 +64,6 @@ void testTable() {
         CHECK((d.maxLevel == 1) == d.levelUpDesc.ko.empty());
         CHECK(!hasHangul(d.name.en) && !hasHangul(d.initialDesc.en) && !hasHangul(d.levelUpDesc.en));
         CHECK(hasHangul(d.name.ko) && hasHangul(d.initialDesc.ko));
-        // A late level-up text comes with its level, in both languages.
         CHECK((d.lateFrom > 0) == !d.lateLevelUpDesc.en.empty());
         CHECK((d.lateFrom > 0) == !d.lateLevelUpDesc.ko.empty());
         if (d.lateFrom > 0) CHECK(d.lateFrom > 2 && d.lateFrom <= d.maxLevel);
@@ -82,8 +78,7 @@ void testTable() {
     CHECK(augmentName(ids::Shield, Lang::English) == "Shield");
     CHECK(augmentName(ids::Missile, Lang::English) == "Air Raid");
 
-    // Numbers on the cards come from tune::, formatted the way the design
-    // table writes them.
+    // card numbers come from tune::
     auto ko = [](char const* id) { return findAugment(id)->initialDesc.ko; };
     auto koUp = [](char const* id) { return findAugment(id)->levelUpDesc.ko; };
     CHECK(contains(ko(ids::Shield), "1.5초간"));
@@ -108,7 +103,6 @@ void testTable() {
     CHECK(contains(ko(ids::Berserk), "2.5초간"));
     CHECK(contains(koUp(ids::Berserk), "1.5% 증가"));
 
-    // The English texts quote the same numbers, with their units.
     auto en = [](char const* id) { return findAugment(id)->initialDesc.en; };
     auto enUp = [](char const* id) { return findAugment(id)->levelUpDesc.en; };
     CHECK(contains(en(ids::Shield), "noclip for 1.5 seconds"));
@@ -135,15 +129,14 @@ void testTable() {
     CHECK(contains(en(ids::Berserk), "2.5 seconds of berserk"));
     CHECK(contains(enUp(ids::Berserk), "up by 1.5%"));
 
-    // describe(): initial for level 1, level-up text after, initial again
-    // when there is no level-up text; in the language asked for.
+    // describe(): initial at 1, level-up after, initial again without a level-up text
     auto const& slow = *findAugment(ids::SlowMo);
     CHECK(&slow.describe(1, Lang::Korean) == &slow.initialDesc.ko);
     CHECK(&slow.describe(2, Lang::Korean) == &slow.levelUpDesc.ko);
     CHECK(&slow.describe(2, Lang::English) == &slow.levelUpDesc.en);
     auto const& fore = *findAugment(ids::Foresight);
     CHECK(&fore.describe(2, Lang::English) == &fore.initialDesc.en);
-    // Cat's last levels grow the count only, and say so (user, 2026-09-30).
+    // cat's last levels only add count
     auto const& cat = *findAugment(ids::Cat);
     CHECK(cat.maxLevel == 7);
     CHECK(cat.lateFrom == 6);
@@ -153,24 +146,22 @@ void testTable() {
     CHECK(contains(cat.lateLevelUpDesc.ko, "4개 더 제거합니다"));
     CHECK(!contains(cat.lateLevelUpDesc.ko, "쿨타임"));
     CHECK(contains(cat.lateLevelUpDesc.en, "4 more hazards"));
-    CHECK(&slow.describe(5, Lang::Korean) == &slow.levelUpDesc.ko);   // no late text: same all the way
-    // Max levels (user, 2026-09-30).
+    CHECK(&slow.describe(5, Lang::Korean) == &slow.levelUpDesc.ko);   // no late text
     CHECK(findAugment(ids::Shield)->maxLevel == 5);
-    CHECK(findAugment(ids::SlowMo)->maxLevel == 3);   // stays 3 (user, 2026-09-30)
+    CHECK(findAugment(ids::SlowMo)->maxLevel == 3);
     CHECK(findAugment(ids::HazardHitbox)->maxLevel == 7);
     CHECK(findAugment(ids::WaveHitbox)->maxLevel == 7);
 }
 
-// describeAt(): the detail card's text carries that level's numbers.
+// describeAt(): the detail card, with that level's numbers
 void testDescribeAt() {
-    // Level 1 and single-level augments read exactly like the draft card.
+    // Lv1 and single-level augments read like the draft card
     for (auto lang : { Lang::English, Lang::Korean }) {
         for (auto const& d : allAugments()) {
             auto const& initial = d.initialDesc.in(lang);
             CHECK(d.describeAt(1, lang) == initial);
             CHECK(d.describeAt(0, lang) == initial);
             if (d.maxLevel == 1) CHECK(d.describeAt(3, lang) == initial);
-            // Every level has a text, and the numbers differ from level 1's.
             for (int lv = 2; lv <= d.maxLevel; lv++) {
                 CHECK(d.describeAt(lv, lang) != initial);
                 CHECK(hasHangul(d.describeAt(lv, lang)) == (lang == Lang::Korean));
@@ -205,7 +196,7 @@ void testDescribeAt() {
     CHECK(contains(at(ids::Berserk, 2), "4.5% 확률로"));
     CHECK(contains(at(ids::Berserk, 3), "6% 확률로"));
     CHECK(contains(at(ids::Berserk, 3), "2.5초간"));
-    // Past the cap reads as the cap.
+    // past the cap reads as the cap
     CHECK(at(ids::Shield, 9) == at(ids::Shield, 5));
     CHECK(at(ids::StartPos, 5) == at(ids::StartPos, 3));
 
@@ -235,7 +226,7 @@ void testFormulas() {
     CHECK_NEAR(formula::slowMoScale(0), 1.f);
     CHECK_NEAR(formula::slowMoScale(3), 0.85f);
 
-    // (120 + X/2) % at X % progress (user, 2026-09-30).
+    // (120 + X/2) % at X % progress
     CHECK_NEAR(formula::nerveBoost(0, 1.f), 1.f);
     CHECK_NEAR(formula::nerveBoost(1, 0.f), 1.2f);
     CHECK_NEAR(formula::nerveBoost(1, 0.5f), 1.45f);
@@ -251,8 +242,7 @@ void testFormulas() {
     CHECK_NEAR(formula::waveScale(5, 0, 0.f), 0.5f);
     CHECK_NEAR(formula::waveScale(7, 0, 0.f), 0.3f);
     CHECK_NEAR(formula::waveScale(5, 1, 0.f), 1.f - 0.5f * 1.2f);
-    // wave Lv5 + nerve at 100 % would be 1 - 0.85, Lv7 + nerve anywhere
-    // 1 - 0.84 or less: floored.
+    // floored: Lv5 + nerve at 100 % would be 1 - 0.85, Lv7 + nerve 1 - 0.84 or less
     CHECK_NEAR(formula::waveScale(5, 1, 1.f), tune::MinHitboxScale);
     CHECK_NEAR(formula::waveScale(7, 1, 0.f), tune::MinHitboxScale);
 
@@ -260,7 +250,7 @@ void testFormulas() {
     CHECK(formula::catCount(1) == 5);
     CHECK(formula::catCount(2) == 7);
     CHECK(formula::catCount(5) == 13);
-    // Lv6-7: four more each, the interval stays at Lv5's (user, 2026-09-30).
+    // Lv6-7: +4 each, interval stays at Lv5's
     CHECK(formula::catCount(6) == 17);
     CHECK(formula::catCount(7) == 21);
     CHECK_NEAR(formula::catInterval(0), 0.f);
@@ -291,8 +281,7 @@ void testFormulas() {
     CHECK_NEAR(formula::berserkChance(1), 0.03f);
     CHECK_NEAR(formula::berserkChance(2), 0.045f);
     CHECK_NEAR(formula::berserkChance(3), 0.06f);
-    CHECK_NEAR(formula::berserkChance(500), 1.f);   // a probability, so clamped
-    // The window is flat across levels; only the chance grows.
+    CHECK_NEAR(formula::berserkChance(500), 1.f);   // clamped
     CHECK_NEAR(formula::berserkSeconds(0), 0.f);
     CHECK_NEAR(formula::berserkSeconds(1), 2.5f);
     CHECK_NEAR(formula::berserkSeconds(3), 2.5f);
@@ -311,7 +300,7 @@ void testLifecycle() {
     CHECK(s.isFor(42));
     CHECK(!s.isFor(43));
     CHECK(s.levelName() == "Level");
-    // The free opening draft is queued but not gauge-earned.
+    // opening draft: queued, not gauge-earned
     CHECK(s.pendingDrafts() == 1);
     CHECK(s.pendingGaugeDrafts() == 0);
     CHECK_NEAR(s.gauge(), 0.f);
@@ -322,8 +311,7 @@ void testLifecycle() {
     s.end();
     CHECK(!s.active());
     CHECK(s.pendingDrafts() == 0);
-    // Levels survive end() (Continue on the info screen reads them) but a
-    // new start() wipes everything.
+    // levels survive end() (Continue reads them), start() wipes them
     CHECK(s.levelOf(ids::Shield) == 1);
     s.start(42, "Level");
     CHECK(s.levelOf(ids::Shield) == 0);
@@ -337,7 +325,7 @@ void testGaugeNoFloor() {
     auto s = freshRun();
     GaugeRule rule;
     auto r = s.onDeath(3.f, rule);
-    // First death is always a new best: 3 + 3 bonus.
+    // first death is always a new best: 3 + 3
     CHECK_NEAR(r.bonus, 3.f);
     CHECK_NEAR(r.charge, 6.f);
     CHECK_NEAR(s.gauge(), 6.f);
@@ -345,13 +333,12 @@ void testGaugeNoFloor() {
     CHECK(s.deaths() == 1);
     CHECK_NEAR(s.bestPercent(), 3.f);
 
-    // Same spot again: no bonus, no floor.
+    // same spot: no bonus, no floor
     r = s.onDeath(3.f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     CHECK_NEAR(r.charge, 3.f);
     CHECK_NEAR(s.gauge(), 9.f);
 
-    // Below the best: still just the percent.
     r = s.onDeath(1.f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     CHECK_NEAR(s.gauge(), 10.f);
@@ -362,28 +349,25 @@ void testGaugeNewBestWholePercents() {
     GaugeRule rule;
     s.onDeath(4.1f, rule);
     CHECK_NEAR(s.bestPercent(), 4.1f);
-    // Same whole percent, further along: the best moves, no bonus.
+    // same whole percent: the best moves, no bonus
     auto r = s.onDeath(4.4f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     CHECK_NEAR(r.charge, 4.f);
     CHECK_NEAR(s.bestPercent(), 4.4f);
-    // Crossing into 5 %: one whole percent of bonus, not 0.6.
+    // into 5 %: 1, not 0.6
     r = s.onDeath(5.0f, rule);
     CHECK_NEAR(r.bonus, 1.f);
-    // Decimals never add up to a bonus on their own.
     r = s.onDeath(5.9f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     r = s.onDeath(7.2f, rule);
     CHECK_NEAR(r.bonus, 2.f);
 }
 
-// The gauge holds whole numbers, so what the HUD reads is what it has, and
-// landing exactly on the cost drafts (user, 2026-09-30: 2.2 + 3.3 + 12.1 %
-// with their bonuses was 29.6, shown as "30/30", and no draft came).
+// whole-number gauge: the HUD shows what it has, and landing exactly on the cost drafts
 void testGaugeWholeCharge() {
     auto s = freshRun();
     GaugeRule rule;
-    rule.thresholdStart = 30.f;   // the cost at the time of the report
+    rule.thresholdStart = 30.f;
     CHECK_NEAR(s.onDeath(2.2f, rule).charge, 4.f);    // 2 + 2
     CHECK_NEAR(s.onDeath(3.3f, rule).charge, 4.f);    // 3 + 1
     auto r = s.onDeath(12.1f, rule);                  // 12 + 9
@@ -394,11 +378,11 @@ void testGaugeWholeCharge() {
     CHECK(r.earned == 1);
     CHECK(s.gauge() == 0.f);
 
-    // Straight onto the cost in one death: 15 + 15.
+    // 15 + 15, straight onto the cost
     auto t = freshRun();
     CHECK(t.onDeath(15.f, rule).earned == 1);
     CHECK(t.gauge() == 0.f);
-    // Just under it: 14 + 14, whatever the decimals.
+    // 14 + 14 whatever the decimals
     auto u = freshRun();
     CHECK(u.onDeath(14.99f, rule).earned == 0);
     CHECK(u.gauge() == 28.f);
@@ -419,8 +403,7 @@ void testGaugeRamp() {
     GaugeRule rule;
     CHECK_NEAR(s.gaugeThreshold(rule), 20.f);
 
-    // 15 % fresh = 15 + 15 = 30 >= 20: one draft, 10 left, and the second
-    // draft costs 20 again.
+    // 15 + 15 = 30: one draft, 10 left, next one still 20
     auto r = s.onDeath(15.f, rule);
     CHECK(r.earned == 1);
     CHECK_NEAR(s.gauge(), 10.f);
@@ -428,7 +411,7 @@ void testGaugeRamp() {
     CHECK(s.pendingDrafts() == 2);         // opening + this one
     CHECK(s.pendingGaugeDrafts() == 1);
 
-    // Taking drafts: the opening one first leaves the gauge one still full.
+    // the opening one goes first, the gauge one stays
     s.takePendingDraft();
     CHECK(s.pendingDrafts() == 1);
     CHECK(s.pendingGaugeDrafts() == 1);
@@ -438,21 +421,18 @@ void testGaugeRamp() {
     s.takePendingDraft();                   // never negative
     CHECK(s.pendingDrafts() == 0);
 
-    // The opening draft did not count toward the ramp: two gauge drafts in,
-    // the third still costs 20 (it would be 25 if the opening one counted).
+    // the opening draft isn't on the ramp: the third would cost 25 otherwise
     s.fillGauge(rule);
     CHECK(s.onDeath(0.f, rule).earned == 1);
     CHECK_NEAR(s.gaugeThreshold(rule), 20.f);
 }
 
-// 20, 20, 20, 25, 25, 25 ... 65, 65, 65, 70, and flat from there (user,
-// 2026-09-30).
+// 20, 20, 20, 25, 25, 25 ... 65, 65, 65, 70, then flat
 void testGaugeThresholdCap() {
     auto s = freshRun();
     GaugeRule rule;
-    // Before any gauge draft, the "last cost" is simply the next one.
+    // no gauge draft yet: "last cost" is the next one
     CHECK_NEAR(s.lastDraftCost(rule), 20.f);
-    // Thirty gauge drafts walk the ramp up to its ceiling, three per step.
     for (int i = 0; i < 30; i++) {
         float const cost = 20.f + 5.f * static_cast<float>(i / 3);
         CHECK_NEAR(s.gaugeThreshold(rule), cost);
@@ -473,14 +453,14 @@ void testGaugeThresholdCap() {
 void testGaugeMultiDraft() {
     auto s = freshRun();
     GaugeRule rule;
-    // 32 % fresh = 32 + 32 = 64 pays 20 + 20 + 20, 4 left (< 25).
+    // 32 + 32 = 64 pays 20 + 20 + 20, 4 left (< 25)
     auto r = s.onDeath(32.f, rule);
     CHECK(r.earned == 3);
     CHECK_NEAR(s.gauge(), 4.f);
     CHECK(s.pendingDrafts() == 4);         // opening + these three
     CHECK(s.pendingGaugeDrafts() == 3);
     CHECK_NEAR(s.gaugeThreshold(rule), 25.f);
-    // The HUD's "cost/cost" while they wait is the last one earned.
+    // HUD's "cost/cost" = the last one earned
     CHECK_NEAR(s.lastDraftCost(rule), 20.f);
 
     auto t = freshRun();
@@ -490,9 +470,7 @@ void testGaugeMultiDraft() {
     CHECK(t.pendingGaugeDrafts() == 0);
 }
 
-// A life is one visit to the level: deaths a checkpoint brings the player
-// back from charge nothing, and the death that really ends the life pays once
-// for the furthest point the whole life reached.
+// checkpoint respawns charge nothing; the death that ends the life pays once, for its best
 void testGaugeCheckpointLife() {
     auto s = freshRun();
     GaugeRule rule;
@@ -508,7 +486,7 @@ void testGaugeCheckpointLife() {
     CHECK_NEAR(s.bestPercent(), 0.f); // the bonus is not spent yet either
     CHECK_NEAR(s.lifeBest(), 6.f);
 
-    // 6 (+6 new best), not 6 + 4: the 4 % death only ends the life.
+    // 6 (+6 new best), not 6 + 4
     r = s.onDeath(4.f, rule);
     CHECK(!r.deferred);
     CHECK_NEAR(r.bonus, 6.f);
@@ -517,7 +495,7 @@ void testGaugeCheckpointLife() {
     CHECK_NEAR(s.bestPercent(), 6.f);
     CHECK_NEAR(s.lifeBest(), 0.f);
 
-    // Several respawns in one life: one payment, at the furthest point.
+    // several respawns, one payment
     s.onDeath(20.f, rule, true);
     s.onDeath(12.f, rule, true);
     CHECK_NEAR(s.lifeBest(), 20.f);
@@ -526,20 +504,20 @@ void testGaugeCheckpointLife() {
     CHECK_NEAR(r.charge, 20.f + 14.f);   // 20, and 20 - 6 whole new percents
     CHECK_NEAR(s.bestPercent(), 20.f);
 
-    // A life that stayed below the best pays its own percent only.
+    // below the best: just its own percent
     s.onDeath(10.f, rule, true);
     r = s.onDeath(3.f, rule);
     CHECK_NEAR(r.bonus, 0.f);
     CHECK_NEAR(r.charge, 10.f);
 
-    // Drafts wait for the settling death as well.
+    // drafts wait too
     auto t = freshRun();
     GaugeRule plain;
     CHECK(t.onDeath(32.f, plain, true).earned == 0);
     CHECK(t.pendingGaugeDrafts() == 0);
     CHECK(t.onDeath(1.f, plain).earned == 3);   // 32 + 32 bonus pays 20 + 20 + 20
 
-    // Ending the run drops a life nothing was paid for.
+    // end() drops an unpaid life
     auto u = freshRun();
     u.onDeath(30.f, rule, true);
     CHECK_NEAR(u.lifeBest(), 30.f);
@@ -558,8 +536,7 @@ void testGaugeStopsWhenNothingDraftable() {
     CHECK_NEAR(s.gauge(), 200.f);   // charge kept, no draft queued
 }
 
-// The run's last levels: a draft shows only what is left, and the gauge
-// never queues more drafts than there are levels to give (user, 2026-09-30).
+// last levels: a draft offers only what's left, the gauge never queues more drafts than levels
 void testGaugeLastLevels() {
     auto s = freshRun();
     s.takePendingDraft();   // the opening draft, as if picked
@@ -570,7 +547,7 @@ void testGaugeLastLevels() {
     CHECK(s.levelsLeft() == 2);
     CHECK(s.anyDraftable());
     GaugeRule rule;
-    // 100 % fresh = 200: enough for many drafts, but only two levels are left.
+    // 200 would pay for plenty, only two levels left
     auto r = s.onDeath(100.f, rule);
     CHECK(r.earned == 2);
     CHECK(s.pendingDrafts() == 2);
@@ -578,7 +555,6 @@ void testGaugeLastLevels() {
     auto roll = s.rollDraft(4, rng);
     CHECK(roll.size() == 1);
     CHECK(roll[0]->id == ids::Cat);
-    // Picking both: nothing left, nothing queued any more.
     s.takePendingDraft(); s.applyPick(ids::Cat);
     s.takePendingDraft(); s.applyPick(ids::Cat);
     CHECK(s.levelsLeft() == 0);
@@ -586,8 +562,7 @@ void testGaugeLastLevels() {
     CHECK(s.onDeath(100.f, rule).earned == 0);
     CHECK(s.pendingDrafts() == 0);
 
-    // One level left while the opening draft still waits: that draft
-    // covers it, so the gauge queues none.
+    // one level left and the opening draft still waiting: it covers that level
     auto t = freshRun();
     for (auto const& d : allAugments()) {
         int const keep = d.id == ids::Shield ? 1 : 0;
@@ -605,7 +580,7 @@ void testFillGauge() {
     CHECK_NEAR(s.fillGauge(rule), 10.f);
     CHECK_NEAR(s.gauge(), 20.f);
     CHECK_NEAR(s.fillGauge(rule), 0.f);
-    // Next death (any percent) drafts.
+    // next death drafts, any percent
     CHECK(s.onDeath(0.f, rule).earned == 1);
 
     RunState idle;
@@ -642,13 +617,13 @@ void testRollDraft() {
     std::set<AugmentDef const*> unique(roll.begin(), roll.end());
     CHECK(unique.size() == 3);
 
-    // Maxed augments never show up.
+    // maxed ones never show up
     for (int i = 0; i < findAugment(ids::Shield)->maxLevel; i++) s.grant(ids::Shield);
     for (int i = 0; i < 100; i++) {
         for (auto d : s.rollDraft(4, rng)) CHECK(d->id != ids::Shield);
     }
 
-    // Count is capped by what is left.
+    // capped by what's left
     auto t = freshRun();
     for (auto const& d : allAugments()) {
         if (d.id != ids::Cat) for (int i = 0; i < d.maxLevel; i++) t.grant(d.id);

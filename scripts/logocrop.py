@@ -1,13 +1,9 @@
 """Fit an exported mark into resources/ui/aug-logo.png.
 
-CircleButtonSprite scales whatever it is given to 65 % of the circle, so any
-transparent margin in the file only makes the mark smaller: this crops the
-drawing to its own bounds, pads it 2 % into a square and resamples it to
-256 px. 256 is about twice what the buttons draw at uhd (the level page's
-Medium circle wants ~125 px, the pause menu's Big ~147), which keeps the
-in-game shrink under 2x: GD's textures have no mipmaps, and shrinking more
-than that makes thin strokes jagged (a 336 px export looked broken,
-2026-09-29).
+CircleButtonSprite fits the sprite to 65% of the circle, so any transparent
+margin just makes the mark smaller. Crops to the drawing, pads 2% into a
+square and resizes to 256 px. The buttons draw it at ~125-147 px (uhd) and GD
+has no mipmaps, so shrinking more than 2x makes the thin strokes jagged.
 
     py -3 scripts/logocrop.py path/to/export.png
 """

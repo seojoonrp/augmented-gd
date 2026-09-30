@@ -14,17 +14,14 @@ void Removed::take(GameObject* obj) {
     obj->destroyObject();
 }
 
-int Removed::restore() {
-    int stillDisabled = 0;
+void Removed::restore() {
     for (auto& e : m_entries) {
         if (!e.obj) continue;
-        if (e.obj->m_isDisabled || e.obj->m_isDisabled2) stillDisabled++;
         e.obj->m_isDisabled = false;
         e.obj->m_isDisabled2 = false;
         e.obj->setOpacity(e.opacity);
     }
     m_entries.clear();
-    return stillDisabled;
 }
 
 bool View::contains(GameObject* obj, CCNode* fallbackParent) const {
@@ -41,8 +38,7 @@ View viewAhead(PlayLayer* layer, float lead) {
     float px = layer->m_player1->getPositionX();
     bool aheadIsLeft = layer->m_player1->m_isGoingLeft;
 
-    // Bound the scan by the screen's extent in object-layer x, whatever the
-    // camera does.
+    // screen corners in object-layer x, whatever the camera is doing
     v.lo = px;
     v.hi = px;
     for (auto corner : { CCPoint{ v.screen.getMinX(), v.screen.getMinY() }, CCPoint{ v.screen.getMaxX(), v.screen.getMinY() },
@@ -74,7 +70,7 @@ bool touchesCircle(GameObject* obj, CCPoint centre, float radius) {
         float reach = radius + obj->m_objectRadius * std::max(obj->getScaleX(), obj->getScaleY());
         return dx * dx + dy * dy <= reach * reach;
     }
-    // Closest point of the rect to the centre, then the distance to it.
+    // closest point on the rect
     auto rect = obj->getObjectRect();
     float cx = std::clamp(centre.x, rect.getMinX(), rect.getMaxX());
     float cy = std::clamp(centre.y, rect.getMinY(), rect.getMaxY());

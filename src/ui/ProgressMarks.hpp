@@ -6,17 +6,11 @@
 
 namespace augment {
 
-// Markers drawn on GD's own progress bar (PlayLayer::m_progressBar): a gold
-// dot at the run's best percent (the new-best particles' colour) and a green
-// dot per placed checkpoint, each with a black rim like the bar's and small
-// enough to sit inside the fill track.
-// Lives as a child of the bar, so it follows the bar's position, scale and
-// visibility and dies with it. One draw node, redrawn only when a value
-// changes.
+// Dots on GD's progress bar: gold at the run's best, green per checkpoint.
+// Child of the bar, so it follows its position/scale/visibility.
 class ProgressMarks : public cocos2d::CCNode {
 public:
-    // `fill` (PlayLayer::m_progressFill) only serves to measure the track;
-    // nullptr falls back to the geometry seen in the 2026-09-17 log.
+    // fill (m_progressFill) is only used to measure the track; null = fallback numbers
     static ProgressMarks* create(cocos2d::CCSprite* bar, cocos2d::CCSprite* fill);
 
     void setBest(float percent);

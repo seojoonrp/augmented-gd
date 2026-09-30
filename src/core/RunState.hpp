@@ -1,9 +1,7 @@
 #pragma once
 
-// The state of one run and the rules that move it: gauge economy, augment
-// levels, pending drafts. Pure C++ (no Geode, no logging, no settings): the
-// game-side AugmentManager feeds it settings and logs what it returns, and
-// scripts/test.ps1 runs it on the host.
+// One run: gauge economy, augment levels, pending drafts. No Geode, no
+// logging, no settings (AugmentManager does those).
 
 #include "AugmentDef.hpp"
 
@@ -17,35 +15,30 @@
 
 namespace augment {
 
-// How the draft gauge charges and what a draft costs. Defaults are tune::;
-// the tests build their own.
+// defaults are tune::, tests build their own
 struct GaugeRule {
     float thresholdStart = tune::GaugeThresholdStart;
     float thresholdStep = tune::GaugeThresholdStep;
-    // Gauge-earned drafts per step: 3 = 20, 20, 20, 25, 25, 25 …
-    int thresholdEvery = tune::GaugeThresholdEvery;
-    // The ramp stops here: every draft past it costs this much.
+    int thresholdEvery = tune::GaugeThresholdEvery;   // gauge drafts per step
     float thresholdMax = tune::GaugeThresholdMax;
     float newBestMult = tune::NewBestBonusMult;
 };
 
 struct DeathResult {
-    float charge = 0.f;   // percent + bonus added to the gauge
-    float bonus = 0.f;    // new-best part of that (0 when the best did not move)
-    int earned = 0;       // drafts this death queued
-    // A checkpoint respawn follows, so nothing was charged yet (charge,
-    // bonus and earned are all 0): the life pays once, when it ends.
+    float charge = 0.f;   // added to the gauge, bonus included
+    float bonus = 0.f;    // new-best part
+    int earned = 0;       // drafts queued
+    // checkpoint respawn follows: nothing charged yet, the life pays when it ends
     bool deferred = false;
 };
 
 class RunState {
 public:
-    // Augment id -> level. The transparent comparator lets the per-frame
-    // lookups by `ids::` literal skip building a std::string each time.
+    // less<> so per-frame lookups by ids:: literal don't build a std::string
     using Levels = std::map<std::string, int, std::less<>>;
 
     // --- lifecycle ---
-    // Queues the free opening draft (not gauge-earned).
+    // queues the free opening draft
     void start(int levelID, std::string levelName);
     void end();
     bool active() const { return m_active; }
@@ -54,75 +47,55 @@ public:
     std::string const& levelName() const { return m_levelName; }
 
     // --- draft gauge ---
-    // Once per attempt when player 1 dies. Charges by the whole percent
-    // reached (no minimum) plus the new-best delta in whole percents times
-    // the bonus multiplier (bestPercent itself keeps the decimals), so the
-    // gauge only ever holds whole numbers — what the HUD reads; while
-    // the gauge covers the (rising) cost and the pending drafts leave levels
-    // to give (levelsLeft), a draft is queued and the cost rises. Leftover
-    // charge carries over.
-    //
-    // `respawning` = a checkpoint respawn follows this death, so the life
-    // goes on: the death is counted, the gauge waits, and the percent is
-    // remembered. The death that really ends the life charges for the best
-    // percent of the whole life, once (user, 2026-09-27: dying at 6 % and
-    // then at 4 % behind one checkpoint must pay 6, not 10).
+    // Once per attempt when player 1 dies. Charge = floor(percent) + whole
+    // new-best percents * mult, leftover carries over. With `respawning`
+    // (checkpoint) the gauge waits and the death that ends the life pays once
+    // for the life's best: 6 % then 4 % behind a checkpoint pays 6, not 10.
     DeathResult onDeath(float percent, GaugeRule const& rule, bool respawning = false);
     float gauge() const { return m_gauge; }
-    // Best percent of the life in progress, 0 when no death is waiting on a
-    // checkpoint respawn. What the next settling death will charge for; the
-    // HUD folds it into the best it shows, so the mark never slides back.
+    // best of a life a checkpoint is holding open, 0 otherwise. the HUD folds
+    // it in so the best mark never slides back.
     float lifeBest() const { return m_lifeBest; }
-    // Cost of the next draft under `rule`: the ramp, capped at its ceiling.
     float gaugeThreshold(GaugeRule const& rule) const;
-    // Cost of the most recent gauge-earned draft — what the HUD shows as
-    // "30/30" while that draft waits (the threshold has already moved on);
-    // the current threshold before any was earned.
+    // cost of the last gauge draft, for the HUD's "30/30" while it waits
+    // (the threshold has already moved on)
     float lastDraftCost(GaugeRule const& rule) const;
-    // Debug: tops the gauge up to the threshold. Returns the charge added.
+    // debug: tops up to the threshold, returns what it added
     float fillGauge(GaugeRule const& rule);
     int deaths() const { return m_deaths; }
     int draftsTaken() const { return m_draftsTaken; }
     float bestPercent() const { return m_bestPercent; }
 
-    // Drafts earned but not yet shown. A big new best can earn several at
-    // once; the popup chains them, taking one per takePendingDraft().
+    // earned but not shown yet; a big new best can earn several
     int pendingDrafts() const { return m_pendingDrafts; }
     bool hasPendingDraft() const { return m_pendingDrafts > 0; }
     void takePendingDraft();
     void dropPendingDrafts();
-    // Pending drafts the gauge paid for (the free opening draft is not one).
-    // While any is waiting the HUD shows the gauge as full.
+    // the ones the gauge paid for (not the opening draft); the HUD shows a full bar while any wait
     int pendingGaugeDrafts() const { return m_pendingGaugeDrafts; }
 
     // --- augments ---
     int levelOf(std::string_view id) const;
     bool has(std::string_view id) const { return this->levelOf(id) > 0; }
     Levels const& augments() const { return m_levels; }
-    // Any augment below its max level? False = the run holds everything
-    // (the HUD's MAX gauge).
+    // false = everything maxed (MAX gauge)
     bool anyDraftable() const;
-    // Levels still to be drafted over all augments; each draft takes one.
     int levelsLeft() const;
-    // Up to `count` random augments that are not yet maxed.
+    // up to `count` random augments below max level
     std::vector<AugmentDef const*> rollDraft(std::size_t count, std::mt19937& rng) const;
-    // Cards the next draft shows: 3, or DraftCountCards once draft-count is owned.
     std::size_t draftCardCount() const;
-    // Level bump without counting a draft (debug keys). Returns the new
-    // level, or 0 for an unknown id.
+    // debug keys: +1 level without counting a draft. 0 = unknown id
     int grant(std::string const& id);
-    // Picking an augment: grant + one more draft taken. Returns the new level.
+    // grant + counts a draft
     int applyPick(std::string const& id);
 
-    // --- slow-mo toggle (persists across attempts within a run) ---
+    // --- slow-mo toggle, kept across attempts ---
     bool slowMoEnabled() const { return m_slowMoEnabled; }
     void toggleSlowMo() { m_slowMoEnabled = !m_slowMoEnabled; }
 
-    // --- effects at the current levels (formula:: with this run's levels) ---
-    // 1.0 when the run has no slow-mo; otherwise the level's speed scale.
+    // --- formula:: at this run's levels ---
     float slowMoScale() const;
-    // `progress` = current level percent / 100. Nerve grows both shrinks the
-    // further into the level the player is; pass 0 outside a run.
+    // progress = level percent / 100, pass 0 outside a run
     float nerveBoost(float progress) const;
     float hazardScale(float progress) const;
     float waveScale(float progress) const;
@@ -130,12 +103,11 @@ public:
     float catInterval() const;
     float missileInterval() const;
     float missileRadius() const;
-    // Berserker: the per-destroyed-hazard roll and how long a hit roll lasts.
     float berserkChance() const;
     float berserkSeconds() const;
 
 private:
-    // Cost of gauge draft number `n` (0-based) under `rule`.
+    // cost of gauge draft `n`, 0-based
     static float costOf(int n, GaugeRule const& rule);
 
     bool m_active = false;
@@ -144,12 +116,9 @@ private:
 
     int m_deaths = 0;
     int m_draftsTaken = 0;
-    // Drafts the gauge paid for; the free one at run start is not among them
-    // and so does not raise the threshold.
+    // the free opening draft isn't counted, so it doesn't raise the cost
     int m_gaugeDrafts = 0;
     float m_bestPercent = 0.f;
-    // Best percent of the life that a checkpoint respawn is holding open;
-    // 0 when nothing is deferred.
     float m_lifeBest = 0.f;
     float m_gauge = 0.f;
     int m_pendingDrafts = 0;

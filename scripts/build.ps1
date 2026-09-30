@@ -25,8 +25,7 @@ if ($Clean -and (Test-Path build)) {
     Remove-Item -Recurse -Force build
 }
 
-# src/core is pure C++: its tests run on the host in a few seconds and catch
-# economy / formula regressions before the user has to boot the game.
+# src/core tests run on the host, no need to boot the game for those.
 if (-not $SkipTests) {
     & "$PSScriptRoot\test.ps1"
 }

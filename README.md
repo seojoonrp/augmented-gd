@@ -44,3 +44,7 @@ This runs the host tests, bakes the UI fonts, builds the mod and installs it int
 ## Feedback
 
 Bugs, augment ideas and questions: open an [issue](https://github.com/seojoonrp/augmented-gd/issues) or email **seojoonrp@gmail.com**.
+
+## License
+
+The code is under the [MIT License](LICENSE). The fonts in `resources/fonts` keep their own licenses (Pretendard: SIL Open Font License 1.1, see `LICENSE-Pretendard.txt`).

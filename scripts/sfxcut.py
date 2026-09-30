@@ -1,10 +1,7 @@
-# Cuts the mod's sound effects out of the source files in
-# resources/sfx/source/ (the user's picks, mp3 or anything FMOD reads) into
-# resources/sfx/<name>.wav (16-bit, the source's rate and channels): start and
-# end points, a short fade-in against clicks, a fade-out, a peak level. The
-# decoding is GD's own FMOD (fmod.dll in the GD folder, through ctypes), so
-# nothing needs installing. Not run by build.ps1: rerun after changing a
-# source or a cut below (the .wav files are committed).
+# Cuts the sound effects out of resources/sfx/source/ into
+# resources/sfx/<name>.wav (16-bit): trim, short fade-in against clicks,
+# fade-out, peak level. Decodes with GD's own fmod.dll through ctypes so
+# nothing needs installing. Not run by build.ps1 (the .wav files are committed).
 #
 #   py -3 scripts/sfxcut.py                    write every cut in CUTS
 #   py -3 scripts/sfxcut.py --analyze FILE     print FILE's level every 20 ms
@@ -23,20 +20,13 @@ SOURCE = os.path.join(ROOT, 'resources', 'sfx', 'source')
 OUT = os.path.join(ROOT, 'resources', 'sfx')
 FMOD_DLL = os.environ.get('FMOD_DLL', r'C:\Program Files (x86)\Steam\steamapps\common\Geometry Dash\fmod.dll')
 
-# name -> cut. Times in seconds of the source. `fade_out` = (from, to): the
-# level falls from 1 at `from` to 0 at `to`, where the sound ends. `peak` is
-# the loudest sample after the cut (the cue gains in src/game/Sfx.cpp set the
-# rest). Each start sits just before the source's first sound (its mp3
-# encoder delay: 21.5 / 22.8 / 48.3 ms), from `--analyze` (2026-09-29).
+# name -> cut, times in seconds of the source. fade_out = (from, to), the sound
+# ends at `to`. starts skip the mp3 encoder delay (found with --analyze).
 CUTS = {
-    # A 15 ms click; only the lead-in silence goes.
     'hover.wav': dict(src='hover.mp3', start=0.019, end=0.048, fade_in=0.002, fade_out=(0.038, 0.048)),
-    # Two quick hits and their shimmer (the source is silent past 0.5 s);
-    # ends well inside the draft's 1 s send-off.
+    # has to end inside the draft's 1 s send-off
     'select.wav': dict(src='select.mp3', start=0.021, end=0.56, fade_out=(0.40, 0.56)),
-    # The blast is the first 0.2 s, then 15 s of rumble and debris: keep the
-    # blast and the first of the rumble, and let the rest fade away early
-    # (user: "fade out partway"). Strikes come every 6 s at Lv1, 4 s at Lv5.
+    # blast + a bit of the rumble, the source goes on for 15 s
     'missile.wav': dict(src='missile.mp3', start=0.046, end=1.35, fade_out=(0.45, 1.35)),
 }
 

@@ -23,11 +23,8 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 # Set up the mod binary
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-# `geode build` is RelWithDebInfo, and a debug link keeps every function it
-# pulls in (/DEBUG implies /OPT:NOREF): most of the DLL was unused code from
-# Geode's statically linked libraries. /OPT:REF drops it, the PDB stays for
-# crash logs. A Release link does the same (qolmod ships Release builds on
-# Windows, `refs/qolmod/.github/workflows/build.yml:43`).
+# geode build is RelWithDebInfo and /DEBUG implies /OPT:NOREF, so the dll kept
+# a lot of unused code from Geode's static libs. /OPT:REF drops it (pdb stays).
 if (WIN32)
     target_link_options(${PROJECT_NAME} PRIVATE "LINKER:/OPT:REF")
 endif()

@@ -1,7 +1,6 @@
 #pragma once
 
-// Factories for every augment behaviour, one per file in this directory.
-// LevelSession creates them in table order (docs/DESIGN.md).
+// One factory per augment file.
 
 #include "Augment.hpp"
 
@@ -22,7 +21,7 @@ std::unique_ptr<Augment> makeBrake();
 std::unique_ptr<Augment> makeMissile();
 std::unique_ptr<Augment> makeBerserk();
 
-// Table order, so HUD rows and grant dispatch follow docs/DESIGN.md.
+// table order (HUD rows and grant dispatch follow it)
 std::vector<std::unique_ptr<Augment>> makeAllAugments();
 
 } // namespace augment

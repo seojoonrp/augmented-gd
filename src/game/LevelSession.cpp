@@ -53,10 +53,8 @@ void LevelSession::banner(std::string const& text) {
 
 void LevelSession::rewardDeath(CCPoint at, float before, float cost, DeathResult const& r) {
     if (!m_hud) return;
-    // Nothing left to draft: the bar stays a full MAX, no numbers or
-    // particles flying into it.
+    // all maxed: the bar stays MAX, no numbers or particles
     if (this->mgr().allMaxed()) {
-        log::info("Death reward skipped: every augment is maxed");
         this->refreshHud(true);
         return;
     }
@@ -73,9 +71,7 @@ void LevelSession::setMarks(ProgressMarks* marks) {
 }
 
 namespace {
-    // HUD text rebuilds per second. The rows carry timers with one decimal,
-    // so 10 Hz reads smoothly; per frame was ~10 fmt strings a frame for
-    // nothing.
+    // text rebuilds per second; the timers show one decimal, so 10 Hz is plenty
     constexpr float kHudRate = 10.f;
 }
 
@@ -91,34 +87,29 @@ void LevelSession::refreshHud(bool force) {
     auto& mgr = this->mgr();
 
     float now = this->percent();
-    // lifeBest is the furthest a life held open by a checkpoint got to: the
-    // run's best does not count it until the life settles, but the readout
-    // and the mark must not slide back to the checkpoint in the meantime.
+    // the run best skips a checkpointed life until it settles, the readout
+    // shouldn't slide back meanwhile
     float best = std::max({ now, mgr.bestPercent(), mgr.lifeBest() });
-    // A gauge-earned draft that is still waiting shows as a full bar reading
-    // its own cost, e.g. 30/30 (the threshold has already moved on); the free
-    // opening draft does not (the gauge really is at 0 then).
-    // Once every augment is maxed the bar is simply full and reads MAX.
+    // a waiting gauge draft shows as a full bar at its own cost, e.g. 30/30
+    // (the threshold already moved on). not the opening draft, the gauge is really 0 then
     bool const draftWaiting = mgr.pendingGaugeDrafts() > 0;
     m_hud->setGauge(mgr.gauge(), draftWaiting ? mgr.lastDraftCost() : mgr.gaugeThreshold(), draftWaiting, mgr.allMaxed());
     if (m_marks) m_marks->setBest(best);
 
-    // The top-left readout (header + one row per augment) is debug-mode only
-    // since the pause menu shows the same things (user, 2026-09-28).
-    if (!AugmentManager::debugMode()) {
+    // top-left readout is debug only (and can be off even then, for clean
+    // screenshots). the pause menu shows the same
+    if (!AugmentManager::debugMode() || !Mod::get()->getSettingValue<bool>("debug-readout")) {
         m_hud->setHeader("");
         m_hud->setSlots({});
         return;
     }
-    // `record` is every run's best on this level (Records.hpp), apart from
-    // both this run's best and GD's normal one.
+    // record = best of all runs on this level, not GD's
     m_hud->setHeader(fmt::format(
         "deaths {}   now {:.1f}%   best {:.1f}%   record {}%",
         mgr.deaths(), now, best, records::best(m_layer->m_level)
     ));
 
-    // One row per owned augment in table order. Names are the Korean
-    // display names; the state text stays English (debug readout).
+    // names follow the language setting, state text stays English
     std::vector<RunHud::Slot> slots;
     Lang const lang = language();
     for (auto const& def : allAugments()) {
@@ -129,30 +120,31 @@ void LevelSession::refreshHud(bool force) {
     m_hud->setSlots(slots);
 }
 
-std::vector<GameObject*>& LevelSession::objectsByX() {
-    if (m_objectsByX.empty() && m_layer->m_objects) {
-        // Each x is read once up front: sorting on getPositionX() itself
-        // costs two virtual calls per comparison, ~n log n of them.
-        std::vector<std::pair<float, GameObject*>> keyed;
-        keyed.reserve(m_layer->m_objects->count());
-        for (auto obj : CCArrayExt<GameObject*>(m_layer->m_objects)) {
-            if (obj->m_objectType == GameObjectType::Decoration || obj->m_isDecoration) continue;
-            keyed.emplace_back(obj->getPositionX(), obj);
+void LevelSession::checkSectionFiling() {
+    m_filingChecked = true;
+    // first object past column 0 should sit in column floor(x / SectionWidth)
+    auto const& columns = m_layer->m_sections;
+    auto const& sizes = m_layer->m_sectionSizes;
+    for (std::size_t i = 1; i < columns.size() && i < sizes.size(); i++) {
+        auto column = columns[i];
+        auto counts = sizes[i];
+        if (!column || !counts) continue;
+        for (std::size_t j = 0; j < column->size() && j < counts->size(); j++) {
+            auto section = column->at(j);
+            if (!section || counts->at(j) <= 0 || section->empty()) continue;
+            auto obj = section->at(0);
+            if (!obj) continue;
+            float const x = obj->getPositionX();
+            int const expected = static_cast<int>(std::floor(x / SectionWidth));
+            if (expected != static_cast<int>(i)) {
+                log::warn(
+                    "Sections: object at x {:.0f} is in column {}, the scan expected {}",
+                    x, i, expected
+                );
+            }
+            return;
         }
-        std::sort(keyed.begin(), keyed.end(), [](auto const& a, auto const& b) { return a.first < b.first; });
-        m_objectsByX.reserve(keyed.size());
-        for (auto const& entry : keyed) m_objectsByX.push_back(entry.second);
-        log::info("Tracking {} non-decoration objects by x", m_objectsByX.size());
     }
-    return m_objectsByX;
-}
-
-void LevelSession::warmObjectIndex() {
-    // The augments that scan objectsByX().
-    constexpr char const* kScanners[] = { ids::Foresight, ids::Cat, ids::Missile };
-    if (!m_objectsByX.empty() || !this->runLevel()) return;
-    if (std::ranges::none_of(kScanners, [&](char const* id) { return this->owns(id); })) return;
-    this->objectsByX();
 }
 
 // ---------------------------------------------------------------- fan-out
@@ -180,13 +172,9 @@ bool LevelSession::onBeforeReset() {
 }
 
 void LevelSession::onAttemptStart(bool fromCheckpoint) {
-    if (m_deathCounted) {
-        auto since = std::chrono::duration<float>(std::chrono::steady_clock::now() - m_deathAt).count();
-        log::info("Attempt start {:.2f} s after the death", since);
-    }
     m_deathCounted = false;
     m_runCleared = false;
-    // The reward sequence belongs to the attempt that died.
+    // the reward animation belongs to the attempt that died
     if (m_hud) m_hud->settleGauge();
     for (auto& a : m_augments) a->onAttemptStart(*this, fromCheckpoint);
     if (fromCheckpoint) {
@@ -199,8 +187,7 @@ void LevelSession::onCheckpointPlaced() {
 }
 
 bool LevelSession::onHit(PlayerObject* player, GameObject* object) {
-    // Augments that can answer the hit for free go first (Augment::hitPriority),
-    // then the rest in table order.
+    // free answers first (hitPriority), then table order
     for (int tier = 1; tier >= 0; tier--) {
         for (auto& a : m_augments) {
             if ((a->hitPriority() > 0) != (tier > 0)) continue;
@@ -231,9 +218,6 @@ void LevelSession::onPause() {
 
 void LevelSession::onGranted(std::string const& id, int level) {
     for (auto& a : m_augments) a->onGranted(*this, id, level);
-    // A pick lands behind the draft popup; a scanner drafted now indexes
-    // the level there instead of on its first sweep.
-    this->warmObjectIndex();
 }
 
 bool LevelSession::onHotkey(Hotkey which, bool down) {
@@ -253,7 +237,6 @@ Augment* LevelSession::find(std::string const& id) const {
 bool LevelSession::countDeath() {
     if (m_deathCounted) return false;
     m_deathCounted = true;
-    m_deathAt = std::chrono::steady_clock::now();
     return true;
 }
 
@@ -261,33 +244,17 @@ bool LevelSession::countDeath() {
 
 bool LevelSession::debugGrant(int index) {
     auto const& defs = allAugments();
-    if (index < 0 || index >= static_cast<int>(defs.size())) {
-        // Says out loud that the key hit nothing: a debug key for an
-        // augment the running build does not have (a stale install) is
-        // otherwise silent.
-        log::info("Debug grant: no augment at index {} ({} in the table)", index, defs.size());
-        return false;
-    }
-    if (!this->runLevel()) {
-        log::info("Debug grant ignored: not a run level");
-        return false;
-    }
+    if (index < 0 || index >= static_cast<int>(defs.size())) return false;
+    if (!this->runLevel()) return false;
     auto const& def = defs[index];
-    if (this->levelOf(def.id) >= def.maxLevel) {
-        log::info("Debug grant: '{}' already maxed", def.id);
-        return true;
-    }
+    if (this->levelOf(def.id) >= def.maxLevel) return true;
     int lvl = this->mgr().grant(def.id);
-    log::info("Debug grant: '{}' -> level {}", def.id, lvl);
     this->onGranted(def.id, lvl);
     return true;
 }
 
 bool LevelSession::debugFillGauge() {
-    if (!this->runLevel()) {
-        log::info("Debug fill ignored: not a run level");
-        return false;
-    }
+    if (!this->runLevel()) return false;
     this->mgr().debugFillGauge();
     return true;
 }

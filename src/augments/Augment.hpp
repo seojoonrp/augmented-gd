@@ -1,12 +1,8 @@
 #pragma once
 
-// One augment's in-level behaviour. The PlayLayer hook owns the lifecycle and
-// calls the LevelSession, which fans each event out to every augment in
-// table order; an augment keeps its own per-attempt state and reads its
-// level from the run. Every hook has an empty default, so a new augment
-// overrides only what it needs and touches nothing else.
-//
-// Levels are per run (RunState); everything in here is per level load.
+// One augment's in-level behaviour. LevelSession fans each event out to every
+// augment in table order; all hooks default to no-ops. Levels live in the run
+// (RunState), everything here is per level load.
 
 #include "../input/Hotkeys.hpp"
 
@@ -22,8 +18,7 @@ class LevelSession;
 
 class Augment {
 public:
-    // `ids` are the augment ids this behaviour answers for (usually one;
-    // HitboxScales serves hazard-hitbox, wave-hitbox and nerve together).
+    // usually one id; HitboxScales answers for hazard-hitbox, wave-hitbox and nerve
     explicit Augment(std::vector<std::string> ids) : m_ids(std::move(ids)) {}
     virtual ~Augment() = default;
 
@@ -31,47 +26,34 @@ public:
     bool handles(std::string const& id) const;
 
     // --- level ---
-    // Before PlayLayer::init runs: nothing exists yet. The place to publish
-    // globals that objects read as they are created.
+    // Before PlayLayer::init, nothing exists yet. Publish globals objects read on creation here.
     virtual void onLevelInit(LevelSession&) {}
-    // After PlayLayer::init: objects exist, the HUD is up.
+    // After PlayLayer::init: objects and HUD exist.
     virtual void onLevelReady(LevelSession&) {}
     // PlayLayer::addObject, run levels only.
     virtual void onObjectAdded(LevelSession&, GameObject*) {}
-    // PlayLayer::onQuit, before the layer goes.
+    // PlayLayer::onQuit, layer still alive.
     virtual void onQuit(LevelSession&) {}
 
     // --- attempt ---
-    // Inside resetLevel, before GD resets (the dying attempt's state is
-    // still there). Return true when this reset *continues* the attempt (a
-    // checkpoint respawn) instead of starting over from 0.
+    // In resetLevel, before GD resets (the dying attempt is still there).
+    // true = this reset continues the attempt (checkpoint respawn).
     virtual bool onBeforeReset(LevelSession&) { return false; }
-    // Inside resetLevel, after GD reset. A checkpoint respawn is the same
-    // attempt: per-attempt budgets refill only when `fromCheckpoint` is false.
+    // In resetLevel, after GD's reset. Per-attempt budgets refill only when !fromCheckpoint.
     virtual void onAttemptStart(LevelSession&, bool fromCheckpoint) {}
-    // destroyPlayer on a run attempt, before the death is counted. `object`
-    // is what killed the player, or null when GD names nothing (suicide, out
-    // of bounds — qolmod guards the same way). Return true to swallow the hit
-    // (the original is not called).
+    // destroyPlayer on a run attempt, before the death counts. `object` is null
+    // when GD names nothing (suicide, out of bounds). true = swallow the hit.
     virtual bool onHit(LevelSession&, PlayerObject*, GameObject* object) { return false; }
-    // Two tiers for that question: everything is 0 (table order) except
-    // an augment that can answer a hit for free (berserk smashing the
-    // hazard), which is asked first so the shield keeps its charge.
+    // > 0 is asked before everyone else (berserk: a free smash, so the shield keeps its charge).
     virtual int hitPriority() const { return 0; }
-    // Player 1 really died (counted once per attempt), before GD's reset and
-    // before the gauge is charged. Return true when the run comes back from
-    // this death (a checkpoint respawn): the life is not over, so the draft
-    // gauge waits for the death that ends it.
+    // Player 1 really died (once per attempt), before the gauge is charged.
+    // true = the run comes back from it (checkpoint), so the gauge waits.
     virtual bool onDeath(LevelSession&) { return false; }
-    // A checkpoint was placed (startpos). Snapshot whatever per-attempt
-    // state should come back with the respawn (shield charges, brake time).
-    // Only the newest checkpoint is ever respawned at, so one slot suffices.
+    // Checkpoint placed: snapshot per-attempt state. Only the newest one is ever respawned at.
     virtual void onCheckpointPlaced(LevelSession&) {}
     // Right after onAttemptStart(fromCheckpoint = true): restore the snapshot.
     virtual void onCheckpointRespawn(LevelSession&) {}
-    // `count` hazards were just destroyed by an augment (cat sweep, missile
-    // blast, berserk smash). Fired by whoever removed them, after the
-    // removal; berserker rolls its chance per hazard here.
+    // An augment just destroyed `count` hazards (cat, missile, berserk smash).
     virtual void onHazardsDestroyed(LevelSession&, int count) {}
     // postUpdate, run levels only. dt is already time-scaled.
     virtual void onFrame(LevelSession&, float dt) {}
@@ -79,17 +61,14 @@ public:
     virtual void onPause(LevelSession&) {}
 
     // --- run ---
-    // An augment was granted (draft pick or debug key); `level` is the new
-    // level. Every augment hears every grant, so cross effects (nerve →
-    // hitbox scales) need no wiring.
+    // Draft pick or debug key, `level` = new level. Every augment hears every
+    // grant, so cross effects (nerve -> hitbox scales) need no wiring.
     virtual void onGranted(LevelSession&, std::string const& id, int level) {}
-    // A hotkey press (`down`) or release. Return true when consumed; most
-    // augments act on the press only.
+    // Press (`down`) or release. true = consumed.
     virtual bool onHotkey(LevelSession&, Hotkey, bool down) { return false; }
 
     // --- HUD ---
-    // Per-attempt state text for the HUD row of `id` (English; the row's
-    // name is the Korean augment name). Empty is fine.
+    // Debug HUD row for `id`, English. Empty is fine.
     virtual std::string hudState(LevelSession&, std::string const& id) { return ""; }
 
 private:

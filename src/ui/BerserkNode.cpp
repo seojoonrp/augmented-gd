@@ -8,17 +8,11 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    // The frame is faked as a few nested bands (CCDrawNode has no gradients):
-    // kBands rings of kBandWidth each, dimmer toward the middle of the screen.
-    // Tuned in two passes with the user (2026-09-27): 6 x 9 units at 0.5 alpha
-    // was too much, 4 x 6 at 0.2 too little, so this sits in between; a
-    // notch stronger on 2026-09-29 (7.5 wide at 0.33 before), then eased
-    // back the same day in two steps (8 / 0.40, then 7.75 / 0.365, each a
-    // touch much) to just under where it started.
+    // no gradients in CCDrawNode, so the frame is nested bands that get
+    // dimmer toward the middle of the screen
     constexpr int kBands = 5;
     constexpr float kBandWidth = 7.5f;
     constexpr float kFrameAlpha = 0.32f;
-    // The frame dims away over the window's last moments.
     constexpr float kFadeOutSeconds = 0.4f;
     constexpr float kPulseRate = 9.f;
 
@@ -45,8 +39,7 @@ BerserkNode* BerserkNode::create() {
 
 bool BerserkNode::init() {
     if (!CCNode::init()) return false;
-    // Origin = the UI layer's origin, so everything below is in screen
-    // coordinates.
+    // at the UI layer's origin: screen coords
     this->setAnchorPoint({ 0.f, 0.f });
     this->setContentSize({ 0.f, 0.f });
     this->setPosition({ 0.f, 0.f });
@@ -73,7 +66,7 @@ void BerserkNode::tick(float dt) {
     for (auto& b : m_bursts) b.age += dt;
     std::erase_if(m_bursts, [](Burst const& b) { return !b.target || b.age >= BurstSeconds; });
     if (m_left <= 0.f && m_bursts.empty()) {
-        // Nothing to show: clear once, then stay out of the way.
+        // idle: clear once, then skip
         if (m_dirty) {
             m_draw->clear();
             m_dirty = false;
@@ -90,16 +83,15 @@ void BerserkNode::redraw() {
     if (m_left > 0.f) {
         auto win = CCDirector::get()->getWinSize();
         float fade = std::clamp(m_left / kFadeOutSeconds, 0.f, 1.f);
-        // Faster pulse as the window runs out, so "about to end" reads.
+        // pulse speeds up (to 2x) as the window runs out
         float urgency = m_total > 0.f ? 1.f + (1.f - std::clamp(m_left / m_total, 0.f, 1.f)) : 1.f;
-        // A breath, not a strobe.
         float pulse = 0.72f + 0.28f * std::sin(m_age * kPulseRate * urgency);
         for (int i = 0; i < kBands; i++) {
             float inner = static_cast<float>(i) * kBandWidth;
             float outer = inner + kBandWidth;
             float drop = 1.f - static_cast<float>(i) / kBands;
             auto col = premul(1.f, 0.15f, 0.1f, kFrameAlpha * drop * drop * pulse * fade);
-            // The band as four filled rects (bottom, top, left, right).
+            // bottom, top, left, right
             CCPoint bands[4][4] = {
                 { { 0.f, inner }, { win.width, inner }, { win.width, outer }, { 0.f, outer } },
                 { { 0.f, win.height - outer }, { win.width, win.height - outer }, { win.width, win.height - inner }, { 0.f, win.height - inner } },
@@ -113,7 +105,7 @@ void BerserkNode::redraw() {
     for (auto& b : m_bursts) {
         auto obj = b.target.data();
         if (!obj || !obj->getParent()) continue;
-        // Object -> screen -> this node (whose origin is the screen's).
+        // object -> screen -> this node
         CCPoint world = obj->getParent()->convertToWorldSpace({ obj->getPositionX(), obj->getPositionY() });
         CCPoint at = m_draw->convertToNodeSpace(world);
 
@@ -122,7 +114,7 @@ void BerserkNode::redraw() {
         float radius = kBurstStart + (kBurstEnd - kBurstStart) * ease;
         float alpha = 1.f - u;
         m_draw->drawCircle(at, radius, kNoFill, 1.8f, premul(1.f, 0.25f, 0.15f, alpha * 0.85f), kSegments);
-        // Filled drawCircle, not drawDot (GD draws a dot as a square quad).
+        // not drawDot, GD's is a square
         m_draw->drawCircle(at, kBurstStart * (1.f - u), premul(1.f, 0.9f, 0.7f, alpha * 0.7f), 0.f, kNoFill, 12);
     }
 }

@@ -1,7 +1,6 @@
-// slow-mo (나무늘보): game speed 1 - 0.05 * level while a run attempt is
-// playing; X toggles it for the rest of the run. The scale itself is
-// scales::time(), read by the CCScheduler hook (SchedulerHook.cpp) and
-// mirrored onto the FMOD master pitch.
+// slow-mo (나무늘보): game speed 1 - 0.05 * level during run attempts, X
+// toggles it for the rest of the run. SchedulerHook reads scales::time(),
+// FMOD pitch follows it.
 
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"
@@ -20,25 +19,20 @@ class SlowMo : public Augment {
 public:
     SlowMo() : Augment({ ids::SlowMo }) {}
 
-    // Re-evaluated every frame so pause / practice / run end all fall back
-    // to normal speed without special cases.
+    // every frame, so pause / practice / run end fall back to 1x on their own
     void onFrame(LevelSession& s, float) override { this->apply(s); }
     void onGranted(LevelSession& s, std::string const& id, int) override {
         if (id == ids::SlowMo) this->apply(s);
     }
-    // Pause menu at normal speed; the next frame re-applies slow-mo.
+    // pause menu runs at normal speed, next frame re-applies
     void onPause(LevelSession&) override { scales::setTime(1.f); }
     void onQuit(LevelSession&) override { scales::setTime(1.f); }
 
     bool onHotkey(LevelSession& s, Hotkey which, bool down) override {
         if (which != Hotkey::SlowMo || !down) return false;
         auto& mgr = s.mgr();
-        if (!s.runAttempt() || !mgr.has(ids::SlowMo)) {
-            log::info("X ignored: runAttempt={} slowmoLv={}", s.runAttempt(), mgr.levelOf(ids::SlowMo));
-            return false;
-        }
+        if (!s.runAttempt() || !mgr.has(ids::SlowMo)) return false;
         mgr.toggleSlowMo();
-        log::info("Slow-mo toggled -> {}", mgr.slowMoEnabled() ? "ON" : "OFF");
         this->apply(s);
         return true;
     }

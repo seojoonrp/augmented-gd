@@ -6,19 +6,17 @@
 namespace augment {
 
 namespace {
-    // "1.5" / "4" / "0.5": the shortest decimal that reads naturally in a
-    // sentence. Only used for the handful of tune:: values the cards quote.
+    // "1.5", "4", "0.5": no trailing zeros
     std::string num(float v) {
         if (v == std::floor(v)) return std::to_string(static_cast<int>(v));
         std::string s = std::to_string(v);
         while (s.back() == '0') s.pop_back();
         return s;
     }
-    // A step stored as a fraction (0.05) quoted as a percentage ("5").
+    // 0.05 -> "5"
     std::string pct(float step) { return num(std::round(step * 1000.f) / 10.f); }
-    // Korean count words for the small steps the cat text uses.
     std::string countKo(int n) { return n == 1 ? "한 개" : std::to_string(n) + "개"; }
-    // English amounts with their unit: "1 second", "1.5 seconds", "3 blocks".
+    // "1 second", "1.5 seconds", "3 blocks"
     std::string amountEn(float v, char const* one, char const* many) {
         return num(v) + " " + (v == 1.f ? one : many);
     }
@@ -34,8 +32,7 @@ std::string const& AugmentDef::describe(int level, Lang lang) const {
     return levelUpDesc.in(lang);
 }
 
-// The initial text's sentences with level `n`'s numbers from formula::, so
-// the detail card and the game cannot disagree.
+// same sentences as the initial text, numbers from formula:: so they match the game
 std::string AugmentDef::describeAt(int level, Lang lang) const {
     if (level <= 1 || maxLevel <= 1) return initialDesc.in(lang);
     int const n = std::min(level, maxLevel);
@@ -102,14 +99,11 @@ std::string AugmentDef::describeAt(int level, Lang lang) const {
             "to set off " + secondsEn(formula::berserkSeconds(n)) + " of berserk mode.\n"
             "In berserk mode, hazards you hit are destroyed.";
     }
-    // A multi-level augment without its own sentence here: the initial text
-    // is still true, only its numbers are the first level's.
+    // no per-level sentence: the initial text still holds, with Lv1 numbers
     return initialDesc.in(lang);
 }
 
-// Text is the design table (docs/DESIGN.md) with its numbers taken from
-// tune::, English first. Number keys 1-9 grant augments in this order
-// (Shift+1 = the 10th, Shift+2 the 11th, Shift+3 the 12th, Shift+4 the 13th).
+// order matters: debug keys 1-9 then Shift+1..4 grant in this order
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
         { ids::Shield, { "Shield", "결계인가?" }, 5,

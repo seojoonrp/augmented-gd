@@ -1,8 +1,7 @@
 name: Build Geode Mod
 
-# Windows only: the mod uses Windows-only input / cursor APIs, and the baked UI
-# fonts (resources/fonts/gen, gitignored) are produced by scripts/fontgen.py,
-# which runs here before the build. See docs/HARNESS.md "CI".
+# Windows only for now. The baked UI fonts (resources/fonts/gen) are gitignored,
+# so fontgen.py runs before the build.
 
 on:
   workflow_dispatch:

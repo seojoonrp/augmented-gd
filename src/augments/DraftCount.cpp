@@ -1,5 +1,5 @@
-// draft-count (기회비용): four cards per draft instead of three. The rule
-// itself is RunState::draftCardCount(); this only owns the HUD row.
+// draft-count (기회비용): four cards per draft instead of three. The rule is
+// in RunState::draftCardCount(), this is just the HUD row.
 
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"

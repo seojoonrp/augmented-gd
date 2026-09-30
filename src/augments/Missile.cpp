@@ -1,11 +1,8 @@
-// missile (공습): every missileInterval() seconds of play a missile drops on
-// a random hazard that is on screen and ahead of the player; when it lands
-// (MissileNode::FallSeconds later) every hazard whose collision shape touches
-// the blast circle (missileRadius()) is removed for the rest of the attempt.
-// Aiming at a hazard rather than a random point means a strike always hits
-// something; while nothing is in view the strike stays armed and fires as
-// soon as a target scrolls in. Removal and put-back are hazard::
-// (HazardRemoval.hpp), the same path as the cat.
+// missile (공습): every missileInterval() seconds a missile drops on a random
+// hazard on screen ahead of the player; on impact (MissileNode::FallSeconds
+// later) every hazard touching the missileRadius() blast is gone for the
+// attempt. Aimed at a hazard so it always hits something; with nothing in
+// view it stays armed and fires once something scrolls in.
 
 #include "Augments.hpp"
 #include "HazardRemoval.hpp"
@@ -26,13 +23,10 @@ namespace augment {
 
 namespace {
 
-// Targets closer than this (object units ahead of the player) are skipped.
-// 150 was enough to land before the player arrived, but the user found it
-// pointless ("gone as I pass it"), so it is ~1 s of travel at 1x speed:
-// the strike clears what is coming up, not what is at the player's feet.
+// skip targets closer than this ahead of the player (~1 s at 1x), so the
+// strike clears what's coming, not what's at your feet
 constexpr float kLead = 300.f;
-// Objects further than this from the blast centre in x are not even tested
-// (big hazards can still reach in from beyond the radius).
+// x range tested around the blast beyond its radius (big hazards reach in)
 constexpr float kScanPad = 90.f;
 
 class Missile : public Augment {
@@ -45,7 +39,6 @@ public:
         if (!m_node && layer->m_objectLayer) {
             m_node = MissileNode::create();
             layer->m_objectLayer->addChild(m_node, 999);
-            log::info("Missile: node added to the object layer");
         }
         if (!s.runAttempt() || layer->m_isPaused || !layer->m_player1 || layer->m_player1->m_isDead) return;
 
@@ -61,32 +54,15 @@ public:
         if (interval <= 0.f) return;
         m_timer += dt;
         if (m_timer < interval) return;
-        if (this->launch(s)) {
-            m_timer = 0.f;
-            m_waitingLogged = false;
-        }
-        else if (!m_waitingLogged) {
-            log::info("Missile: armed, no hazard in view at {:.1f}% - waiting", s.percent());
-            m_waitingLogged = true;
-        }
+        if (this->launch(s)) m_timer = 0.f;
     }
 
-    // Put back everything the strikes took this attempt; drop a missile
-    // still in the air. Runs before GD's own reset so any per-object reset
-    // GD does still gets the last word.
+    // before GD's reset, so GD's own per-object reset still gets the last word
     bool onBeforeReset(LevelSession&) override {
         m_timer = 0.f;
-        m_waitingLogged = false;
-        if (m_strike.active) {
-            m_strike = {};
-            if (m_node) m_node->cancel();
-            log::info("Missile: strike in flight cancelled by the reset");
-        }
-        else if (m_node) m_node->cancel();
-        if (m_removed.empty()) return false;
-        auto count = m_removed.size();
-        int stillDisabled = m_removed.restore();
-        log::info("Missile: restored {} hazards ({} were still disabled)", count, stillDisabled);
+        if (m_strike.active) m_strike = {};
+        if (m_node) m_node->cancel();
+        m_removed.restore();
         return false;
     }
 
@@ -101,7 +77,7 @@ public:
     }
 
 private:
-    // Pick the target and start the drop. False when nothing is in view.
+    // false when nothing is in view
     bool launch(LevelSession& s) {
         auto layer = s.layer();
         if (!layer->m_objectLayer || !layer->m_player1) return false;
@@ -113,8 +89,7 @@ private:
         static std::mt19937 rng{ std::random_device{}() };
         auto target = candidates[std::uniform_int_distribution<std::size_t>(0, candidates.size() - 1)(rng)];
 
-        // Impact = the target's position in object-layer space; the drop
-        // starts above the top edge of the screen at that x.
+        // impact at the target in object-layer space, drop starts above the top of the screen
         CCNode* parent = target->getParent() ? target->getParent() : layer->m_objectLayer;
         CCPoint world = parent->convertToWorldSpace({ target->getPositionX(), target->getPositionY() });
         CCPoint impact = layer->m_objectLayer->convertToNodeSpace(world);
@@ -123,14 +98,9 @@ private:
 
         m_strike = { true, impact, s.mgr().missileRadius(), 0.f };
         if (m_node) m_node->launch(from, impact, m_strike.radius);
-        log::info(
-            "Missile: launched at ({:.0f}, {:.0f}) r{:.0f}, 1 of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f})",
-            impact.x, impact.y, m_strike.radius, candidates.size(), s.percent(), view.lo, view.hi
-        );
         return true;
     }
 
-    // The missile landed: remove every live hazard touching the blast.
     void detonate(LevelSession& s) {
         auto layer = s.layer();
         CCPoint centre = m_strike.impact;
@@ -147,17 +117,10 @@ private:
             m_removed.take(obj);
             removed++;
         });
-        log::info(
-            "Missile: impact at ({:.0f}, {:.0f}) r{:.0f} removed {} hazards at {:.1f}% ({} removed this attempt)",
-            centre.x, centre.y, radius, removed, s.percent(), m_removed.size()
-        );
         s.onHazardsDestroyed(removed);
     }
 
-    // Seconds since the last launch (not counted while a missile is in the
-    // air), the strike in flight, and what this attempt's strikes removed.
-    float m_timer = 0.f;
-    bool m_waitingLogged = false;
+    float m_timer = 0.f;   // since the last launch, paused while one is in the air
     struct Strike {
         bool active = false;
         CCPoint impact;
@@ -166,8 +129,7 @@ private:
     };
     Strike m_strike;
     hazard::Removed m_removed;
-    // Child of m_objectLayer; dies with the level.
-    MissileNode* m_node = nullptr;
+    MissileNode* m_node = nullptr;   // child of m_objectLayer
 };
 
 } // namespace

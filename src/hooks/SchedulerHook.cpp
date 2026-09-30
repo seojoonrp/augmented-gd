@@ -1,5 +1,4 @@
-// Slow-mo time scaling. Every scheduled update (PlayLayer::update included)
-// receives the scaled dt; scales::setTime() is what the SlowMo augment drives.
+// every scheduled update (PlayLayer's too) gets dt * scales::time(), for slow-mo and brake
 
 #include "../game/Scales.hpp"
 

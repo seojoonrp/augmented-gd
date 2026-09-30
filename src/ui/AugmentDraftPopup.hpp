@@ -11,16 +11,13 @@
 
 namespace augment {
 
-// Modal "pick one of N" popup. Has no close button and ignores Esc/back:
-// the only way out is to pick a card. The cards fan out from the centre when
-// the popup opens; the reveal is driven from visit() with a real clock
-// because the director is paused during a draft, which freezes cocos actions.
+// Pick one of N, no way out but picking. Animations run from visit() on a
+// real clock: the director is paused during a draft, so actions don't run.
 class AugmentDraftPopup : public geode::Popup {
 public:
     using PickCallback = std::function<void(std::string const& augmentID)>;
 
-    // `choices` are shown left-to-right. `onPick` is invoked after the popup
-    // has already been removed from the scene, so it must not touch the popup.
+    // onPick runs after the popup is gone, so it mustn't touch it
     static AugmentDraftPopup* create(std::vector<AugmentDef const*> choices, PickCallback onPick);
 
 protected:
@@ -30,29 +27,23 @@ protected:
     void onClose(cocos2d::CCObject*) override {}
     void visit() override;
 
-    // The card's visual (full-size, scaled to fit); the menu item wrapping it
-    // keeps the final position and size so the touch area never moves.
     cocos2d::CCNode* createCard(AugmentDef const& def, int currentLevel);
     void onCard(cocos2d::CCObject* sender);
     void stepReveal();
-    // Once the cards have landed: the card under the mouse rises a little
-    // (polled like the run summary's tiles, RunInfoPopup::visit; the menu
-    // item and its hit area stay put) and a tick plays as it is entered.
+    // hovered card rises a bit, its hit area stays put
     void stepHover();
-    // After a pick: the chosen card's send-off, then the popup closes and
-    // the pick goes through (finishPick). True once it has closed.
+    // true once the popup has closed
     bool stepPick();
     void finishPick();
 
     struct RevealCard {
-        cocos2d::CCNode* item = nullptr;    // the menu item: fixed footprint, hit area
+        cocos2d::CCNode* item = nullptr;    // fixed footprint / hit area
         cocos2d::CCNode* visual = nullptr;
-        cocos2d::CCPoint from;  // menu-row centre, in the item's coordinates
-        cocos2d::CCPoint to;    // resting position, in the item's coordinates
+        cocos2d::CCPoint from;  // row centre, item space
+        cocos2d::CCPoint to;    // resting spot, item space
         float fromRotation = 0.f;
-        float lift = 0.f;       // hover rise above `to`, eased
-        // Where the pick's animation starts from (hover lift included).
-        cocos2d::CCPoint pickFrom;
+        float lift = 0.f;       // hover rise
+        cocos2d::CCPoint pickFrom;   // hover lift included
         float pickFromScale = 1.f;
     };
 
@@ -67,7 +58,7 @@ protected:
     int m_hovered = -1;
     int m_picked = -1;
     float m_cardScale = 1.f;
-    // The ring that flashes out from the chosen card; in its holder.
+    // lives in the chosen card's holder
     cocos2d::CCDrawNode* m_pickRing = nullptr;
 };
 

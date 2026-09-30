@@ -1,9 +1,5 @@
-// hazard-hitbox augment: shrink hazard hitboxes as GD computes them. See the header
-// for why there are two hooks plus a field write in augments/HitboxScales.cpp.
-//
-// Pattern from qolmod's AccurateHitboxes (refs/qolmod/src/Hacks/Level/
-// AccurateHitboxes.cpp): hook updateOrientedBox(), rewrite the corners, then
-// computeAxes() + orderCorners(). Verified in game 2026-09-16.
+// Shrinks hazard hitboxes as GD computes them (see the header). The oriented box
+// part is the same trick as qolmod's accurate hitboxes.
 
 #include "HazardHitboxHook.hpp"
 #include "../game/Scales.hpp"
@@ -37,14 +33,12 @@ bool isTarget(GameObject* obj) {
 
 class $modify(AugGameObject, GameObject) {
     CCRect const& getObjectRect() {
-        // Only a fresh computation may be shrunk: GD recomputes from position
-        // and size, so this never compounds. A cached read was shrunk already.
+        // only shrink a fresh computation, a cached rect is already shrunk
         bool wasDirty = m_isObjectRectDirty;
         auto& rect = GameObject::getObjectRect();
         float scale = augment::scales::hazard();
         if (scale >= 1.f || !wasDirty || !augment::hazard::isTarget(this)) return rect;
-        // Off-grid rotation: the rect is the bounding box of the oriented box,
-        // which updateOrientedBox() below has already shrunk.
+        // rotated off-grid: the rect is the oriented box's bounds, shrunk below
         if (m_shouldUseOuterOb && m_orientedBox) return rect;
 
         shrinkRect(m_objectRect, scale);

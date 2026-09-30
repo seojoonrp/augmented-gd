@@ -14,7 +14,7 @@ namespace augment::card {
 namespace {
     constexpr float kInset = 10.f;
 
-    // Vertical slots, measured down from the card's top edge.
+    // y values are from the card's top edge
     constexpr float kNameY = 18.f;
     constexpr float kNameScale = 0.6f;
     constexpr float kImageTop = 34.f;
@@ -22,8 +22,6 @@ namespace {
     constexpr float kImageHeight = 70.f;
     constexpr float kImageBorder = 2.f;
     constexpr float kImageRadius = 4.5f;
-    // Description block is centred between the image box and the footer band,
-    // with this much breathing room above and below.
     constexpr float kDescMargin = 5.f;
     constexpr float kDescScale = 0.5f;
     constexpr float kDescMinScale = 0.35f;
@@ -33,10 +31,8 @@ namespace {
     constexpr float kPipRadius = 3.8f;    // outline included
     constexpr float kPipSpacing = 7.f;
 
-    // Label widths for one font, in label units: one probe label re-set per
-    // string (setString reuses its glyph sprites; a fresh label per word
-    // built every glyph again), and each width kept, because the card's
-    // shrink loop wraps the same text again at every step.
+    // One probe label reused for every string (a new label per word rebuilt
+    // every glyph), widths cached since the shrink loop rewraps the same text.
     class TextMeasure {
     public:
         explicit TextMeasure(char const* font) : m_probe(CCLabelBMFont::create("", font)) {}
@@ -57,10 +53,8 @@ namespace {
         std::unordered_map<std::string, float> m_widths;
     };
 
-    // Word-wrap by measuring words (TextMeasure). CCLabelBMFont's width
-    // argument never wrapped our fonts in game (Pretendard or the baked
-    // ImcreSoojin, 2026-09-17), so the label gets explicit newlines instead.
-    // `maxWidth` is in label units (pre-scale). Existing newlines are kept.
+    // CCLabelBMFont's width arg doesn't wrap these fonts, so wrap by hand.
+    // maxWidth is pre-scale.
     std::string wrapText(std::string const& text, TextMeasure& measure, float maxWidth) {
         std::string out;
         size_t paraStart = 0;
@@ -101,18 +95,17 @@ CCNode* augmentCard(AugmentDef const& def, CardFace const& face) {
     auto const fromTop = [](float dy) { return CCPoint{ CardWidth / 2, CardHeight - dy }; };
     float const inner = CardWidth - 2 * kInset;
 
-    // White rim (full-size slices: its corner radius must cover the body's).
+    // rim radius has to cover the body's corners
     auto rim = roundedBox({ CardWidth + 2 * Rim, CardHeight + 2 * Rim }, ccWHITE, RimRadius);
     rim->setPosition(centre);
     card->addChild(rim, 0);
 
-    // Body: GD's green button, black ring and highlight included.
     auto body = NineSlice::create("GJ_button_01.png");
     body->setContentSize({ CardWidth, CardHeight });
     body->setPosition(centre);
     card->addChild(body, 1);
 
-    // Footer band: the darker strip along the bottom of GD's big buttons.
+    // footer band, like the dark strip on GD's big buttons
     auto band = roundedBox({ CardWidth - 2 * Ring, kFooterHeight }, ccBLACK, kFooterRadius, 70);
     band->setPosition({ CardWidth / 2, Ring + kFooterHeight / 2 });
     card->addChild(band, 2);
@@ -122,14 +115,11 @@ CCNode* augmentCard(AugmentDef const& def, CardFace const& face) {
     name->setPosition(fromTop(kNameY));
     card->addChild(name, 3);
 
-    // Image slot: the augment's art in a bordered white panel (CardStyle.hpp).
     auto image = artSlot(def.id, { kImageWidth, kImageHeight }, kImageRadius, kImageBorder);
     image->setPosition(fromTop(kImageTop + kImageHeight / 2));
     card->addChild(image, 2);
 
-    // Description: wrapped here (see wrapText) at the card's inner width and
-    // shrunk in steps until it fits between the image box and the footer,
-    // then centred in that gap.
+    // shrink until it fits between the art and the footer
     float const slotTop = kImageTop + kImageHeight + kDescMargin;
     float const slotBottom = CardHeight - Ring - kFooterHeight - kDescMargin;
     float const slot = slotBottom - slotTop;
@@ -145,17 +135,13 @@ CCNode* augmentCard(AugmentDef const& def, CardFace const& face) {
         descScale -= 0.05f;
     }
     if (desc->getContentSize().height * descScale > slot) {
-        log::warn(
-            "Card '{}' description still overflows at scale {:.2f} ({:.0f} > {:.0f} pt)",
-            def.id, descScale, desc->getContentSize().height * descScale, slot
-        );
+        log::warn("Card '{}': description doesn't fit", def.id);
     }
     desc->setScale(descScale);
     desc->setAnchorPoint({ 0.5f, 0.5f });
     desc->setPosition(fromTop((slotTop + slotBottom) / 2));
     card->addChild(desc, 3);
 
-    // Footer: text on the left, drawn level stars on the right.
     auto footer = CCLabelBMFont::create(face.footer.c_str(), fonts::Text);
     footer->setScale(kFooterScale);
     footer->setColor(face.footerColor);

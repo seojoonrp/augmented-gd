@@ -1,7 +1,7 @@
 #pragma once
 
-// Level → effect. Pure functions of augment levels so the hooks, the HUD and
-// the host tests all compute the same numbers.
+// level -> effect, shared by the hooks, the HUD and the host tests.
+// level 0 (unowned) gives the neutral value: 1 for scales, 0 otherwise.
 
 #include "AugmentDef.hpp"
 
@@ -11,20 +11,17 @@
 
 namespace augment::formula {
 
-// Game speed at a slow-mo level; 1.0 when unowned.
 inline float slowMoScale(int slowMoLevel) {
     return 1.f - tune::SlowMoStep * static_cast<float>(slowMoLevel);
 }
 
-// What nerve multiplies both hitbox shrinks by: 1.2 at the start, 1.7 at
-// the end. `progress` is level percent / 100, clamped to 0..1. 1.0 when
-// nerve is unowned.
+// 1.2 at the start of the level, 1.7 at the end
 inline float nerveBoost(int nerveLevel, float progress) {
     if (nerveLevel <= 0) return 1.f;
     return 1.f + tune::NerveBase + tune::NerveSlope * std::clamp(progress, 0.f, 1.f);
 }
 
-// shrink is "how much is cut off", so 0 = untouched; floored at MinHitboxScale.
+// shrink = how much is cut off, 0 = untouched
 inline float shrinkToScale(float shrink) {
     return std::clamp(1.f - shrink, tune::MinHitboxScale, 1.f);
 }
@@ -34,13 +31,12 @@ inline float hazardScale(int hazardLevel, int nerveLevel, float progress) {
     return shrinkToScale(shrink * nerveBoost(nerveLevel, progress));
 }
 
-// Applies while the player is in wave mode only; the hook checks that.
+// wave mode only, the hook checks that
 inline float waveScale(int waveLevel, int nerveLevel, float progress) {
     float shrink = tune::WaveStep * static_cast<float>(waveLevel);
     return shrinkToScale(shrink * nerveBoost(nerveLevel, progress));
 }
 
-// Hazards removed per sweep; 0 when unowned. The late levels add more.
 inline int catCount(int catLevel) {
     if (catLevel <= 0) return 0;
     int const early = std::min(catLevel, tune::CatLateLevel - 1);
@@ -48,44 +44,42 @@ inline int catCount(int catLevel) {
     return tune::CatBaseCount + tune::CatCountStep * (early - 1) + tune::CatLateCountStep * late;
 }
 
-// Seconds between sweeps; 0 when unowned. The late levels leave it alone.
+// seconds; the late levels don't touch it
 inline float catInterval(int catLevel) {
     if (catLevel <= 0) return 0.f;
     int const early = std::min(catLevel, tune::CatLateLevel - 1);
     return std::max(tune::CatMinInterval, tune::CatBaseInterval - tune::CatIntervalStep * static_cast<float>(early - 1));
 }
 
-// Seconds between missile strikes; 0 when unowned.
 inline float missileInterval(int missileLevel) {
     if (missileLevel <= 0) return 0.f;
     return std::max(tune::MissileMinInterval, tune::MissileBaseInterval - tune::MissileIntervalStep * static_cast<float>(missileLevel - 1));
 }
 
-// Blast radius in object-layer units; 0 when unowned.
+// object-layer units
 inline float missileRadius(int missileLevel) {
     if (missileLevel <= 0) return 0.f;
     return tune::MissileBaseRadius + tune::MissileRadiusStep * static_cast<float>(missileLevel - 1);
 }
 
-// Probability (0..1) that one destroyed hazard opens berserk; 0 when unowned.
+// 0..1, per destroyed hazard
 inline float berserkChance(int berserkLevel) {
     if (berserkLevel <= 0) return 0.f;
     float chance = tune::BerserkChanceBase + tune::BerserkChanceStep * static_cast<float>(berserkLevel - 1);
     return std::clamp(chance, 0.f, 1.f);
 }
 
-// How long one roll keeps berserk open; 0 when unowned.
 inline float berserkSeconds(int berserkLevel) {
     if (berserkLevel <= 0) return 0.f;
     return tune::BerserkSeconds;
 }
 
-// Game speed while the brake is held; independent of slow-mo.
+// independent of slow-mo
 inline float brakeScale() {
     return 1.f - tune::BrakeCut;
 }
 
-// Real seconds of braking per attempt; 0 when unowned.
+// real seconds per attempt
 inline float brakeBudget(int brakeLevel) {
     if (brakeLevel <= 0) return 0.f;
     return tune::BrakeSecondsPerLevel * static_cast<float>(brakeLevel);

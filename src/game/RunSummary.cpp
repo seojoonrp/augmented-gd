@@ -14,15 +14,12 @@ namespace augment::summary {
 
 void open() {
     auto s = AugmentManager::get().session();
-    if (!s) {
-        log::info("Summary: asked for without a session");
-        return;
-    }
+    if (!s) return;
     auto& mgr = AugmentManager::get();
     RunInfoPopup::Info info;
     info.deaths = mgr.deaths();
-    // What the HUD's best shows, minus the attempt still in progress:
-    // the record only moves on deaths, and this must never read above it.
+    // the HUD's best minus the live attempt: the record only moves on deaths,
+    // this must never read above it
     info.sessionBest = static_cast<int>(std::max(mgr.bestPercent(), mgr.lifeBest()));
     info.record = records::best(s->layer()->m_level);
     for (auto const& def : allAugments()) {

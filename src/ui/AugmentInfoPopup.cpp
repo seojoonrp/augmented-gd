@@ -9,10 +9,8 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    // A bit bigger than in a draft so the text reads comfortably; 1.3 (273 pt)
-    // filled the screen's height and felt heavy (user), 1.1 is 231 pt.
-    constexpr float kCardScale = 1.1f;
-    // Lighter than the summary's overlay, which is already under it.
+    constexpr float kCardScale = 1.1f;   // a bit bigger than in a draft
+    // lighter, the summary's overlay is already under it
     constexpr GLubyte kOverlayOpacity = 120;
     constexpr ccColor3B kGold = { 255, 215, 60 };
 }
@@ -46,8 +44,6 @@ bool AugmentInfoPopup::init(AugmentDef const& def, int level) {
     node->setScale(kCardScale);
     node->setPosition({ width / 2, height / 2 });
     m_mainLayer->addChild(node, 1);
-
-    log::info("AugmentInfoPopup: '{}' at Lv {}/{}", def.id, level, def.maxLevel);
     return true;
 }
 

@@ -1,8 +1,6 @@
 #pragma once
 
-// The mod's UI pieces: the rim / ring measurements the draft card (white rim
-// around GJ_button_01) is built from, the art slot, level stars, and the
-// GD-menu-coloured popup card and panels (run summary, resume prompt).
+// Shared drawing for the cards, panels and popups.
 
 #include <Geode/Geode.hpp>
 #include <Geode/ui/NineSlice.hpp>
@@ -17,11 +15,9 @@ namespace augment::card {
 constexpr float Rim = 2.f;
 constexpr float RimRadius = 8.f;    // just outside GJ_button_01's ~6 pt corners
 constexpr float Ring = 2.5f;        // GJ_button_01's black ring at sd
-// square02b_001's corner radius at scale 1 (measured: ~36 of 320 uhd px).
-constexpr float SquareRadius = 9.f;
+constexpr float SquareRadius = 9.f;  // square02b_001's corners at scale 1 (~36 of 320 uhd px)
 
-// square02b_001 is a plain white rounded square; the slices are scaled so
-// the corner radius comes out as asked, whatever the box size.
+// slices scaled so the corners come out at `radius` whatever the size
 inline geode::NineSlice* roundedBox(cocos2d::CCSize size, cocos2d::ccColor3B color, float radius, GLubyte opacity = 255) {
     float const scale = radius / SquareRadius;
     auto box = geode::NineSlice::create("square02b_001.png");
@@ -32,13 +28,7 @@ inline geode::NineSlice* roundedBox(cocos2d::CCSize size, cocos2d::ccColor3B col
     return box;
 }
 
-// A card's art slot, anchored at its centre: black border around a white
-// panel with the augment's drawing fitted inside, aspect kept. The file is
-// `resources/augments/<id>.png` (480x280, the draft card's 120x70 slot at
-// uhd; Geode makes the smaller ones), looked up from the id at runtime, so a
-// new augment needs a file, not code — a missing one leaves the panel empty.
-// The inner radius is the outer one minus the border so the border looks the
-// same thickness around the corners.
+// Black border, white panel, <id>.png fitted inside. No file = empty panel.
 inline cocos2d::CCNode* artSlot(std::string const& id, cocos2d::CCSize size, float radius, float border) {
     auto node = cocos2d::CCNode::create();
     node->setContentSize(size);
@@ -62,24 +52,20 @@ inline cocos2d::CCNode* artSlot(std::string const& id, cocos2d::CCSize size, flo
         node->addChild(art, 2);
     }
     else {
-        geode::log::warn("Card art '{}': none at '{}'", id, artName);
+        geode::log::warn("No card art for '{}'", id);
     }
     return node;
 }
 
 // ---------------------------------------------------------------- drawn shapes
-// CCDrawNode takes premultiplied colours and one colour per polygon. A border
-// in the fill's own colour closes the hairline seams its anti-aliasing leaves
-// between opaque polygons that share an edge (the gradient's strips). Keep
-// the pieces fat: on thin, sharp triangles the border's mitred corners shoot
-// out long spikes (the drawn star of 2026-09-28).
+// CCDrawNode colours are premultiplied. A border in the fill colour hides the
+// AA seams between strips; keep pieces fat or the mitred corners spike.
 
 inline cocos2d::ccColor4F premul(cocos2d::ccColor3B c, float alpha = 1.f) {
     return { c.r / 255.f * alpha, c.g / 255.f * alpha, c.b / 255.f * alpha, alpha };
 }
 
-// Outline of a rounded rectangle, counter-clockwise; convex, so drawPolygon's
-// fan fills it correctly (the draft gauge).
+// counter-clockwise and convex, so drawPolygon's fan fill works
 inline std::vector<cocos2d::CCPoint> roundedRectPoints(cocos2d::CCRect rect, float radius, int segments = 6) {
     float const r = std::min({ radius, rect.size.width / 2, rect.size.height / 2 });
     float const minX = rect.getMinX() + r, maxX = rect.getMaxX() - r;
@@ -95,14 +81,8 @@ inline std::vector<cocos2d::CCPoint> roundedRectPoints(cocos2d::CCRect rect, flo
     return points;
 }
 
-// A GD menu tile, after CreatorLayer's buttons (colours sampled from the
-// user's screenshot, 2026-09-28): white rim, black ring, and a green body
-// shaded left to right in two halves, the upper lighter, over a dark strip
-// along the bottom. A translucent black shadow down and to the right reads
-// dark blue on the blue card. The body pieces are CCLayerGradients along
-// (1, 0) — start colour on the left — with square corners, which the black
-// ring's inner edge hides. `size` = the ring's outer edge; anchored at its
-// centre.
+// GD menu tile, after CreatorLayer's buttons. The gradient bands have square
+// corners, the ring hides them. `size` = the ring's outer edge.
 inline cocos2d::CCNode* gdPanel(cocos2d::CCSize size, float rim, float ring, float shadowOffset) {
     constexpr cocos2d::ccColor4B kTopLeft = { 200, 254, 89, 255 };
     constexpr cocos2d::ccColor4B kTopRight = { 107, 208, 19, 255 };
@@ -113,14 +93,14 @@ inline cocos2d::CCNode* gdPanel(cocos2d::CCSize size, float rim, float ring, flo
     constexpr float kTopShare = 0.49f;      // of the body's height
     constexpr float kStripShare = 0.045f;
     constexpr float kMinStrip = 2.f;
-    constexpr GLubyte kShadowOpacity = 102; // black at 40 %
+    constexpr GLubyte kShadowOpacity = 102; // 40%
 
     auto node = cocos2d::CCNode::create();
     node->setContentSize(size);
     node->setAnchorPoint({ 0.5f, 0.5f });
     cocos2d::CCPoint const centre{ size.width / 2, size.height / 2 };
     cocos2d::CCSize const outer{ size.width + 2 * rim, size.height + 2 * rim };
-    float const outerRadius = ring + rim;   // even white rim around the ring's corner
+    float const outerRadius = ring + rim;   // keeps the white rim even round the corner
 
     auto shadow = roundedBox(outer, { 0, 0, 0 }, outerRadius, kShadowOpacity);
     shadow->setPosition(centre + cocos2d::CCPoint{ shadowOffset, -shadowOffset });
@@ -149,9 +129,8 @@ inline cocos2d::CCNode* gdPanel(cocos2d::CCSize size, float rim, float ring, flo
     return node;
 }
 
-// A rounded box with a vertical gradient, as horizontal strips whose ends
-// follow the corner arcs: 1 pt strips in the corner bands, 3 pt between.
-// Anchored at its centre.
+// vertical gradient as horizontal strips that follow the corner arcs
+// (1 pt strips in the corners, 3 pt between)
 inline cocos2d::CCDrawNode* gradientBox(cocos2d::CCSize size, cocos2d::ccColor3B top, cocos2d::ccColor3B bottom, float radius) {
     auto node = cocos2d::CCDrawNode::create();
     node->setContentSize(size);
@@ -182,15 +161,10 @@ inline cocos2d::CCDrawNode* gradientBox(cocos2d::CCSize size, cocos2d::ccColor3B
     return node;
 }
 
-// Level pips: the user's rounded star (resources/ui/round-star.svg, baked to
-// round-star.png by scripts/stargen.py: white fill inside a black outline)
-// tinted gold for levels held and grey for the rest. Drawing it with
-// CCDrawNode went wrong twice (the font glyph had a stray mark, the drawn
-// rounded star's thin fan triangles threw long spikes), hence the sprite.
-// `radius` is the drawn star's, outline included; the node's content size
-// covers the row and the caller picks the anchor.
+// Level stars. A sprite, since a CCDrawNode star spiked at the tips.
+// `radius` includes the outline; the caller sets the anchor.
 inline cocos2d::CCNode* stars(int filled, int total, float radius, float spacing) {
-    constexpr float kStarTilt = -12.f;   // degrees; cocos turns clockwise for positive
+    constexpr float kStarTilt = -12.f;   // degrees, positive is clockwise in cocos
     auto node = cocos2d::CCNode::create();
     float const d = 2 * radius;
     node->setContentSize({ (total - 1) * spacing + d, d });
@@ -201,7 +175,6 @@ inline cocos2d::CCNode* stars(int filled, int total, float radius, float spacing
             break;
         }
         star->setScale(d / star->getContentSize().width);
-        // Tipped a little to the left (user, 2026-09-28).
         star->setRotation(kStarTilt);
         star->setColor(i < filled ? cocos2d::ccColor3B{ 255, 215, 60 } : cocos2d::ccColor3B{ 115, 115, 115 });
         star->setPosition({ radius + i * spacing, radius });
@@ -210,13 +183,8 @@ inline cocos2d::CCNode* stars(int filled, int total, float radius, float spacing
     return node;
 }
 
-// The mod's popup card (run summary, resume prompt): the draft cards' white
-// rim and black ring around GD's menu blue (the vertical gradient behind
-// CreatorLayer, sampled from the user's screenshot 2026-09-28: 0/96/241 at
-// the top of the screen, 0/49/124 at the bottom — a card is shorter, so it
-// stops short of the darkest), with a soft shadow. `size` = the ring's outer
-// edge; anchored at its centre. (A top highlight went in round 3 and a thin
-// white inner stroke in round 8, both at the user's word.)
+// Popup card: the draft cards' rim and ring around CreatorLayer's blue
+// gradient (stops short of its darkest). `size` = the ring's outer edge.
 inline cocos2d::CCNode* framedPanel(cocos2d::CCSize size) {
     constexpr float kRingRadius = 6.5f;
     constexpr cocos2d::ccColor3B kTop = { 0, 96, 241 };

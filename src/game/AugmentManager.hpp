@@ -14,29 +14,24 @@ namespace augment {
 
 class LevelSession;
 
-// Geode-side owner of the current run: wraps RunState with settings and
-// logging, and owns the LevelSession while a run level is loaded. Singleton
-// so UI callbacks never need to hold a pointer to a PlayLayer (which may be
-// gone by the time they fire): they ask for session() at call time.
+// Owns the run (RunState + settings + logging) and the LevelSession.
+// Singleton so callbacks ask for session() at call time instead of holding a
+// PlayLayer that may be gone.
 class AugmentManager {
 public:
     static AugmentManager& get();
 
-    // --- level session (see LevelSession.hpp) ---
-    // Called by the PlayLayer hook around the layer's life. beginLevel
-    // replaces any stale session (a layer that went without onQuit).
+    // --- level session ---
+    // PlayLayer hook, around the layer's life. beginLevel replaces a stale
+    // session (a layer that never got onQuit).
     LevelSession& beginLevel(PlayLayer* layer, int levelID);
     void endLevel();
-    // The live session, or null when no run level is loaded or the layer it
-    // was made for is no longer the current PlayLayer.
+    // null unless a run level is loaded and its layer is still PlayLayer::get()
     LevelSession* session() const;
-    // For the PlayLayer hook itself: the session made for `layer`, or null.
-    // No PlayLayer::get() check, because inside PlayLayer::init GD may not
-    // have published the layer yet.
+    // for the PlayLayer hook: no PlayLayer::get() check, GD may not have set it yet inside init
     LevelSession* sessionFor(PlayLayer* layer) const;
 
-    // Read access to the run; every mutation goes through the methods below
-    // so it gets logged in one place.
+    // read-only; changes go through the methods below
     RunState const& state() const { return m_state; }
 
     // --- run lifecycle ---
@@ -44,24 +39,19 @@ public:
     void endRun();
     bool isRunActive() const { return m_state.active(); }
     bool isRunFor(int levelID) const { return m_state.isFor(levelID); }
-    // A run level is only one entered through the AUG button: it arms the
-    // next PlayLayer of that level, GD's own Play button disarms, and any
-    // other way in plays normally with the run parked for the next Continue
-    // (user, 2026-09-29: a run left mid-way came back on a normal Play).
+    // Only the AUG button enters a run level: it arms the next PlayLayer of
+    // that level, GD's Play button disarms, anything else plays normally and
+    // leaves the run parked.
     void armRunEntry(int levelID);
     void disarmRunEntry();
-    // For PlayLayer::init: true when the AUG button armed this level. Clears
-    // the flag either way, so it never outlives one level load.
+    // for PlayLayer::init; clears the flag either way
     bool takeRunEntry(int levelID);
     int levelID() const { return m_state.levelID(); }
     std::string const& levelName() const { return m_state.levelName(); }
 
     // --- draft gauge ---
-    // Called once per attempt when player 1 dies. Returns what the death
-    // charged (`charge` includes the new-best `bonus`) so the caller can
-    // show it. `respawning` = a checkpoint brings this attempt back, so the
-    // gauge waits for the death that ends the life (`deferred` result, and
-    // nothing to show).
+    // once per attempt when player 1 dies. respawning = a checkpoint brings it
+    // back, the charge waits (deferred result)
     DeathResult onDeath(float percent, bool respawning);
     int pendingDrafts() const { return m_state.pendingDrafts(); }
     bool hasPendingDraft() const { return m_state.hasPendingDraft(); }
@@ -69,23 +59,18 @@ public:
     void dropPendingDrafts() { m_state.dropPendingDrafts(); }
     int pendingGaugeDrafts() const { return m_state.pendingGaugeDrafts(); }
     float gauge() const { return m_state.gauge(); }
-    // Every augment at its max level: the gauge reads MAX and pays nothing.
+    // gauge reads MAX and pays nothing
     bool allMaxed() const { return !m_state.anyDraftable(); }
-    // Cost of the next draft: the rising ramp (20, 20, 20, 25 ... stopping
-    // at 70), the same in debug mode.
     float gaugeThreshold() const { return m_state.gaugeThreshold(this->gaugeRule()); }
-    // Cost of the gauge draft earned last; the HUD shows "cost/cost" while it waits.
+    // the HUD shows "cost/cost" while that draft waits
     float lastDraftCost() const { return m_state.lastDraftCost(this->gaugeRule()); }
-    // The `debug-mode` setting: number keys grant augments and fill the gauge.
+    // `debug-mode` setting: number keys grant augments / fill the gauge
     static bool debugMode();
-    // Debug: tops the gauge up to the threshold so the next death drafts.
-    // Returns the charge added.
+    // tops the gauge up so the next death drafts; returns what it added
     float debugFillGauge();
     int deaths() const { return m_state.deaths(); }
     int draftsTaken() const { return m_state.draftsTaken(); }
     float bestPercent() const { return m_state.bestPercent(); }
-    // Best percent of a life a checkpoint respawn is holding open (0 when
-    // nothing is deferred); the HUD shows it as part of the best.
     float lifeBest() const { return m_state.lifeBest(); }
 
     // --- augments ---
@@ -94,28 +79,23 @@ public:
     RunState::Levels const& augments() const { return m_state.augments(); }
     std::vector<AugmentDef const*> rollDraft(size_t count) const;
     size_t draftCardCount() const { return m_state.draftCardCount(); }
-    // Picking an augment increments its level (or adds it at level 1).
     void applyPick(std::string const& id);
-    // Same level bump without counting a draft (debug keys). Returns the new
-    // level, or 0 for an unknown id.
+    // debug keys: level up without counting a draft. 0 = unknown id
     int grant(std::string const& id);
 
-    // --- slow-mo toggle (persists across attempts within a run) ---
+    // --- slow-mo, toggle kept across attempts ---
     bool slowMoEnabled() const { return m_state.slowMoEnabled(); }
     void toggleSlowMo() { m_state.toggleSlowMo(); }
     float slowMoScale() const { return m_state.slowMoScale(); }
-    // --- hitbox shrinks (hazard-hitbox / wave-hitbox, boosted by nerve) ---
-    // `progress` is the current level percent / 100; pass 0 outside a run.
+    // --- hitbox scales; progress = percent / 100, 0 outside a run ---
     float nerveBoost(float progress) const { return m_state.nerveBoost(progress); }
     float hazardScale(float progress) const { return m_state.hazardScale(progress); }
     float waveScale(float progress) const { return m_state.waveScale(progress); }
-    // --- cat: hazards removed per sweep and seconds between sweeps (0 when unowned) ---
+    // --- cat / missile / berserker, 0 when unowned ---
     int catCount() const { return m_state.catCount(); }
     float catInterval() const { return m_state.catInterval(); }
-    // --- missile: seconds between strikes and blast radius in object units (0 when unowned) ---
     float missileInterval() const { return m_state.missileInterval(); }
-    float missileRadius() const { return m_state.missileRadius(); }
-    // --- berserker: roll per destroyed hazard and window length (0 when unowned) ---
+    float missileRadius() const { return m_state.missileRadius(); }   // object-layer units
     float berserkChance() const { return m_state.berserkChance(); }
     float berserkSeconds() const { return m_state.berserkSeconds(); }
 

@@ -31,6 +31,7 @@ Augmented runs never count as real progress. A run attempt does not save a norma
 
 - Supports only English and Korean for now.
 - Windows only for now. Updates will be done soon!
+- Platformer levels work, but classic levels are recommended.
 
 ## Feedback
 

@@ -1,7 +1,6 @@
-// brake (브레이크): while C is held the game runs at 1 - tune::BrakeCut
-// (40 %), for BrakeSecondsPerLevel * level real seconds per attempt. The
-// speed goes through scales::setTimeOverride, which wins over the slow-mo
-// base speed while set, so the two never fight over the scheduler.
+// brake (브레이크): hold C to run the game at 1 - tune::BrakeCut, for
+// BrakeSecondsPerLevel * level real seconds per attempt. Goes through
+// scales::setTimeOverride, which beats slow-mo's base speed while set.
 
 #include "Augments.hpp"
 #include "../core/Formulas.hpp"
@@ -20,66 +19,45 @@ class Brake : public Augment {
 public:
     Brake() : Augment({ ids::Brake }) {}
 
-    // The key may still be physically down across a reset, so m_held
-    // survives it; only the budget is per attempt (a checkpoint respawn
-    // continues the attempt, like shield's charges).
+    // m_held survives resets on purpose, the key can still be down
     void onAttemptStart(LevelSession& s, bool fromCheckpoint) override {
-        if (!fromCheckpoint) {
-            m_left = formula::brakeBudget(s.levelOf(ids::Brake));
-            m_emptyNoticed = false;
-        }
+        if (!fromCheckpoint) m_left = formula::brakeBudget(s.levelOf(ids::Brake));
         this->apply(s);
     }
 
-    // The checkpoint keeps the seconds left when it was placed.
     void onCheckpointPlaced(LevelSession&) override { m_savedLeft = m_left; }
     void onCheckpointRespawn(LevelSession& s) override {
         m_left = m_savedLeft;
-        m_emptyNoticed = false;
-        log::info("Brake: restored from checkpoint, {:.1f}s left", m_left);
         this->apply(s);
     }
 
-    void onGranted(LevelSession& s, std::string const& id, int level) override {
+    void onGranted(LevelSession& s, std::string const& id, int) override {
         if (id != ids::Brake) return;
-        // Drafted mid-attempt: the new level's extra seconds are usable now.
+        // drafted mid-attempt: the new level's seconds count right away
         m_left += tune::BrakeSecondsPerLevel;
-        log::info("Brake: level {} -> {:.1f}s left this attempt", level, m_left);
         this->apply(s);
     }
 
     bool onHotkey(LevelSession& s, Hotkey which, bool down) override {
-        if (which != Hotkey::Brake) return false;
-        if (!s.owns(ids::Brake)) {
-            if (down) log::info("C ignored: brake not owned");
-            return false;
-        }
+        if (which != Hotkey::Brake || !s.owns(ids::Brake)) return false;
         m_held = down;
-        log::info("Brake {}: {:.1f}s left, runAttempt={}", down ? "held" : "released", m_left, s.runAttempt());
         this->apply(s);
         return true;
     }
 
-    // Re-evaluated every frame so pause / practice / run end all release
-    // the override without special cases. dt arrives time-scaled; the
-    // budget counts real seconds.
+    // Checked every frame so pause / practice / run end drop the override for
+    // free. dt comes in time-scaled, the budget is real seconds.
     void onFrame(LevelSession& s, float dt) override {
         if (this->active(s)) {
             float scale = scales::time();
             m_left -= scale > 0.f ? dt / scale : dt;
-            if (m_left <= 0.f) {
-                m_left = 0.f;
-                if (!m_emptyNoticed) {
-                    m_emptyNoticed = true;
-                    log::info("Brake: budget used up this attempt");
-                }
-            }
+            if (m_left <= 0.f) m_left = 0.f;
         }
         this->apply(s);
     }
 
-    // Focus loss reaches us as pauseGame(unfocused) and the release never
-    // arrives, so a pause forgets the key; the player presses again.
+    // Focus loss shows up as pauseGame and the key release never comes, so
+    // a pause forgets the key.
     void onPause(LevelSession&) override {
         m_held = false;
         scales::setTimeOverride(0.f);
@@ -109,7 +87,6 @@ private:
     bool m_held = false;
     float m_left = 0.f;
     float m_savedLeft = 0.f;
-    bool m_emptyNoticed = false;
 };
 
 } // namespace

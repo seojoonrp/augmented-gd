@@ -1,9 +1,6 @@
-// cat (고양이): every catInterval() seconds of play, remove catCount()
-// random hazards that are on screen and ahead of the player. The scan and
-// the removal / put-back bookkeeping are hazard:: (HazardRemoval.hpp), shared
-// with the missile. A CatNode in the UI layer shows the cat in the
-// bottom-right corner (idle frames, a wand swing per cast) and a small magic
-// circle on each removed hazard.
+// cat (고양이): every catInterval() seconds, removes catCount() random hazards
+// that are on screen and ahead of the player. The cat itself sits in the
+// bottom-right corner (CatNode).
 
 #include "Augments.hpp"
 #include "HazardRemoval.hpp"
@@ -32,7 +29,6 @@ public:
         if (!m_node && layer->m_uiLayer) {
             m_node = CatNode::create();
             layer->m_uiLayer->addChild(m_node, 999);
-            log::info("Cat: node added to the UI layer");
         }
         if (!s.runAttempt() || layer->m_isPaused || !layer->m_player1 || layer->m_player1->m_isDead) return;
 
@@ -44,14 +40,10 @@ public:
         this->sweep(s);
     }
 
-    // Put back everything the cat took this attempt. Runs before GD's own
-    // reset so any per-object reset GD does still gets the last word.
+    // before GD's reset, so GD's own per-object reset still gets the last word
     bool onBeforeReset(LevelSession&) override {
         m_timer = 0.f;
-        if (m_removed.empty()) return false;
-        auto count = m_removed.size();
-        int stillDisabled = m_removed.restore();
-        log::info("Cat: restored {} hazards ({} were still disabled)", count, stillDisabled);
+        m_removed.restore();
         return false;
     }
 
@@ -84,18 +76,12 @@ private:
             removed++;
         }
         if (m_node) m_node->castAt(hit);
-        log::info(
-            "Cat: removed {}/{} of {} hazards in view at {:.1f}% (scan x {:.0f}..{:.0f}, {} removed this attempt)",
-            removed, want, candidates.size(), s.percent(), view.lo, view.hi, m_removed.size()
-        );
         if (removed > 0) s.onHazardsDestroyed(removed);
     }
 
-    // Seconds since the last sweep, and what this attempt's sweeps removed.
-    float m_timer = 0.f;
+    float m_timer = 0.f;   // since the last sweep
     hazard::Removed m_removed;
-    // Child of m_uiLayer; dies with the level.
-    CatNode* m_node = nullptr;
+    CatNode* m_node = nullptr;   // child of m_uiLayer
 };
 
 } // namespace

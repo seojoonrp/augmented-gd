@@ -1,7 +1,6 @@
-// foresight (사륜안): draw GD-style hitboxes around the player. GD's own
-// hitbox drawing is gated by an inlined "practice mode && show-hitboxes"
-// check that can't be reached from a hook (OpenHack byte-patches it), so
-// the boxes are drawn on our own CCDrawNode in the object layer.
+// foresight (사륜안): GD-style hitboxes around the player. GD's own hitbox
+// drawing sits behind an inlined "practice mode && show hitboxes" check that
+// no hook reaches, so we draw on our own CCDrawNode instead.
 
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"
@@ -18,8 +17,8 @@ namespace augment {
 
 namespace {
 
-// Past the screen edge a box still counts as on screen: its outline is drawn
-// centred on the edge and anti-aliased, so one just outside can still show.
+// outlines are centred on the edge and anti-aliased, so a box just off
+// screen can still show
 constexpr float kViewPad = 4.f;
 
 class Foresight : public Augment {
@@ -31,9 +30,8 @@ public:
     }
 
 private:
-    // The screen in object-layer coordinates (the draw node's space): the
-    // bounding box of its four corners, so camera zoom, offset and rotation
-    // all count, like hazard::viewAhead.
+    // Screen in object-layer space, as the bounding box of its corners, so
+    // zoom / offset / rotation all count.
     static CCRect visibleRect(PlayLayer* layer) {
         auto const win = CCDirector::get()->getWinSize();
         CCPoint const corners[] = { { 0.f, 0.f }, { win.width, 0.f }, { 0.f, win.height }, { win.width, win.height } };
@@ -64,8 +62,7 @@ private:
         node->setVisible(true);
         if (!layer->m_player1) return;
 
-        // GD-style: thin outlines, no fill. Blue = solid, red = hazard,
-        // green = everything else that interacts (portals, pads, rings, coins).
+        // blue = solid, red = hazard, green = other interactive stuff (portals, pads, rings, coins)
         constexpr float kBorder = 0.25f;
         ccColor4F const noFill = { 0.f, 0.f, 0.f, 0.f };
         auto colorFor = [](GameObjectType type) -> std::optional<ccColor4F> {
@@ -88,16 +85,13 @@ private:
             }
         };
 
-        // Objects within roughly one screen ahead / a bit behind the player,
-        // at any height; of those, only the boxes that reach the screen are
-        // drawn. Every box is a polygon rebuilt each frame, and the window
-        // holds far more than the screen does on a tall or zoomed-in level.
+        // One extra grid column each side for objects filed just off screen
+        // whose box still reaches in. Only boxes that touch the view get drawn.
         CCRect const view = visibleRect(layer);
-        float px = layer->m_player1->getPositionX();
-        s.forEachObjectInX(px - 240.f, px + 720.f, [&](GameObject* obj) {
+        float const pad = LevelSession::SectionWidth;
+        s.forEachObjectInX(view.getMinX() - pad, view.getMaxX() + pad, [&](GameObject* obj) {
             if (!obj->isVisible() || obj->m_isHide) return;
-            // Disabled = removed by the cat (or toggled off by the level); GD
-            // skips these in collision, so no box.
+            // disabled (cat, or the level toggled it): GD skips it in collision too
             if (obj->m_isDisabled || obj->m_isDisabled2) return;
             auto color = colorFor(obj->m_objectType);
             if (!color) return;
@@ -114,8 +108,7 @@ private:
             }
         });
 
-        // Player: yellow outer box plus the smaller inner box GD uses for
-        // solid collisions.
+        // player: yellow outer box + the smaller inner box GD uses for solids
         ccColor4F const playerColor = { 1.f, 1.f, 0.f, 1.f };
         auto drawPlayer = [&](PlayerObject* p) {
             auto rect = p->getObjectRect();
@@ -132,8 +125,7 @@ private:
         if (layer->m_player2 && layer->m_gameState.m_isDualMode) drawPlayer(layer->m_player2);
     }
 
-    // Child of m_objectLayer; dies with the level.
-    CCDrawNode* m_node = nullptr;
+    CCDrawNode* m_node = nullptr;   // child of m_objectLayer
 };
 
 } // namespace

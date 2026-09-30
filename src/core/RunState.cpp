@@ -16,8 +16,7 @@ void RunState::start(int levelID, std::string levelName) {
     m_bestPercent = 0.f;
     m_lifeBest = 0.f;
     m_gauge = 0.f;
-    // Every run opens with a free draft; PlayLayer::startGame shows it. Not
-    // gauge-earned, so it leaves the threshold ramp alone.
+    // free opening draft (PlayLayer::startGame shows it), not on the ramp
     m_pendingDrafts = 1;
     m_pendingGaugeDrafts = 0;
     m_levels.clear();
@@ -51,40 +50,28 @@ DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawn
 
     m_deaths++;
 
-    // A death the run comes back from (checkpoint respawn) settles nothing:
-    // the life is one visit to the level, so it pays once, for the furthest
-    // point it reached. The best percent is left alone too, or the bonus
-    // below would already be spent when the life ends.
+    // A checkpoint respawn settles nothing: the life pays once, for the
+    // furthest it got. Don't touch the best yet either, or the bonus is spent early.
     m_lifeBest = std::max(m_lifeBest, percent);
     if (respawning) {
         r.deferred = true;
         return r;
     }
-    // Everything this life reached, including the deaths it was revived from.
     percent = m_lifeBest;
     m_lifeBest = 0.f;
 
-    // No minimum: dying at 3 % is worth 3, so farming early deaths never
-    // pays. New ground is paid twice (at mult 1): the bonuses over a whole
-    // run sum to at most 100 * mult, so this rewards progress and nothing
-    // else. A new best counts in whole percents (4.1 -> 4.4 is not one: a
-    // "NEW BEST +0" annoyed the user), while the best itself keeps the
-    // decimals for the HUD and the progress dot.
-    //
-    // The charge is whole percents too, GD's own death percent: with the
-    // decimals kept, deaths at 2.2, 3.3 and 12.1 % plus 12 bonus made 29.6,
-    // the HUD rounded it to "30/30" and no draft came (user, 2026-09-30).
+    // No minimum, so farming early deaths doesn't pay. New ground pays twice
+    // (bonuses sum to at most 100 * mult per run). Whole percents for both, or
+    // a 29.6 gauge reads "30/30" and doesn't draft; the best keeps its decimals
+    // for the HUD and the progress dot.
     float wholeNew = std::floor(percent) - std::floor(m_bestPercent);
     if (wholeNew > 0.f) r.bonus = std::floor(wholeNew * rule.newBestMult);
     m_bestPercent = std::max(m_bestPercent, percent);
     r.charge = std::floor(percent) + r.bonus;
     m_gauge += r.charge;
 
-    // A big new best can pay for several drafts at once; each one raises
-    // the cost of the next. Leftover charge carries over. Every draft
-    // (the opening one too) takes one level, so no more are queued than
-    // there are levels left to give: the last draft of a run shows only
-    // what is left, and none follows it.
+    // can pay for several. every draft (opening one too) takes a level, so
+    // never queue more than there are levels left
     while (m_gauge >= this->gaugeThreshold(rule) && m_pendingDrafts < this->levelsLeft()) {
         m_gauge -= this->gaugeThreshold(rule);
         m_gaugeDrafts++;

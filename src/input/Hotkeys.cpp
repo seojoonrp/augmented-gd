@@ -1,21 +1,8 @@
-// Hotkeys (keys come from the "keybind" settings in mod.json).
-//
-// Why a plain listener never fired: the loader registers its own
-// KeyboardInputEvent listener in queueMods(), before any mod binary is loaded,
-// so at priority 0 it runs ahead of every listener a mod adds from $execute /
-// $on_mod. That listener turns presses into KeybindSettingPressedEventV3 and
-// returns Stop as soon as one setting's listener does. Custom Keybinds binds
-// Z / X (practice checkpoints) on the PlayLayer and returns Stop whenever the
-// level isn't paused, so in a level X and Z were consumed before they reached
-// us (or CCKeyboardDispatcher, which is why hooking that saw nothing either).
-//
-// Two paths, each ahead of that:
-//   1. our settings carry "priority": -5, so the loader dispatches them before
-//      Custom Keybinds' for the same key; the node-scoped listener lives in
-//      PlayLayer::init (PlayLayerHook.cpp) and dies with the layer.
-//   2. a raw KeyboardInputEvent listener at priority -1, ahead of the loader's
-//      (registered below).
-// Whichever runs first handles the press; the other one hits the frame guard.
+// Two input paths, because the loader's own key listener runs before anything a
+// mod adds at priority 0, and Custom Keybinds stops Z / X in levels there:
+//   1. our keybind settings have "priority": -5 (listeners in PlayLayerHook.cpp)
+//   2. a raw KeyboardInputEvent listener at -1, below
+// Whichever fires first handles the key, the frame guard drops the other.
 
 #include "Hotkeys.hpp"
 #include "../game/AugmentManager.hpp"
@@ -34,16 +21,12 @@ namespace augment::hotkeys {
 
 namespace {
 
-// One physical press (or release) can reach route() through both input
-// paths in the same frame; the second one is dropped (and answered like the
-// first). Indexed [hotkey][down].
+// last frame each [hotkey][down] was routed, and what it returned then
 unsigned g_lastFrame[HotkeyCount][2] = {};
 bool g_lastHandled[HotkeyCount][2] = {};
 
-// getSettingValue does the typeinfo cast for us; an empty result means the
-// setting couldn't be resolved, so fall back to the mod.json default. A span
-// views the setting's own list (this runs for every key event in the game;
-// the vector form copied the list each time).
+// empty = setting couldn't be read, use the mod.json default.
+// span because this runs on every key event and a vector would copy the list
 bool keybindMatches(char const* settingKey, enumKeyCodes fallback, Keybind const& pressed) {
     auto binds = Mod::get()->getSettingValue<std::span<Keybind const>>(settingKey);
     if (binds.empty()) return pressed == Keybind(fallback, KeyboardModifier::None);
@@ -52,27 +35,16 @@ bool keybindMatches(char const* settingKey, enumKeyCodes fallback, Keybind const
 
 } // namespace
 
-bool route(Hotkey which, bool down, char const* source) {
-    char const* action = down ? "press" : "release";
-    if (down && draft::isOpen()) {
-        log::info("Hotkey {} {} via {} ignored: draft open", hotkeyName(which), action, source);
-        return false;
-    }
+bool route(Hotkey which, bool down) {
+    if (down && draft::isOpen()) return false;
     auto session = AugmentManager::get().session();
-    if (!session) {
-        log::info("Hotkey {} {} via {} ignored: no run level", hotkeyName(which), action, source);
-        return false;
-    }
+    if (!session) return false;
 
-    // getTotalFrames starts at 0, so the "never" sentinel is ~0u.
+    // stored as frame + 1 so the zeroed arrays never match frame 0
     unsigned frame = CCDirector::sharedDirector()->getTotalFrames();
     int i = static_cast<int>(which);
     int d = down ? 1 : 0;
-    if (g_lastFrame[i][d] == frame + 1) {
-        log::info("Hotkey {} {} via {} duplicate in frame {}, ignored", hotkeyName(which), action, source, frame);
-        return g_lastHandled[i][d];
-    }
-    log::info("Hotkey {} {} via {} (frame {})", hotkeyName(which), action, source, frame);
+    if (g_lastFrame[i][d] == frame + 1) return g_lastHandled[i][d];
 
     bool handled = session->onHotkey(which, down);
     g_lastFrame[i][d] = frame + 1;
@@ -85,27 +57,25 @@ bool route(Hotkey which, bool down, char const* source) {
 $on_mod(Loaded) {
     using namespace augment;
     KeyboardInputEvent().listen([](KeyboardInputData& data) {
-        // Repeats are neither a press nor a release for us.
         if (data.action == KeyboardInputData::Action::Repeat) return ListenerResult::Propagate;
         bool down = data.action == KeyboardInputData::Action::Press;
-        // Text fields get their keys untouched.
+        // leave text fields alone
         if (CCIMEDispatcher::sharedDispatcher()->hasDelegate()) return ListenerResult::Propagate;
 
         Keybind pressed(data.key, data.modifiers);
         if (hotkeys::keybindMatches("keybind-slowmo", KEY_X, pressed)) {
-            return hotkeys::route(Hotkey::SlowMo, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+            return hotkeys::route(Hotkey::SlowMo, down) ? ListenerResult::Stop : ListenerResult::Propagate;
         }
         if (hotkeys::keybindMatches("keybind-checkpoint", KEY_Z, pressed)) {
-            return hotkeys::route(Hotkey::Checkpoint, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+            return hotkeys::route(Hotkey::Checkpoint, down) ? ListenerResult::Stop : ListenerResult::Propagate;
         }
         if (hotkeys::keybindMatches("keybind-brake", KEY_C, pressed)) {
-            return hotkeys::route(Hotkey::Brake, down, "raw") ? ListenerResult::Stop : ListenerResult::Propagate;
+            return hotkeys::route(Hotkey::Brake, down) ? ListenerResult::Stop : ListenerResult::Propagate;
         }
         if (!down) return ListenerResult::Propagate;
 
-        // Debug: 1..9 grant augments (table order), Shift+1..9 the 10th
-        // onwards (Shift+1 cat, Shift+2 brake, Shift+3 missile, Shift+4 berserker),
-        // 0 fills the gauge. Never while a draft is up.
+        // debug: 1-9 grant augments in table order, Shift+1-9 the 10th on
+        // (Shift+1 cat, 2 brake, 3 missile, 4 berserk), 0 fills the gauge
         bool shift = data.modifiers == KeyboardModifier::Shift;
         if (data.key >= KEY_Zero && data.key <= KEY_Nine && (data.modifiers == KeyboardModifier::None || shift)
             && AugmentManager::debugMode() && !draft::isOpen()) {
@@ -122,5 +92,4 @@ $on_mod(Loaded) {
         }
         return ListenerResult::Propagate;
     }, -1).leak();
-    log::info("Hotkey raw listener registered (priority -1)");
 }

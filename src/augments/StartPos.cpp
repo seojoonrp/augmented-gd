@@ -1,16 +1,12 @@
-// startpos (스타트포스): `level` checkpoint placements per attempt (a life
-// from 0 %). Only the newest placement counts: a death respawns there once,
-// and after that respawn the next death restarts from 0 unless a new
-// checkpoint was placed (budget permitting). Z places. Placing also asks the
-// other augments to snapshot their state (shield charges, brake time) and
-// the respawn restores it.
+// startpos (스타트포스): Z places a checkpoint, `level` per attempt. Only the
+// newest counts: a death respawns there once, after that the next death
+// restarts from 0 unless a new one was placed. Placing also snapshots the
+// other augments (shield charges, brake time) for the respawn.
 //
-// GD's checkpoint internals (docs/GD-INTERNALS.md "Checkpoints in normal
-// mode"): our own ref decides where to respawn; GD's m_checkpointArray is
-// made to end in it right before a respawn if GD dropped it
-// (removePlacedCheckpoint deletes a checkpoint placed < 0.1 s before the
-// death), and the practice-mode respawn path is borrowed for exactly the one
-// PlayLayer::resetLevel() call that respawns.
+// Our own ref decides where to respawn, not GD's m_checkpointArray: GD drops
+// a checkpoint placed < 0.1 s before a death (removePlacedCheckpoint), so the
+// array gets patched right before the respawn, and the respawn itself borrows
+// the practice-mode path for that one resetLevel() call.
 
 #include "Augments.hpp"
 #include "../game/LevelSession.hpp"
@@ -30,29 +26,16 @@ class StartPos : public Augment {
 public:
     StartPos() : Augment({ ids::StartPos }) {}
 
-    // An unused placement means we come back to it. Our own ref decides,
-    // not GD's array.
-    // The answer also tells the gauge whether this death ends the life: a
-    // death we come back from charges nothing (the life pays once).
+    // a death we come back from doesn't end the life, so the gauge isn't charged for it
     bool onDeath(LevelSession& s) override {
         if (!s.owns(ids::StartPos)) return false;
         m_respawnPending = m_checkpoint != nullptr;
-        log::info(
-            "Checkpoint: death with {}/{} placed, {}, GD array {} -> {}",
-            m_placed, s.levelOf(ids::StartPos), m_checkpoint ? "one ready" : "none ready",
-            this->gdCount(s), m_respawnPending ? "respawn" : "restart from 0"
-        );
         return m_respawnPending;
     }
 
-    // Decides the kind of reset and points GD at the right checkpoint (or
-    // none) before its resetLevel runs.
     bool onBeforeReset(LevelSession& s) override {
         auto layer = s.layer();
         bool fromCheckpoint = m_respawnPending && m_checkpoint && s.runAttempt();
-        if (m_respawnPending && !fromCheckpoint) {
-            log::info("Checkpoint: respawn dropped (ready {}, runAttempt {})", m_checkpoint != nullptr, s.runAttempt());
-        }
         m_respawnPending = false;
         m_lastRespawn = nullptr;
 
@@ -61,10 +44,9 @@ public:
             m_checkpoint = nullptr;
             m_percents.clear();
 
-            // Borrow the practice-mode respawn path for exactly this reset.
-            // GD respawns at m_currentCheckpoint / the last array entry, so
-            // both are pointed at the target first; onAttemptStart undoes the
-            // practice flag right after GD's reset.
+            // Practice respawn path for this one reset. It uses
+            // m_currentCheckpoint / the last array entry, so point both at
+            // the target. onAttemptStart puts the practice flag back.
             this->syncGdArray(s, m_target);
             layer->m_currentCheckpoint = m_target;
             m_wasPractice = layer->m_isPracticeMode;
@@ -72,9 +54,9 @@ public:
             return true;
         }
 
-        // Fresh attempt: refill everything. Same as qolmod's StartposSwitcher:
-        // a null current checkpoint makes GD start from the start position.
-        // Practice mode on a run level keeps the player's own checkpoints.
+        // Fresh attempt. A null current checkpoint makes GD start from the
+        // start (same trick as qolmod's StartposSwitcher). Practice on a run
+        // level keeps the player's own checkpoints.
         m_placed = 0;
         m_checkpoint = nullptr;
         m_percents.clear();
@@ -90,15 +72,10 @@ public:
         s.layer()->m_isPracticeMode = m_wasPractice;
         this->consume(s, m_target);
         m_target = nullptr;
-        log::info(
-            "Respawned from checkpoint ({}/{} placed this attempt, next death restarts from 0)",
-            m_placed, s.levelOf(ids::StartPos)
-        );
         s.notice(tr("Back at the checkpoint.", "체크포인트에서 부활합니다."));
     }
 
-    // The dot on GD's progress bar follows the live placement; ProgressMarks
-    // only redraws when the list changes, and the bar may attach late.
+    // every frame: ProgressMarks only redraws on change, and the bar can attach late
     void onFrame(LevelSession& s, float) override {
         if (auto marks = s.marks()) marks->setCheckpoints(m_percents);
     }
@@ -120,13 +97,11 @@ private:
     }
 
     CheckpointObject* gdLast(LevelSession& s) const {
-        // getLastCheckpoint() is inline and dereferences the array unguarded.
+        // getLastCheckpoint() is inline and doesn't null-check the array
         return s.layer()->m_checkpointArray ? s.layer()->getLastCheckpoint() : nullptr;
     }
 
-    // GD respawns at the last entry of m_checkpointArray. Normally that
-    // already is `target` (GD kept our placement). If GD dropped it on the
-    // normal-mode death, rebuild the array as just the target.
+    // if GD dropped our placement on the death, rebuild the array as just the target
     void syncGdArray(LevelSession& s, CheckpointObject* target) {
         auto layer = s.layer();
         int count = this->gdCount(s);
@@ -134,38 +109,24 @@ private:
 
         if (count > 0) layer->removeAllCheckpoints();
         layer->storeCheckpoint(target);
-        log::info("Checkpoint: rebuilt GD array ({} -> {} entries)", count, this->gdCount(s));
     }
 
-    // A respawn uses its checkpoint up. removeCheckpoint(false) drops the
-    // newest entry — it is what GD itself calls (removePlacedCheckpoint) to
-    // undo a checkpoint placed right before a death. The object stays alive
-    // in m_lastRespawn because GD may still point at it this attempt.
+    // A respawn uses the checkpoint up. removeCheckpoint(false) pops the
+    // newest entry (GD's own removePlacedCheckpoint does the same). Keep a ref
+    // in m_lastRespawn since GD may still point at it this attempt.
     void consume(LevelSession& s, CheckpointObject* target) {
         m_lastRespawn = target;
-        int before = this->gdCount(s);
         if (this->gdLast(s) == target) s.layer()->removeCheckpoint(false);
-        log::info(
-            "Checkpoint: consumed (GD array {} -> {}{})",
-            before, this->gdCount(s), this->gdLast(s) == target ? ", still on top!" : ""
-        );
     }
 
-    // Returns true when the key was consumed (also when the budget is spent
-    // or GD refuses: the player has the augment, so Z is ours either way).
+    // true = key consumed, even when out of placements or GD refuses
     bool tryPlace(LevelSession& s) {
         auto layer = s.layer();
         int lvl = s.levelOf(ids::StartPos);
         bool dead = !layer->m_player1 || layer->m_player1->m_isDead;
-        if (!s.runAttempt() || layer->m_isPaused || lvl == 0 || dead) {
-            log::info("Z ignored: runAttempt={} paused={} cpLv={} dead={}", s.runAttempt(), layer->m_isPaused, lvl, dead);
-            return false;
-        }
+        if (!s.runAttempt() || layer->m_isPaused || lvl == 0 || dead) return false;
 
-        if (m_placed >= lvl) {
-            log::info("Z ignored: no checkpoints left ({}/{})", m_placed, lvl);
-            return true;
-        }
+        if (m_placed >= lvl) return true;
 
         bool wasPractice = layer->m_isPracticeMode;
         layer->m_isPracticeMode = true;
@@ -174,32 +135,23 @@ private:
 
         if (cp) {
             m_placed++;
-            bool replaced = m_checkpoint != nullptr;
             m_checkpoint = cp;
             m_percents.assign(1, s.percent());
             s.onCheckpointPlaced();
-            log::info(
-                "Checkpoint placed ({}/{}){} at {:.1f}%, GD array {}", m_placed, lvl,
-                replaced ? ", replaces the previous one" : "", s.percent(), this->gdCount(s)
-            );
             s.notice(tr("Checkpoint placed.", "체크포인트가 설정되었습니다."));
         }
         else {
-            // GD refused (its own conditions, e.g. mid-dash). Nothing is shown
-            // — the HUD row still reads `none`, and the log says why.
-            log::info("markCheckpoint returned null at {:.1f}%", s.percent());
+            // GD's own conditions (e.g. mid-dash); nothing on screen says so
+            log::info("StartPos: GD refused the checkpoint at {:.1f}%", s.percent());
         }
         return true;
     }
 
-    // Placed this attempt (the budget), and the one live placement.
-    int m_placed = 0;
-    Ref<CheckpointObject> m_checkpoint;
-    // Percent of the live placement (0 or 1 entries); only feeds the
-    // progress-bar dot.
-    std::vector<float> m_percents;
+    int m_placed = 0;   // this attempt's budget
+    Ref<CheckpointObject> m_checkpoint;   // the one live placement
+    std::vector<float> m_percents;   // 0 or 1 entries, for the progress bar dot
     bool m_respawnPending = false;
-    // Between onBeforeReset and onAttemptStart of a respawn.
+    // between onBeforeReset and onAttemptStart of a respawn
     Ref<CheckpointObject> m_target;
     bool m_wasPractice = false;
     Ref<CheckpointObject> m_lastRespawn;

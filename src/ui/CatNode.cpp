@@ -9,16 +9,14 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    // Magic circles: 128 px uhd frames (32 pt), shown a touch bigger. Small
-    // on purpose (a GD block is ~30 units, so one sits about on a block).
+    // circle frames are 128px uhd (32pt); about one block across on screen
     constexpr float kSigilHold = 0.5f;      // game seconds at full size
-    constexpr float kSigilExit = 0.35f;     // then spins away, shrinking and fading
-    constexpr float kSigilExitSpin = 200.f; // degrees turned over the exit
+    constexpr float kSigilExit = 0.35f;     // spin + shrink + fade
+    constexpr float kSigilExitSpin = 200.f; // degrees
     constexpr float kSigilSize = 34.f;      // pt across
-    constexpr float kSigilFlip = 0.1f;      // game seconds per shaky frame
+    constexpr float kSigilFlip = 0.1f;
     constexpr char const* kSigilSprites[2] = { "cat-magic-1.png"_spr, "cat-magic-2.png"_spr };
-    // The flash as a circle appears: a glow with short rays behind it that
-    // swells from kFlashFrom to kFlashTo times the circle while it fades.
+    // flash behind a new circle, grows from/to these multiples of kSigilSize
     constexpr float kFlashTime = 0.2f;
     constexpr float kFlashFrom = 1.3f;
     constexpr float kFlashTo = 2.1f;
@@ -26,13 +24,12 @@ namespace {
 
     float smoothstep(float u) { return u * u * (3.f - 2.f * u); }
 
-    // The cat in the corner. The frames are 256 px uhd squares (64 pt) with
-    // the cat standing on their bottom edge.
-    constexpr float kMascotSize = 58.f;     // pt, the frame's height on screen
-    constexpr float kMascotRight = 4.f;     // screen right edge -> frame
-    constexpr float kMascotBottom = 2.f;    // screen bottom -> frame
-    constexpr float kIdleFrame = 0.5f;      // game seconds per idle frame
-    constexpr float kCastTime = 0.45f;      // game seconds the wand frame shows
+    // mascot frames: 256px uhd squares, cat standing on the bottom edge
+    constexpr float kMascotSize = 58.f;     // pt tall
+    constexpr float kMascotRight = 4.f;     // margins from the screen corner, pt
+    constexpr float kMascotBottom = 2.f;
+    constexpr float kIdleFrame = 0.5f;
+    constexpr float kCastTime = 0.45f;
     constexpr char const* kIdleSprites[2] = { "cat-idle-1.png"_spr, "cat-idle-2.png"_spr };
     constexpr char const* kCastSprite = "cat-cast.png"_spr;
 }
@@ -50,8 +47,6 @@ CatNode* CatNode::create() {
 bool CatNode::init() {
     if (!CCNode::init()) return false;
 
-    // The circles convert each target's world position into this node's
-    // space, so where it sits does not matter to them.
     this->setAnchorPoint({ 0.f, 0.f });
     this->setContentSize({ 0.f, 0.f });
     this->setPosition({ 0.f, 0.f });
@@ -67,7 +62,7 @@ bool CatNode::buildMascot() {
     auto make = [&](char const* file, char const* id) -> CCSprite* {
         auto sprite = CCSprite::create(file);
         if (!sprite) {
-            log::warn("Cat: sprite {} missing, no cat in the corner", file);
+            log::warn("Cat: missing sprite {}", file);
             return nullptr;
         }
         sprite->setAnchorPoint({ 1.f, 0.f });
@@ -96,10 +91,6 @@ bool CatNode::buildMascot() {
     }
     m_shown = m_idle[0];
     m_shown->setVisible(true);
-    log::info(
-        "Cat: mascot at ({:.0f}, {:.0f}), {:.0f} pt ({:.0f} pt frames, scale {:.2f})",
-        corner.x, corner.y, kMascotSize, m_idle[0]->getContentSize().height, scale
-    );
     return true;
 }
 
@@ -125,7 +116,7 @@ void CatNode::castAt(std::vector<GameObject*> const& targets) {
         Sigil sigil;
         sigil.target = obj;
         sigil.phase = phase(rng);
-        // One doodle, turned any which way, so a sweep's circles differ.
+        // same doodle for every circle, a random turn keeps them from matching
         sigil.angle = turn(rng);
         for (int i = 0; i < 2; i++) {
             auto sprite = CCSprite::create(kSigilSprites[i]);
@@ -141,26 +132,20 @@ void CatNode::castAt(std::vector<GameObject*> const& targets) {
             for (auto sprite : sigil.frames) {
                 if (sprite) sprite->removeFromParent();
             }
-            log::warn("Cat: magic circle sprites missing, no circles");
+            log::warn("Cat: circle sprites missing");
             break;
         }
-        // Added onto the level's colours (GD's own glows blend this way; the
-        // texture is premultiplied, hence ONE, ONE), so it only brightens.
+        // additive like GD's glows (texture is premultiplied, hence ONE/ONE)
         if (auto flash = CCSprite::create(kFlashSprite)) {
             flash->setBlendFunc({ GL_ONE, GL_ONE });
             flash->setRotation(sigil.angle);
             this->addChild(flash, -1);
             sigil.flash = flash;
         }
-        else {
-            static bool warned = false;
-            if (!warned) log::warn("Cat: {} missing, circles appear without a flash", kFlashSprite);
-            warned = true;
-        }
         m_active.push_back(sigil);
     }
+    // nothing in view -> no swing
     if (targets.empty()) return;
-    // Nothing in view means nothing cast: the cat keeps idling.
     m_castLeft = kCastTime;
     this->stepMascot(0.f);
     this->stepSigils(0.f);
@@ -187,7 +172,7 @@ void CatNode::stepSigils(float dt) {
 
     for (auto& sigil : m_active) {
         auto obj = sigil.target.data();
-        // Object -> screen -> this node.
+        // object -> screen -> this node
         CCPoint at = this->convertToNodeSpace(obj->getParent()->convertToWorldSpace(obj->getPosition()));
 
         if (sigil.flash) {
@@ -203,8 +188,8 @@ void CatNode::stepSigils(float dt) {
             }
         }
 
-        // The exit: shrinking eases in and out, the spin picks up speed, and
-        // the second half fades, so nothing snaps. The shaking stops for it.
+        // exit: eased shrink, spin speeding up, fade over the second half.
+        // frames stop flipping once it starts
         float const u = std::clamp((sigil.age - kSigilHold) / kSigilExit, 0.f, 1.f);
         float const shrink = smoothstep(u);
         float const fade = 1.f - smoothstep(std::clamp(u * 2.f - 1.f, 0.f, 1.f));

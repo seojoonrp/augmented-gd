@@ -1,356 +1,170 @@
-# Augment Mode — game design
+# Design notes
 
-A level becomes a **run**: attempts accumulate augments until the level is
-cleared. Dying keeps your augments; clearing ends the run.
+A level becomes a **run**: you keep dying, every death feeds a gauge, a full
+gauge gets you a draft, and augments stack up until the level is cleared.
+Dying keeps your augments; clearing ends the run.
 
 ## Run
 
-- Started from the level info screen (`AUG` button → Start). One run per level
-  ID at a time; starting again on the same level offers Continue / Restart.
-- Ends on `levelComplete`. Leaving the level does **not** end it.
-- **Only the AUG button enters a run** (2026-09-29, user: a run left mid-way
-  came back when the level was played normally). The AUG button (new run,
-  Continue or Restart) arms the next `PlayLayer` of that level
-  (`AugmentManager::armRunEntry`); GD's own Play button disarms, and any
-  way in that was not armed plays a normal attempt — no augments, GD's
-  records as usual — with the run parked until the next Continue.
-- Practice / test-mode attempts never count and get no augments.
-- **Run attempts never touch GD's own records** (2026-09-28, user: a run on a
-  level with no record wrote its percent into GD's). No normal percent is
-  saved, GD's New Best! does not fire, and a clear with augments is not a GD
-  clear — `levelComplete` runs with `m_isTestMode` borrowed, and the end
-  screen's quote reads "Cleared with augments!" (English is fine there; the
-  user dropped a second "Normal progress is not saved." sentence). GD's attempt counter still counts.
-  Records GD already holds from earlier runs cannot be told apart and stay.
+- Started with the round `AUG` button on the level info screen. There is
+  **one run at a time** across all levels, kept in memory only (closing GD
+  ends it).
+- `AUG` on the level that has the run offers Continue / Restart. On any other
+  level it asks first, because starting there drops the parked run (Cancel /
+  Start). Both prompts are `RunPromptPopup`.
+- **Only the AUG button enters a run.** It arms the next `PlayLayer` of that
+  level (`AugmentManager::armRunEntry`). GD's own Play button disarms, and any
+  way in that wasn't armed is a normal attempt (no augments, GD records as
+  usual) with the run left parked.
+- A run ends on `levelComplete`. Leaving the level does not end it.
+- Practice / test-mode attempts don't count and get no augments.
 
-## Records (2026-09-28)
+## Records
+
+Run attempts never touch GD's records: no normal-mode percent is saved, GD's
+New Best! doesn't fire, and a run clear isn't a GD clear (`levelComplete` runs
+with `m_isTestMode` borrowed, the end screen says "Cleared with augments!").
+GD's attempt counter still counts. Records GD already had from before stay.
 
 Three bests, kept apart:
 
-| best | scope | what it drives |
+| best | scope | used for |
 |---|---|---|
-| GD's normal best | GD's own | untouched by runs |
-| run best (`RunState::bestPercent`) | one run | the gauge's new-best bonus (gold `+X`), the gold dot |
-| **run record** (`src/game/Records.hpp`) | per level, all runs, Geode saved values (survives restarts) | GD's **New Best!** popup when beaten |
+| GD's normal best | GD | untouched by runs |
+| run best (`RunState::bestPercent`) | one run | the gauge's new-best bonus, the gold dot on the progress bar |
+| run record (`src/game/Records.hpp`) | per level, all runs, saved | GD's New Best! popup when beaten |
 
-The record is a whole percent, compared like GD (4.1 → 4.4 is not one). It is
-checked on **every** death, a checkpoint respawn's included — it is how far a
-run got, not what the gauge has settled — so on such a death New Best! can
-show while the gold `+X` waits for the end of the life. A clear with augments
-sets it to 100 (no popup; the end screen shows instead). The popup is GD's own
-`showNewBest` with no rewards (no orbs, no diamonds). The HUD header shows it
-as `record N%`.
-- Public release note (2026-09-16): `$GEODE_SDK/AGENTS.md` states the Geode
-  index does not accept AI-written mods. Private use is unaffected; any index
-  submission is the user's call.
+The record is a whole percent compared like GD does (4.1 -> 4.4 is not a new
+best). It's checked on every death, checkpoint deaths included, since it's
+about how far a run got. A run clear sets it to 100 (no popup, the end screen
+shows instead). The popup is GD's own `showNewBest` with no orbs or diamonds.
 
-## Draft gauge (redesigned 2026-09-17)
+## Draft gauge
 
-Every run opens with a **free draft**: `startRun` queues it and the
-`PlayLayer::startGame` hook shows it once the level is on screen (the user
-rejected showing it on the level-info screen, 2026-09-17). After that, each
-death charges the gauge:
+Every run opens with a **free draft**, shown once the level is on screen
+(`PlayLayer::startGame`). After that each death charges the gauge:
 
 ```
-charge = floor(percent)                                      (no minimum)
-       + (floor(percent) - floor(best)) * NewBestBonusMult   (only when > 0, mult 1.0)
-threshold = min(GaugeThresholdStart
-                + GaugeThresholdStep * (gaugeDrafts / GaugeThresholdEvery),
-                GaugeThresholdMax)             (20, 20, 20, 25, 25, 25 ... 65 x3, 70, 70 ...)
+charge    = floor(percent)
+          + (floor(percent) - floor(best)) * NewBestBonusMult   (only if > 0, mult 1.0)
+threshold = min(GaugeThresholdStart + GaugeThresholdStep * (gaugeDrafts / GaugeThresholdEvery),
+                GaugeThresholdMax)                               (20 x3, 25 x3, ... 65 x3, 70 ...)
 ```
 
-The charge is whole percents (GD's own death percent) since 2026-09-30, so
-the gauge only holds whole numbers and reads exactly what it has: with the
-decimals kept, deaths at 2.2, 3.3 and 12.1 % plus their bonuses came to 29.6,
-the HUD rounded that to `30/30`, and no draft came (the user's report). The
-ramp starts at 20, steps +5 every third gauge draft and stops at 70 (user,
-2026-09-30: 30, 30, 35, 35 … from earlier that day felt too slow; before
-that, 30 +5 each up to 100 from 2026-09-27).
+- Charges are whole percents, so the bar always reads exactly what it holds
+  (with decimals a gauge of 29.6 would read `30/30` and not draft).
+- Reaching the threshold queues a draft for the next reset from 0 and raises
+  the threshold. A big new best can queue several; the popups then chain.
+  Leftover charge carries over. The opening draft doesn't raise the cost.
+- Never more drafts than levels left to give (`RunState::levelsLeft`), so the
+  last level of the run comes as a single card. Once everything is maxed the
+  bar stays full and reads `MAX`.
+- While a draft waits, the bar is full and shows that draft's cost
+  (`RunState::lastDraftCost`), e.g. `30/30`.
+- New bests count in whole percents; the best itself keeps its decimals for
+  the HUD.
 
-Each time the gauge reaches the threshold a draft is queued for the next
-from-0 reset and the threshold rises — never more drafts than levels left to
-give (`RunState::levelsLeft`, the pending opening draft included), and a
-draft offers only what is left, so the run's last level comes as a single
-card; a big new best can queue several at
-once, and the popups then chain (pick → next popup, game stays paused).
-Leftover charge carries over. Only gauge-earned drafts raise the threshold
-(the opening draft does not). Numbers
-live in `tune::` (`AugmentDef.hpp`) and are tuned by test. A new best counts
-in whole percents (4.1 → 4.4 is none; the user found `NEW BEST +0` annoying,
-2026-09-20) while the best itself keeps its decimals for the HUD and the dot.
-When the bonus fires the HUD shows `NEW BEST` and a gold `+X` beside the dead
-icon (`RunHud::playDeathReward`); while a gauge-earned draft waits the gauge
-is full and reads that draft's own cost over itself, e.g. `30/30`
-(`RunState::lastDraftCost` — the threshold has already risen to the next
-cost). It said `DRAFT!` until 2026-09-29, when the user asked for the numbers.
+**A life pays once.** A life is one go from 0 %. A death that a checkpoint
+brings you back from charges nothing; the death that really ends the life
+pays for the furthest point the life reached (`RunState::onDeath`, with
+`respawning` answered by `StartPos::onDeath`). Dying at 6 %, respawning, and
+dying at 4 % is worth 6, not 10. The deferred death shows no reward at all;
+everything plays on the settling death.
 
-**A life pays once** (2026-09-27): a death a checkpoint brings the player back
-from charges nothing. A life — one visit to the level from 0 % — is settled by
-the death that really ends it, for the furthest point the whole life reached
-(`respawning` in `RunState::onDeath`, answered by `StartPos::onDeath`, which
-already knows whether a respawn follows). Dying at 6 % and then, after the
-respawn, at 4 % is worth 6, not 10 (the user's report). The deferred death
-still counts as a death, but nothing is settled, so it shows no `NEW BEST`, no
-`+X` and no particles — the whole reward plays on the settling death, at the
-life's best. The best percent is held back with it (otherwise the new-best
-bonus would be paid before the life is), so the HUD folds `RunState::lifeBest`
-into the best it draws and the white mark never slides back to the checkpoint.
-A life left hanging by a quit or a manual restart is not lost: its best is
-charged by the next death that settles, which comes to the same total.
+Known issue: a life left hanging by a quit or manual restart isn't dropped,
+but it isn't paid in full either. Its `lifeBest` carries into the next life
+and only the larger of the two is paid. Fix would be to settle it on the next
+reset from 0.
 
-Rationale (2026-09-17): the old flat floor (`max(10, percent)`) made
-"die at 0 % ten times" the fastest route to a draft. Without the floor a 3 %
-death is worth 3, so farming never pays, while being stuck at 60 % still pays
-60 per death. The new-best bonus rewards GD's core achievement (new ground is
-paid twice), and its total over a run is bounded by `100 * mult`, so it cannot
-be farmed either. The rising threshold stops late-run draft floods (stuck at
-80 % used to mean a draft every two deaths). Rejected: a decaying floor
-(the floor was dropped instead).
+Why no minimum charge: a flat floor (`max(10, percent)`) made dying at 0 %
+over and over the fastest way to a draft. Without it a 3 % death is worth 3,
+so farming doesn't pay, while being stuck at 60 % still pays 60 per death. The
+new-best bonus pays new ground twice and is capped at `100 * mult` per run, so
+it can't be farmed either. The rising threshold keeps late-run drafts from
+flooding in.
 
-**Debug mode** (`debug-mode` setting, default off): number keys 1–9 grant
-augments (Shift+1–9 the 10th onwards, i.e. Shift+1 = cat, Shift+2 = brake, Shift+3 = missile,
-Shift+4 = berserker) and key 0 tops the gauge up to the threshold (the draft
-still happens on the next death). The cost is the normal ramp: the fixed
-`debug-threshold` setting is gone (2026-09-27), since it meant testing an
-economy nobody plays.
+**Debug mode** (`debug-mode` setting): number keys 1-9 grant augments in table
+order, Shift+1-4 the 10th onwards (cat, brake, missile, berserker), 0 fills
+the gauge to the threshold (the draft still comes on the next death). The
+top-left readout (run numbers, each augment's state) needs `debug-readout`
+on top of it, so debug mode can be used for screenshots.
 
 ## Draft
 
-Three random augments that are not yet maxed, shown on respawn. Picking is
-mandatory (no close button, back key ignored). Duplicate picks level the
-augment up. Pool is 13 augments, all implemented. Owning `draft-count` raises
-the card count to 4 from the next draft on; the popup then narrows the cards
-and scales their text by the same ratio so four still fit GD's 569 pt width.
+Three random augments that aren't maxed yet, shown on respawn. Picking is
+mandatory (no close button, back key ignored). Picking one you have levels it
+up. `draft-count` makes it 4 cards from the next draft on; the popup narrows
+the cards so four still fit.
 
-## Augments (design table, applied 2026-09-17)
+## Augments
 
-Names and descriptions are shown verbatim on the cards, in the language the
-`language` setting picks (Text & fonts, below): the *initial* text when
-drafting level 1, the *level-up* text for every later level. The table has
-the Korean; the English is in `src/core/AugmentDef.cpp` next to it, with the
-same numbers from `tune::`. English names: shield **Shield**, slow-mo
-**Sloth**, startpos **Checkpoint**, foresight **Foresight**, unmirror
-**Unmirror**, hazard-hitbox **Threat Removal**, wave-hitbox **Wave Breaker**,
-nerve **Calm Nerves**, draft-count **Opportunity Cost**, cat **Cat**, brake
-**Brake**, missile **Air Raid**, berserker **Berserker**. The id is the "코드"
-column and is what the hooks key on.
+Names and card texts are in `src/core/AugmentDef.cpp` (English and Korean),
+with the numbers pulled from `tune::` so the card and the game can't disagree.
+Behaviour is one file per augment in `src/augments/`.
 
-| id | name | max | initial | level-up | status |
-|---|---|---|---|---|---|
-| `shield` | 결계인가? | 5 | 매 어템마다 보호막이 지급됩니다. 보호막이 깨지면 1.5초간 노클립 상태로 전환됩니다. | 보호막 개수가 하나 늘어납니다. | working. Covers both players in dual. Charges left at checkpoint placement come back on the respawn (verified 2026-09-17). |
-| `slow-mo` | 나무늘보 | 3 | 게임 속도가 5% 감소합니다. X를 눌러 토글할 수 있습니다. | 게임 속도가 5% 더 감소합니다. | working. Speed = 1 − 0.05·level (95/90/85 %; max 3 — briefly 5 on 2026-09-30, the user took it back), game + music; toggle state persists within the run; pause menu at normal speed. |
-| `startpos` | 스타트포스 | 3 | 매 어템마다 Z를 눌러 체크포인트를 찍을 수 있습니다. 해당 어템에 죽으면 체크포인트에서 부활합니다. | 체크포인트를 한 번 더 찍을 수 있습니다. | working (v3 verified 2026-09-17); max level 3 since 2026-09-29 (was 5, user). `level` placements per attempt (a life from 0 %), but **only the newest one is live**: placing again moves it; a death respawns there **once**, and the next death restarts from 0 unless a new one was placed in between (budget permitting). The older "each checkpoint is one respawn, newest first" chain was dropped as too loose (user, 2026-09-17). A checkpoint also **snapshots shield charges and brake seconds left** and the respawn restores them (`Augment::onCheckpointPlaced` / `onCheckpointRespawn`). A death the respawn comes back from **charges no gauge**: the life pays once, at its best percent (2026-09-27, see the gauge section). |
-| `foresight` | 사륜안 | 1 | 히트박스를 보여줍니다. | – | working. GD colours: blue solid, red hazard, green interactive, yellow player. |
-| `unmirror` | 멀미약 | 1 | 레벨 내 모든 미러포탈을 제거합니다. | – | rewritten 2026-09-17 as a `GJBaseGameLayer::toggleFlipped` hook (refs pattern), untested: flips are refused while owned, drafting un-flips at once. |
-| `hazard-hitbox` | 위협제거 | 7 | 위험 요소(빨간 히트박스)의 크기가 5% 감소합니다. | 위험 요소의 크기가 5% 더 감소합니다. | built, in-game test pending. Hazard / AnimatedHazard hitboxes shrink around their centre to 1 − 0.05·level (95…65 %; max 7 since 2026-09-30, was 5); solids, slopes, player untouched. |
-| `wave-hitbox` | 웨이브브레이커 | 7 | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 감소합니다. | 웨이브 모드일 때 플레이어 히트박스 크기가 10% 더 감소합니다. | working (verified 2026-09-17). Player rect × (1 − 0.10·level) while `m_isDart` (max 7 since 2026-09-30, was 5: 30 % at Lv7); checked per `PlayerObject`, so in dual only the half that is in wave shrinks. The wave icon and trail thickness shrink by the same factor (node scale `m_vehicleSize × scale`, 2026-09-20, unverified in game). Rotated hazards use the player OBB, which this does not touch (`GD-INTERNALS.md`). |
-| `nerve` | 청심환 | 1 | 레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다. X% 도달 시 두 능력의 효과가 각각 기존의 (120 + X/2)%가 됩니다. | — | working (verified 2026-09-17). Both *shrinks* × (1.2 + 0.5·progress), progress = current percent / 100 (user, 2026-09-30; it was 1 + progress, so it now starts at +20 % and ends at +70 % instead of +0 → +100 %). Was 2 levels (k = 1.5 at Lv2); fixed to a single level 2026-09-20. Either scale is floored at `tune::MinHitboxScale` (0.2), which wave-hitbox Lv7 + nerve reaches from 0 % on (0.7 × 1.2 = 0.84) and Lv5 + nerve near the end (0.5 × 1.7 = 0.85). |
-| `draft-count` | 기회비용 | 1 | 다음 드래프트부터 카드가 4개씩 등장합니다. | – | working (verified 2026-09-17). `rollDraft(4)` from the next draft on; the popup narrows the cards to fit. |
-| `cat` | 고양이 | 7 | 마법 고양이를 소환합니다. 고양이는 4초마다 시야에 있는 위험 요소 5개를 랜덤으로 제거합니다. | Lv2-5: 고양이가 매번 위험 요소를 2개 더 제거하고, 제거 쿨타임이 0.5초 감소합니다. Lv6-7: 고양이가 매번 위험 요소를 4개 더 제거합니다. | built 2026-09-17, in-game test pending. Every `4 − 0.5·(lv−1)` s of play up to Lv5 (2 s), then flat; `5 + 2·(lv−1)` random **hazards** up to Lv5 (13), then +4 per level (17, 21 at Lv7; max 7 and the late levels per the user 2026-09-30, `tune::CatLateLevel`, `AugmentDef::lateLevelUpDesc`) (+1 per level until 2026-09-29, user) (Hazard / AnimatedHazard — solids and slopes are never "장애물" here, removing them would break routes) that are on screen *and ahead of the player* are removed for the rest of the attempt (sprite + hitbox, via GD's `destroyObject()` flags). Restored on every reset. It **casts a small magic circle** on each removed hazard — since 2026-09-30 a doodle sprite like the cat (a wobbly white ring round a lopsided yellow star, the wand's, and two + sparkles; 34 pt, a random turn per circle, two shaky frames flipping every 0.1 s, appearing with a quick flash behind it (`cat-flash.png`, a glow with short rays added onto the level, swelling 1.3 -> 2.1x the circle and fading in 0.2 s), there at full size for 0.5 s, then spinning away over 0.35 s — shrink eased in and out, spin picking up to 200 degrees, fading over the second half, shaking stopped (user 2026-09-30: gone at once was too abrupt, then the first spin-out too stiff); the drawn rings / ticks / triangle before were "too high quality") — it replaced the lasers the square used to fire (user 2026-09-27: "그냥 마법으로"). The placeholder square that stood for the cat in the bottom-right corner was removed (user, 2026-09-29). A run summary button tried in that corner was dropped the same day: GD hides the cursor in levels, so it could not be clicked; the summary stays in the pause menu. Since 2026-09-30 the corner holds **the cat itself** (user: two idle images back and forth, a wand-swing image for a moment when it casts): a dumb-looking white doodle cat with a stick wand (wobbly hand-drawn lines, blank ・ㅅ・ stare; the swing is an angry swat with the paw up — the first, polished wizard cat looked "4K" next to the rest, user), 58 pt, idle frames swapped every 0.5 game s, the wand frame for 0.45 s (frames just switch, no size animation — user 2026-09-30) on every sweep that removed something; placeholder art from `scripts/catgen.py`, drawn by `CatNode`. |
-| `brake` | 브레이크 | 3 | C를 누르고 있으면 게임 속도가 60% 감소합니다. 어템마다 최대 7초씩 사용할 수 있습니다. | [브레이크]를 어템마다 7초 더 사용할 수 있습니다. | working (verified 2026-09-17). Held key (C, `keybind-brake`): game + music at **40 %** while held, regardless of slow-mo (the cut is absolute, decided with the user 2026-09-17); budget `7·level` **real** seconds per attempt (a from-0 reset refills; a checkpoint respawn restores the seconds left when the checkpoint was placed), a mid-attempt level-up adds its 7 s at once. Running out is log-only (its notice went with the centre texts, 2026-09-27). Pause forgets the held key (focus loss sends no release). Implemented as a time *override* layer in `Scales.cpp` that wins over the slow-mo base speed. |
-| `missile` | 공습경보 | 5 | 6초마다 시야 내 위험 요소 하나에 미사일이 떨어집니다. 반경 3칸 안의 위험 요소가 모두 제거됩니다. | 폭발 반경이 1칸 커지고, 미사일 쿨타임이 0.5초 감소합니다. | working (verified 2026-09-20, lead 300 "딱 괜찮은듯"). Every `6 − 0.5·(lv−1)` s of play a missile is aimed at a **random hazard** on screen and at least 300 units (~1 s at 1x) ahead of the player (was 150; the user found the impact landed where they already were, 2026-09-20 — aiming at a hazard, not a point, so every strike hits something; nothing in view → the strike stays armed and fires as soon as a hazard scrolls in). It drops for 0.35 s (world-space reticle + missile, `MissileNode` in `m_objectLayer`, **all white** since 2026-09-27 — the depth the orange carried is alpha now; the `MISSILE -n` notice is gone), then lands with a 0.6 s white blast (flash, fireball, two shockwave rings, falling sparks; no smoke and no camera shake, red only as an accent on the fireball halo and the fading sparks, user 2026-09-29), and every hazard whose collision shape (AABB, or radius for saws) touches the blast circle of `3 + (lv−1)` blocks (+0.5 per level until 2026-09-29, user) is removed for the rest of the attempt — same `destroyObject()` flags and put-back as the cat (`HazardRemoval.hpp`). A reset mid-drop cancels the missile. |
-| `berserker` | 버서커 | 3 | 위험 요소가 파괴될 때마다 3% 확률로 2.5초간 버서커 모드에 돌입합니다. 버서커 모드에서는 부딪히는 위험 요소가 모두 파괴됩니다. | 버서커 모드 발동 확률이 1.5% 증가합니다. | built 2026-09-27, in-game test pending. Every hazard **an augment destroys** rolls `0.03 + 0.015·(level−1)` (3 / 4.5 / 6 %; the step was 1 % until 2026-09-30) to open a 2.5 s window (2 s until 2026-09-29); while it is open, `destroyPlayer` with a **hazard** object smashes that hazard (same `destroyObject()` flags and put-back as the cat and the missile) instead of killing the player. A smash is itself a destroyed hazard, so it rolls again and can refresh the window. Solids, slopes and a death GD names no object for (`object == nullptr`, e.g. suicide) still kill. The window is flat across levels (only the chance grows) and is **game** seconds (slow-mo stretches it, like the cat and missile timers); it closes on any reset. Retuned with the user 2026-09-27: 2 % / 3 s at Lv1 became 3 % / 2 s, and the red screen frame landed at 5 bands x 7.5 units, 0.33 alpha, pulse 0.72 +- 0.28 (the middle of three passes: 6 x 9 / 0.5 was "너무 과함", 4 x 6 / 0.2 too little); a notch stronger on 2026-09-29 (5 x 8 at 0.40), then eased back the same day (7.75 / 0.365, still a touch much) to 5 x 7.5 at 0.32 — just under where it started. The 버서커! announcement is a banner above the draft gauge (Notices, below). A `BerserkAura` (`src/ui/BerserkAura.hpp`) also puts a flickering fire crown on the player while the window is open, in the object layer at `player z - 1` so the icon draws on top. Asked before the shield (`Augment::hitPriority`) so a free smash never spends a charge. **Dependency:** nothing else destroys hazards, so without `cat` or `missile` it can never roll — the HUD row says `needs cat/missile`. |
+| id | name | max | what it does | notes |
+|---|---|---|---|---|
+| `shield` | Shield / 결계인가? | 5 | one shield per level every attempt; a broken shield gives 1.5 s of noclip | covers both players in dual; a checkpoint snapshots the charges left |
+| `slow-mo` | Sloth / 나무늘보 | 3 | game speed -5 % per level, X toggles | game + music; pause menu runs at normal speed |
+| `startpos` | Checkpoint / 스타트포스 | 3 | Z places a checkpoint, one placement per level per attempt | only the newest placement is live; a death respawns there once, the next death restarts from 0. restores shield charges and brake seconds from when it was placed |
+| `foresight` | Foresight / 사륜안 | 1 | shows hitboxes | GD colours: blue solid, red hazard, green interactive, yellow player |
+| `unmirror` | Unmirror / 멀미약 | 1 | mirror portals do nothing | `toggleFlipped` hook; drafting it un-flips right away |
+| `hazard-hitbox` | Threat Removal / 위협제거 | 7 | hazard hitboxes -5 % per level | shrinks around the centre; solids, slopes and the player untouched |
+| `wave-hitbox` | Wave Breaker / 웨이브브레이커 | 7 | player hitbox -10 % per level in wave | per player, so in dual only the half in wave shrinks; the icon and trail shrink too. rotated hazards use the player OBB, which this doesn't touch |
+| `nerve` | Calm Nerves / 청심환 | 1 | both shrinks grow with progress: (120 + X/2) % of themselves at X % | either scale is floored at `tune::MinHitboxScale` (0.2) |
+| `draft-count` | Opportunity Cost / 기회비용 | 1 | 4 cards per draft from the next draft | |
+| `cat` | Cat / 고양이 | 7 | every 4 s removes 5 random hazards in view | Lv2-5: +2 hazards, -0.5 s. Lv6-7: +4 hazards (`tune::CatLateLevel`). only hazards ahead of the player; solids and slopes are never removed (that would break routes). a doodle cat sits in the bottom-right corner and casts a magic circle on each removed hazard |
+| `brake` | Brake / 브레이크 | 3 | hold C for 40 % speed, 7 s per level per attempt | absolute, ignores slow-mo; real seconds; a level-up mid-attempt adds its 7 s at once |
+| `missile` | Air Raid / 공습경보 | 5 | every 6 s a missile hits a random hazard in view and clears every hazard within 3 blocks | Lv2+: +1 block, -0.5 s. aims at a hazard at least 300 units ahead so it lands before you get there; with nothing in view it waits and fires as soon as one shows up |
+| `berserker` | Berserker / 버서커 | 3 | every destroyed hazard has a 3 % chance to open a 2.5 s window where hazards you touch get destroyed | +1.5 % per level. only the cat, the missile and berserk itself destroy hazards, so it needs one of them (the HUD row says so). a smash rolls again. asked before the shield so a free smash never spends a charge. solids, slopes and deaths with no object still kill |
 
-Definitions and tuning constants live in `src/core/AugmentDef.*` (the
-description text quotes the numbers as literals, so change both together);
-behaviour in `src/augments/` (one file per augment, see `Augment.hpp`). Debug keys 1-9 grant augments in
-table order, Shift+1-9 continue from the 10th (Shift+1 cat, Shift+2 brake, Shift+3 missile,
-Shift+4 berserker).
+Every removal (cat, missile, berserk) goes through `hazard::Removed`
+(`HazardRemoval.hpp`): it sets GD's `destroyObject()` flags and puts
+everything back on reset. Timers run on game time, so slow-mo stretches them.
 
-## Text & fonts (decided 2026-09-17)
+## Text and fonts
 
-Player-facing text (augment names and card texts, notices, the berserk
-banner, popup titles and messages) comes in English or Korean, chosen by the
-`language` setting at the top of the mod's settings (English by default,
-since 2026-09-29; Korean before that was the only language). Logs and the
-HUD's non-name words stay English. GD's fonts have no Hangul, so the mod ships its own
-(`resources/fonts/`). Player-facing UI (draft cards, popup title,
-notices) uses 아임크리수진 (`ImcreSoojin.ttf`) rendered GD-style — white
-glyphs, black outline, drop shadow — baked by `scripts/fontgen.py`. Debug
-readouts (the HUD lines) stay in plain Pretendard Regular, generated by Geode.
-Both get their charset from the sources (`scripts/fontcharset.ps1`); see
-`docs/GD-INTERNALS.md` "Fonts".
+Player-facing text comes in English or Korean, picked by the `language`
+setting (English by default). GD's fonts have no Hangul, so the mod ships its
+own: ImcreSoojin for the UI, baked GD-style (white, black outline, shadow) by
+`scripts/fontgen.py`, and Pretendard for the debug HUD. Both charsets come from
+the string literals in `src/` (`scripts/fontcharset.ps1`). Logs and debug
+readouts stay English. The AUG prompts' buttons are GD `ButtonSprite`s in
+goldFont, so they're English in both languages.
 
-## Draft card look (decided 2026-09-17)
+## UI
 
-GD button styling: white rim, green body with black ring, darker footer band;
-top to bottom — name, image box, description,
-footer with `NEW` / `Lv a → b` on the left and level pips (gold ★ reached,
-grey ☆ remaining) on the right. Cards fan out from the centre when the draft
-opens and can't be picked until they land.
+**Draft cards** look like GD buttons: white rim, green body with a black
+ring, darker footer. Top to bottom: name, art, description, footer with
+`NEW` / `Lv a -> b` and level stars. Cards fan out from the centre and can't
+be picked until they land. Card art is `resources/augments/<id>.png`
+(480x280, Geode bakes hd/sd); a missing file just leaves the panel empty, so a
+new augment needs an image, not code.
 
-**Card art** (2026-09-27): one drawing per augment in `resources/augments/`,
-named after the augment id (`slow-mo.png`), 480x280 px — the image slot
-(120x70 pt) at uhd, which is what Geode's `resources.sprites` wants: it bakes
-the hd and sd copies itself. `AugmentDraftPopup::createCard` builds the name
-from `def.id` at runtime (`Mod::expandSpriteName`), scales it to fit the white
-panel inside the black border (116x66 pt, aspect kept) and leaves the panel
-empty with a warning if the file is missing — so a new augment needs a file,
-not a code change.
+**AUG button**: the mod's mark in a round green `CircleButtonSprite`, left of
+the difficulty face at the Play button's height. The mark is cropped to its
+own bounds by `scripts/logocrop.py` because the button fits whatever it gets
+to 65 % of the circle.
 
-## Mark and the AUG button (2026-09-27)
+**HUD**: the draft gauge is its own rounded bar at the bottom centre with
+`DRAFT` and `charge/cost` over it (`draft-bar-opacity` setting fades it). A
+death plays a short reward: particles fly from the icon into the bar, gold
+ones and a `+X` for a new best; the whole thing ends before GD respawns. GD's
+progress bar gets two dots: gold at the run's best, green at the live
+checkpoint. Short notices (checkpoint placed, respawned, shield broke) rise
+in near the bottom-left corner; `BERSERK!` is a bigger red banner above the
+gauge. The augment list and stats on the left are debug-mode only; in normal
+play the pause menu has them.
 
-The mark is the user's own drawing. First version (2026-09-27, after a
-generated one they turned down): a level card tilted behind a white arrow
-pointing up, near-white fills with `#2D2D2D` strokes. **Second version**
-(2026-09-29): a grey GD cube tilted behind an arrow pointing up (red at
-first, white in the export that followed the same day). Two
-exports: `logo.png` at the root (336) is what the Geode mod list shows, and
-`resources/ui/aug-logo.png` (**256** since the second version, transparent)
-is the glyph in the game. The glyph is the drawing cropped to its own bounds
-and padded 2 % into a square (`scripts/logocrop.py`), because the button
-fits whatever it is given to 65 % of the circle and any margin inside the
-file only makes the mark smaller (a raw 672 export, drawn in 72 % x 59 % of
-its canvas, came out small). 256 px, not the export's size: the buttons
-draw the glyph at ~125 (level page) to ~147 (pause menu) uhd pixels, GD's
-textures have no mipmaps, and shrinking more than 2x makes thin strokes
-jagged — a 336 export looked broken to the user. The vector lives with the
-user (`Desktop/augmented-gd/logo`), not in the repo; run each new export
-through `logocrop.py`. Geode does **not** round
-a logo's corners — `createModLogo` just scales the file — so the rounding
-in `logo.png` is the user's own (2026-09-27).
-
-On the level info screen that glyph sits in a round green button
-(`CircleButtonSprite`; the glyph fills the 65 % it is fitted to,
-`setTopRelativeScale` left at 1.0 once the file's own padding came down to
-2 %). **Since 2026-09-29** it is **halfway in size between its old Medium
-circle and GD's Play button** — `(46.75 + play width) / 2`, the Play
-button's width read at runtime from `m_playBtnMenu` — drawn from the Large
-circle (321 uhd px) scaled down, and it stands **left of the difficulty
-face, level with the Play button**: `LevelInfoHook::augmentButtonSpot`
-takes the Play button's height and `m_difficultySprite`'s left edge minus
-12 pt minus the radius. Fallbacks (no Play button: 66 % of the screen
-height; no difficulty sprite: x = 122) are logged. Before that it sat
-beside GD's copy button in the left column (three rounds: centred at x 78,
-then 98, then the copy-button row).
-
-## HUD (v2, 2026-09-17)
-
-Kept small so it stays out of the way. The **draft gauge** (redesigned
-2026-09-29 — it used to be a twin of GD's progress bar mirrored to the
-bottom edge, which the user found odd as a mirror of the percent bar) is
-its own rounded rectangle at the bottom centre: 240x14 (GD's bar is 210x16;
-18 in the first build, then 17, then 14 at the user's word),
-corner radius 5 (not a full pill), a white 1.25 pt rim around a black
-1 pt ring (the mod's panel frame; a black rim alone vanished on a dark
-level) around a see-through dark inside, the fill in the draft cards' green
-(eased) with rounded ends concentric with the bar's corners, 1 pt inside
-the black ring (the gold new-best segment is a rounded tail past it), its bottom edge
-7 pt above the screen's. Over it, in GD's percent font at 90 % of GD's
-readout scale: `DRAFT` left-aligned with the bar's left end and
-`charge/cost` (e.g. `23/30`) right-aligned with its right end, on one line;
-while a gauge-earned draft waits it reads that draft's cost, e.g. `30/30` —
-the free opening draft does not fill it. Once every augment is maxed the bar
-is simply full, `MAX` stands where `DRAFT` was and the count is gone; deaths
-play no reward then (user, 2026-09-30). 240 keeps the bar's left end clear
-of the longest corner notice. The `draft-bar-opacity` setting (5-100 %,
-default 100, 2026-09-30: the bar sometimes hid what was under it) fades the
-bar, its fill and both labels, live; the reward particles and `+X` numbers
-stay opaque. At the far left, a grey
-header (deaths, live %, best %) and then one **row per owned augment**, top
-to bottom: a framed placeholder box where the icon will go, the Korean name,
-and its English per-attempt state. GD's own progress bar gets rimmed dots:
-gold at the run's best (moves with the player past it, and the colour of the
-new-best particles), green at the live checkpoint (`ProgressMarks`). Both are
-`0.375` of the fill track's height, so they sit inside it instead of poking
-out of the bar (user screenshot, 2026-09-27). Decided with the user over four rounds on
-2026-09-17. The two hitbox lines
-show the scale *at the player's current position*, so they move as nerve ramps
-up; 웨이브브레이커 adds `ACTIVE` while a player is in wave.
-
-**Debug-mode only since 2026-09-28**: the grey header and the augment rows
-are drawn only with the `debug-mode` setting on (the user wants them kept for
-debugging); in normal play the pause menu carries that information. The
-gauge, the progress-bar dots and the notices always show.
-
-## Pause menu (2026-09-28)
-
-On a run level the pause menu's practice button is replaced by the mod's
-round button (the AUG button's face, sized to the practice button) — a
-practice attempt is not a run attempt, so a run has no use for it; it stays,
-with ours beside it, only if the player is already in practice mode. The
-button opens the **run summary** (`RunInfoPopup`) in **GD's own menu
-colours** (round 7, after a CreatorLayer screenshot from the user, values
-sampled from it): the card (`card::framedPanel`) keeps the white rim, black
-ring and soft shadow around GD's menu blue as a vertical gradient
-(0/96/241 → 0/56/142) — the thin white inner stroke went in round 8, and
-the AUG resume prompt now sits on the same card; the stat chips and the tiles are
-**GD menu panels** (`card::gdPanel`) — white rim, black ring, a green body
-shaded left to right in two halves (upper 200/254/89 → 107/208/19, lower
-150/252/62 → 70/162/13, 49 % / rest) over a dark strip along the bottom
-(75/127/30 → 38/84/9), and a black 40 % shadow down-right that reads dark
-blue on the card. (Rounds 2–6 had a green gradient card with dark
-translucent chips and tiles; the user found the colours off.) Three stat chips on top, captions in English
-per the user — **Deaths** (this run), **Session Best** (this run's best,
-whole percent, not counting the attempt in progress), **Total Best** (the
-runs' record, caption and number both gold) — then `보유 증강 (N)` in white with an engraved
-rule to the right edge, and one tile per held augment in table order: name,
-the card art in the draft card's 120x70 slot, `Lv N` (gold when maxed) and
-level stars. The three chips are a centred row of 112x30 panels, 12 pt
-apart, with smaller text (caption 0.38, number 0.48 — round 7). No
-descriptions (user). Paddings are 14 pt from the ring, 8 pt between tiles,
-chips → section rule → grid 8 / 6 pt (round 5), and chip text is centred by
-its real label heights. A tile keeps 14 pt free at
-each side (its art slot is 104x61, the draft card's shape made smaller), so
-tiles read smaller with more side room, and four in a row fill the card's
-width exactly (round 5, user).
-
-**Tile detail** (2026-09-28, round 4): under the mouse a tile eases up to
-106 % — size only, the white-border highlight of rounds 4–6 went in round 7
-(polled each frame — cocos has no hover event; the hit area stays put) —
-and a click opens `AugmentInfoPopup`: the draft card itself
-(`card::augmentCard`, shared with the draft popup) centred at 1.1x (1.3 in
-round 4 filled the screen's height), with the text of what the augment
-does **at the level held** — `AugmentDef::describeAt(level)`, the initial
-sentences with that level's numbers from `formula::` (shield Lv3 "보호막이
-3개", cat Lv3 "3초마다 … 장애물 9개", missile Lv3 "5초마다 … 반경 5칸"),
-host-tested so the card and the game cannot disagree — `Lv N` in the
-footer (gold once maxed) and N stars. Close / Esc returns to the summary.
-
-**Level stars** (2026-09-28): the user's rounded star
-(`resources/ui/round-star.svg`, baked to `round-star.png` by
-`scripts/stargen.py` — white fill inside a black outline) tinted gold for
-levels held and grey for the rest, 3.8 pt radius, 7 pt apart (round 7),
-tipped 12° to the left (round 6), on the draft cards and the tiles alike
-(`card::stars`). Two drawn versions came first:
-ImcreSoojin's ★ glyph carries a stray mark above the star, and a
-CCDrawNode rounded star threw long spikes (round 4 screenshot). The tiles are drawn at full size and scaled as a whole; the grid
-takes the column count that gives the biggest tiles (full size at most, the
-fuller grid on a tie — 4 augments make 2x2) and the card grows with it up to
-292 pt, so it never scrolls: 3 augments sit at full size, 13 at ~55 %.
-Laid out after the user's references (Vampire Survivors-style upgrade grids).
-
-**Notices** (2026-09-27): the screen used to carry a big centred line for every
-event, which the user read as debug text and asked to have gone. What is left
-are three short Korean lines near the **bottom-left** corner (UI font, white
-with the baked outline, scale 0.45, left edge x 12 / bottom line y 20 — a bit
-off the corner since 2026-09-29). Each rises 10 pt into place while fading
-in (0.32 s, ease-out cubic), holds 1.1 s, then sinks while fading out
-(0.38 s, ease-in cubic) — it used to pop in and fade (user, 2026-09-29); a
-second line while one is still up glides it a line higher, three at most
-(`RunHud::notice`, stepped by hand in `RunHud::update` on real time, so
-slow-mo and the brake do not drag it).
-
-| when | line |
-|---|---|
-| checkpoint placed or moved | 체크포인트가 설정되었습니다. |
-| respawned at a checkpoint | 체크포인트에서 부활합니다. |
-| shield absorbed a hit | 보호막이 깨졌습니다. |
-
-**버서커!** (berserk window opened, not a refresh) is a **banner** instead
-(2026-09-29): red (255/64/48 tint over the baked white glyphs, so the
-outline stays black — a white rim as well was asked for and dropped), scale 0.7, centred just above the draft gauge (6 pt over the
-top of its labels), rising 14 pt with a fade in (0.3 s), held 0.9 s, sinking with a
-fade out (0.4 s) — `RunHud::banner`.
-
-Everything else that used to pop up (`CAT -n`, `MISSILE -n`, `SLOW-MO ON/OFF`,
-`BRAKE EMPTY`, `NEW BEST`, `NO CHECKPOINTS LEFT`, `CAN'T PLACE HERE`, the debug
-grants) is log-only now; a new best is still visible as the gold `+X` beside
-the dead icon.
+**Pause menu**: on a run level the practice button is replaced by the mod's
+round button (practice attempts aren't run attempts anyway). It opens the run
+summary (`RunInfoPopup`) in GD's menu colours: deaths, session best and total
+best, then a tile per held augment (art, name, level). Hover grows a tile, a
+click opens the augment's card with the text for the level held
+(`AugmentDef::describeAt`). The grid picks the column count that gives the
+biggest tiles, so it never scrolls.
 
 ## Not decided yet
 
-- Draft gauge numbers (40 / +10 / bonus ×1.0) are first guesses; tune by test.
-- Remaining augments and systems: candidates, difficulty tiers, rejected ideas
-  and build order are in `ROADMAP.md` (2026-09-16).
-- Run persistence across game restarts (currently in-memory only).
+- Gauge numbers are tuned by playing; they'll keep moving.
+- Runs don't survive a game restart (in memory only).

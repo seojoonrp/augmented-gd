@@ -7,13 +7,10 @@
     cat-flash.png                    the flash behind a circle as it appears (a soft
                                      glow and short rays, drawn additively in game)
 
-A dumb-looking doodle cat (user, 2026-09-30: the first, polished version
-looked "4K" next to everything else): wobbly hand-drawn lines, flat white
-fill, two tiny dot eyes, a crude stick wand. The swing frame is an angry
-swat (squinting eyes, open mouth, paw up). Drawn with Pillow at 4x and
-downsampled. All frames share the canvas and the cat's position, so
-swapping them never makes it jump. Placeholder art until real frames exist;
-build.ps1 does not run it.
+Placeholder doodle cat until real frames exist: wobbly lines, flat white
+fill, dot eyes, a stick wand. Drawn at 4x and downsampled. All frames share
+the same canvas so swapping them doesn't make the cat jump. Not run by
+build.ps1.
 
     py -3 scripts/catgen.py
 """

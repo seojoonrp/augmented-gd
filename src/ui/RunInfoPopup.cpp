@@ -15,16 +15,13 @@ using namespace geode::prelude;
 namespace augment {
 
 namespace {
-    // The card's size is the ring's outer edge (card::framedPanel); every
-    // padding below is measured from there.
+    // card size = the ring's outer edge, paddings are measured from there
     constexpr float kCardWidth = 460.f;
-    // The card grows with the grid up to this: the screen is 320 pt tall and
-    // the close button sits on the card's top-left corner.
+    // screen is 320 tall and the close button sits on the card's corner
     constexpr float kMaxCardHeight = 292.f;
     constexpr float kPad = 14.f;
 
-    // Stat chips: English caption over the number, the pair centred; a
-    // centred row of three GD panels, smaller than the card's width (round 7).
+    // stat chips
     constexpr float kStatWidth = 112.f;
     constexpr float kStatHeight = 30.f;
     constexpr float kStatGap = 12.f;
@@ -35,21 +32,17 @@ namespace {
     constexpr float kStatRing = 2.f;
     constexpr float kStatShadow = 3.f;
 
-    // Section header: label, then an engraved line to the right edge.
     constexpr float kSectionGap = 8.f;    // chips -> header
     constexpr float kSectionHeight = 12.f;
     constexpr float kSectionScale = 0.5f;
     constexpr float kSectionLineGap = 8.f;
     constexpr float kGridTopGap = 6.f;    // header -> grid
-    constexpr float kGridGap = 8.f;       // between tiles
+    constexpr float kGridGap = 8.f;
     constexpr float kEmptyHeight = 40.f;
     constexpr float kEmptyScale = 0.6f;
 
-    // A tile at full size, top to bottom: name, the art slot (the draft
-    // card's 120:70 shape, smaller, for more room at the sides), level +
-    // stars, on a GD menu panel (card::gdPanel). The grid scales it as a
-    // whole; four in a row fill the card's width exactly, since that row is
-    // width-bound.
+    // tile at full size: name, art, level + stars. Four in a row fill the
+    // card's width exactly.
     constexpr float kTileRim = 2.f;
     constexpr float kTileRing = 2.5f;
     constexpr float kTileShadow = 5.f;
@@ -68,13 +61,12 @@ namespace {
     constexpr float kFooterScale = 0.45f;
     constexpr float kPipRadius = 3.8f;    // outline included
     constexpr float kPipSpacing = 7.f;
-    // A hovered tile eases up to this scale; the rate is per second.
     constexpr float kHoverScale = 1.06f;
-    constexpr float kHoverRate = 18.f;
+    constexpr float kHoverRate = 18.f;    // per second
 
-    constexpr ccColor3B kGold = { 255, 215, 60 };    // the stars' gold
+    constexpr ccColor3B kGold = { 255, 215, 60 };
 
-    // Card top -> top of the grid.
+    // card top -> grid top
     constexpr float kHeaderHeight = kPad + kStatHeight + kSectionGap + kSectionHeight + kGridTopGap;
 
     struct Grid {
@@ -83,9 +75,8 @@ namespace {
         float scale = 0.f;
     };
 
-    // The column count that gives the biggest tiles inside width x height
-    // (never above full size). On a tie the fuller grid wins, so four tiles
-    // make 2x2 rather than 3 + 1.
+    // Column count with the biggest tiles (capped at full size). Ties go to
+    // the fuller grid, so four tiles make 2x2 rather than 3 + 1.
     Grid fitGrid(int n, float width, float height) {
         Grid best;
         int bestEmpty = INT_MAX;
@@ -127,8 +118,7 @@ bool RunInfoPopup::init(Info info) {
 
     if (!Popup::init(kCardWidth, cardH)) return false;
     this->setID("run-info-popup"_spr);
-    // Floating card like the resume popup: no brown box, darker overlay,
-    // the close button on the card's corner.
+    // no brown box, just the card over a darker overlay
     m_bgSprite->setVisible(false);
     this->setOpacity(160);
 
@@ -160,7 +150,7 @@ bool RunInfoPopup::init(Info info) {
     section->setAnchorPoint({ 0.f, 0.5f });
     section->setPosition({ kPad, sectionY });
     m_mainLayer->addChild(section, 1);
-    // Engraved rule: a dark line over a light one.
+    // engraved rule
     float const ruleX = kPad + section->getScaledContentSize().width + kSectionLineGap;
     float const ruleW = kCardWidth - kPad - ruleX;
     if (ruleW > 0.f) {
@@ -183,13 +173,11 @@ bool RunInfoPopup::init(Info info) {
     for (int i = 0; i < n; i++) {
         int const row = i / grid.cols;
         int const col = i % grid.cols;
-        // Every row is centred, a short last one included.
+        // centre every row, a short last one too
         int const inRow = std::min(grid.cols, n - row * grid.cols);
         float const rowW = inRow * tileW + (inRow - 1) * kGridGap;
 
-        // holder: the button's footprint at grid size (the hit area never
-        // moves). visual: the full-size tile scaled into it, which the hover
-        // eases up and down (round 7: size only, no border change).
+        // holder keeps the hit area fixed, visual is what the hover scales
         auto holder = CCNode::create();
         holder->setContentSize({ tileW, tileH });
         auto visual = this->createTile(m_held[i]);
@@ -209,11 +197,6 @@ bool RunInfoPopup::init(Info info) {
         m_tiles.push_back({ item, visual, grid.scale, 1.f });
     }
     m_lastVisit = std::chrono::steady_clock::now();
-
-    log::info(
-        "RunInfoPopup: {} deaths, best {}%, record {}%, {} augments in {}x{} at x{:.2f}, card {:.0f}x{:.0f}",
-        info.deaths, info.sessionBest, info.record, n, grid.cols, grid.rows, grid.scale, kCardWidth, cardH
-    );
     return true;
 }
 
@@ -226,7 +209,6 @@ CCNode* RunInfoPopup::createStat(char const* label, std::string const& value, cc
     box->setPosition({ width / 2, kStatHeight / 2 });
     chip->addChild(box, 0);
 
-    // The caption takes the number's colour (Total Best is gold, both lines).
     auto caption = CCLabelBMFont::create(label, fonts::Text);
     caption->setScale(kStatLabelScale);
     caption->setColor(valueColor);
@@ -234,7 +216,7 @@ CCNode* RunInfoPopup::createStat(char const* label, std::string const& value, cc
     number->limitLabelWidth(width - 2 * kTilePad, kStatValueScale, 0.3f);
     number->setColor(valueColor);
 
-    // The caption + number pair, centred in the chip by their real heights.
+    // centre the pair by their real heights
     float const captionH = caption->getScaledContentSize().height;
     float const numberH = number->getScaledContentSize().height;
     float const top = (kStatHeight + captionH + kStatLineGap + numberH) / 2;
@@ -266,8 +248,6 @@ CCNode* RunInfoPopup::createTile(Held const& held) {
     image->setPosition({ kTileWidth / 2, y - kImageHeight / 2 });
     tile->addChild(image, 1);
 
-    // Footer like the draft card's: the level on the left (gold once maxed),
-    // drawn stars on the right, centred between the art and the bottom pad.
     float const footerY = kTilePad + kFooterHeight / 2;
     auto level = CCLabelBMFont::create(fmt::format("Lv {}", held.level).c_str(), fonts::Text);
     level->setScale(kFooterScale);
@@ -300,9 +280,7 @@ void RunInfoPopup::visit() {
     }
     this->setHovered(hovered);
 
-    // Ease every tile toward its target size on a real clock (the pause
-    // menu's own timing does not matter here, and a frame-rate-free
-    // exponential approach reads the same at 60 or 240 fps).
+    // real clock, and an exponential ease so it looks the same at any fps
     auto const now = std::chrono::steady_clock::now();
     float const dt = std::min(0.1f, std::chrono::duration<float>(now - m_lastVisit).count());
     m_lastVisit = now;
