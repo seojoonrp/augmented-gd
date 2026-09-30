@@ -1,8 +1,9 @@
 // cat (고양이): every catInterval() seconds of play, remove catCount()
 // random hazards that are on screen and ahead of the player. The scan and
 // the removal / put-back bookkeeping are hazard:: (HazardRemoval.hpp), shared
-// with the missile. A CatNode in the UI layer casts a small magic circle on
-// each removed hazard.
+// with the missile. A CatNode in the UI layer shows the cat in the
+// bottom-right corner (idle frames, a wand swing per cast) and a small magic
+// circle on each removed hazard.
 
 #include "Augments.hpp"
 #include "HazardRemoval.hpp"

@@ -694,6 +694,11 @@ on the left, swap the colours or pass `{ -1.f, 0.f }`.
   Used by `RunHud` for `draft-bar-opacity` (2026-09-30, **(unverified)** in game).
   An `int` setting with `min` and `max` gets a slider by default (`control.slider`,
   `slider-step`, `arrow-step`, `big-arrows`, `input`: loader `SettingV3.cpp` `IntSettingV3::parse`).
+- Additive sprites: GD's trails blend additively and qolmod switches them back with
+  `setBlendFunc({GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA})` (`refs/qolmod/src/Hacks/Cosmetic/NoTrailBlending.cpp:29`).
+  Our PNG sprites load premultiplied, so a glow uses `{GL_ONE, GL_ONE}` and
+  `setOpacity` still fades it (cocos scales RGB with opacity when the texture is
+  premultiplied). `CatNode`'s circle flash, 2026-09-30, **(unverified)** in game.
 - `CCLabelBMFont::setString` may reset the opacity of the glyph sprites it reuses
   (cocos2d-x 2.x did; GD's copy **(unverified)**), so `RunHud::showGaugeText`
   re-applies the label's opacity after every change.

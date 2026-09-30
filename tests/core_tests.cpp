@@ -156,7 +156,7 @@ void testTable() {
     CHECK(&slow.describe(5, Lang::Korean) == &slow.levelUpDesc.ko);   // no late text: same all the way
     // Max levels (user, 2026-09-30).
     CHECK(findAugment(ids::Shield)->maxLevel == 5);
-    CHECK(findAugment(ids::SlowMo)->maxLevel == 5);
+    CHECK(findAugment(ids::SlowMo)->maxLevel == 3);   // stays 3 (user, 2026-09-30)
     CHECK(findAugment(ids::HazardHitbox)->maxLevel == 7);
     CHECK(findAugment(ids::WaveHitbox)->maxLevel == 7);
 }
@@ -194,7 +194,6 @@ void testDescribeAt() {
     CHECK(contains(at(ids::Cat, 7), "2초마다"));
     CHECK(contains(at(ids::Cat, 7), "위험 요소 21개"));
     CHECK(contains(at(ids::Shield, 5), "보호막이 5개"));
-    CHECK(contains(at(ids::SlowMo, 5), "25% 감소"));
     CHECK(contains(at(ids::HazardHitbox, 7), "35% 감소"));
     CHECK(contains(at(ids::WaveHitbox, 7), "70% 감소"));
     CHECK(contains(at(ids::Cat, 4), "2.5초마다"));

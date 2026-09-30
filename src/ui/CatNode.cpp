@@ -2,36 +2,39 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 
 using namespace geode::prelude;
 
 namespace augment {
 
 namespace {
-    constexpr float kSigilSeconds = 0.55f;
-    // Small on purpose (a GD block is ~30 units, so this sits just inside one).
-    constexpr float kSigilRadius = 16.f;
-    constexpr float kInnerRatio = 0.62f;
-    constexpr float kRingWidth = 1.2f;
-    constexpr float kSpinRate = 2.2f;    // radians a second
-    // Kept deliberately plain (user 2026-09-27: "덜 복잡한"): two rings, four
-    // rim ticks and a single triangle. The first version had eight ticks and a
-    // six-point hexagram, which read as noise at this size.
-    constexpr int kRunes = 4;
-    constexpr int kStarPoints = 3;       // 3 points joined in order = one triangle
-    constexpr int kStarStep = 1;
-    constexpr int kSegments = 24;
-    constexpr float kTau = 6.2831853f;
+    // Magic circles: 128 px uhd frames (32 pt), shown a touch bigger. Small
+    // on purpose (a GD block is ~30 units, so one sits about on a block).
+    constexpr float kSigilHold = 0.5f;      // game seconds at full size
+    constexpr float kSigilExit = 0.35f;     // then spins away, shrinking and fading
+    constexpr float kSigilExitSpin = 200.f; // degrees turned over the exit
+    constexpr float kSigilSize = 34.f;      // pt across
+    constexpr float kSigilFlip = 0.1f;      // game seconds per shaky frame
+    constexpr char const* kSigilSprites[2] = { "cat-magic-1.png"_spr, "cat-magic-2.png"_spr };
+    // The flash as a circle appears: a glow with short rays behind it that
+    // swells from kFlashFrom to kFlashTo times the circle while it fades.
+    constexpr float kFlashTime = 0.2f;
+    constexpr float kFlashFrom = 1.3f;
+    constexpr float kFlashTo = 2.1f;
+    constexpr char const* kFlashSprite = "cat-flash.png"_spr;
 
-    // CCDrawNode wants premultiplied alpha.
-    ccColor4F premul(float r, float g, float b, float a) {
-        return { r * a, g * a, b * a, a };
-    }
-    ccColor4F const kNoFill = { 0.f, 0.f, 0.f, 0.f };
+    float smoothstep(float u) { return u * u * (3.f - 2.f * u); }
 
-    CCPoint onCircle(CCPoint centre, float radius, float angle) {
-        return { centre.x + std::cos(angle) * radius, centre.y + std::sin(angle) * radius };
-    }
+    // The cat in the corner. The frames are 256 px uhd squares (64 pt) with
+    // the cat standing on their bottom edge.
+    constexpr float kMascotSize = 58.f;     // pt, the frame's height on screen
+    constexpr float kMascotRight = 4.f;     // screen right edge -> frame
+    constexpr float kMascotBottom = 2.f;    // screen bottom -> frame
+    constexpr float kIdleFrame = 0.5f;      // game seconds per idle frame
+    constexpr float kCastTime = 0.45f;      // game seconds the wand frame shows
+    constexpr char const* kIdleSprites[2] = { "cat-idle-1.png"_spr, "cat-idle-2.png"_spr };
+    constexpr char const* kCastSprite = "cat-cast.png"_spr;
 }
 
 CatNode* CatNode::create() {
@@ -47,72 +50,172 @@ CatNode* CatNode::create() {
 bool CatNode::init() {
     if (!CCNode::init()) return false;
 
-    // The sigils convert each target's world position into this node's
+    // The circles convert each target's world position into this node's
     // space, so where it sits does not matter to them.
     this->setAnchorPoint({ 0.f, 0.f });
     this->setContentSize({ 0.f, 0.f });
     this->setPosition({ 0.f, 0.f });
     this->setID("cat"_spr);
 
-    m_sigils = CCDrawNode::create();
-    m_sigils->setID("sigils");
-    this->addChild(m_sigils, 0);
+    this->buildMascot();
 
     this->scheduleUpdate();
     return true;
 }
 
+bool CatNode::buildMascot() {
+    auto make = [&](char const* file, char const* id) -> CCSprite* {
+        auto sprite = CCSprite::create(file);
+        if (!sprite) {
+            log::warn("Cat: sprite {} missing, no cat in the corner", file);
+            return nullptr;
+        }
+        sprite->setAnchorPoint({ 1.f, 0.f });
+        sprite->setVisible(false);
+        sprite->setID(id);
+        this->addChild(sprite, 1);
+        return sprite;
+    };
+    m_idle[0] = make(kIdleSprites[0], "cat-idle-1");
+    m_idle[1] = make(kIdleSprites[1], "cat-idle-2");
+    m_cast = make(kCastSprite, "cat-cast");
+    if (!m_idle[0] || !m_idle[1] || !m_cast) {
+        for (auto sprite : { m_idle[0], m_idle[1], m_cast }) {
+            if (sprite) sprite->removeFromParent();
+        }
+        m_idle[0] = m_idle[1] = m_cast = nullptr;
+        return false;
+    }
+
+    auto winSize = CCDirector::get()->getWinSize();
+    float const scale = kMascotSize / m_idle[0]->getContentSize().height;
+    CCPoint const corner{ winSize.width - kMascotRight, kMascotBottom };
+    for (auto sprite : { m_idle[0], m_idle[1], m_cast }) {
+        sprite->setScale(scale);
+        sprite->setPosition(corner);
+    }
+    m_shown = m_idle[0];
+    m_shown->setVisible(true);
+    log::info(
+        "Cat: mascot at ({:.0f}, {:.0f}), {:.0f} pt ({:.0f} pt frames, scale {:.2f})",
+        corner.x, corner.y, kMascotSize, m_idle[0]->getContentSize().height, scale
+    );
+    return true;
+}
+
+void CatNode::stepMascot(float dt) {
+    if (!m_cast) return;
+    m_idleClock = std::fmod(m_idleClock + dt, 2.f * kIdleFrame);
+    m_castLeft = std::max(0.f, m_castLeft - dt);
+
+    CCSprite* want = m_castLeft > 0.f ? m_cast : m_idle[m_idleClock < kIdleFrame ? 0 : 1];
+    if (want != m_shown) {
+        m_shown->setVisible(false);
+        want->setVisible(true);
+        m_shown = want;
+    }
+}
+
 void CatNode::castAt(std::vector<GameObject*> const& targets) {
+    static std::mt19937 rng{ std::random_device{}() };
+    std::uniform_real_distribution<float> turn(0.f, 360.f);
+    std::uniform_real_distribution<float> phase(0.f, 2.f * kSigilFlip);
     for (auto obj : targets) {
-        if (obj) m_active.push_back({ obj, 0.f });
+        if (!obj) continue;
+        Sigil sigil;
+        sigil.target = obj;
+        sigil.phase = phase(rng);
+        // One doodle, turned any which way, so a sweep's circles differ.
+        sigil.angle = turn(rng);
+        for (int i = 0; i < 2; i++) {
+            auto sprite = CCSprite::create(kSigilSprites[i]);
+            if (!sprite) break;
+            sigil.scale = kSigilSize / sprite->getContentSize().width;
+            sprite->setScale(sigil.scale);
+            sprite->setRotation(sigil.angle);
+            sprite->setVisible(false);
+            this->addChild(sprite, 0);
+            sigil.frames[i] = sprite;
+        }
+        if (!sigil.frames[0] || !sigil.frames[1]) {
+            for (auto sprite : sigil.frames) {
+                if (sprite) sprite->removeFromParent();
+            }
+            log::warn("Cat: magic circle sprites missing, no circles");
+            break;
+        }
+        // Added onto the level's colours (GD's own glows blend this way; the
+        // texture is premultiplied, hence ONE, ONE), so it only brightens.
+        if (auto flash = CCSprite::create(kFlashSprite)) {
+            flash->setBlendFunc({ GL_ONE, GL_ONE });
+            flash->setRotation(sigil.angle);
+            this->addChild(flash, -1);
+            sigil.flash = flash;
+        }
+        else {
+            static bool warned = false;
+            if (!warned) log::warn("Cat: {} missing, circles appear without a flash", kFlashSprite);
+            warned = true;
+        }
+        m_active.push_back(sigil);
     }
     if (targets.empty()) return;
-    this->redrawSigils();
+    // Nothing in view means nothing cast: the cat keeps idling.
+    m_castLeft = kCastTime;
+    this->stepMascot(0.f);
+    this->stepSigils(0.f);
 }
 
 void CatNode::update(float dt) {
-    if (m_active.empty()) return;
-    for (auto& s : m_active) s.age += dt;
-    std::erase_if(m_active, [](Sigil const& s) { return !s.target || s.age >= kSigilSeconds; });
-    this->redrawSigils();
+    this->stepMascot(dt);
+    this->stepSigils(dt);
 }
 
-void CatNode::redrawSigils() {
-    m_sigils->clear();
-    for (auto& s : m_active) {
-        auto obj = s.target.data();
-        if (!obj || !obj->getParent()) continue;
+void CatNode::stepSigils(float dt) {
+    if (m_active.empty()) return;
+    auto done = [](Sigil const& sigil) {
+        auto obj = sigil.target.data();
+        return !obj || !obj->getParent() || sigil.age >= kSigilHold + kSigilExit;
+    };
+    for (auto& sigil : m_active) {
+        sigil.age += dt;
+        if (!done(sigil)) continue;
+        for (auto sprite : sigil.frames) sprite->removeFromParent();
+        if (sigil.flash) sigil.flash->removeFromParent();
+    }
+    std::erase_if(m_active, done);
+
+    for (auto& sigil : m_active) {
+        auto obj = sigil.target.data();
         // Object -> screen -> this node.
-        CCPoint world = obj->getParent()->convertToWorldSpace({ obj->getPositionX(), obj->getPositionY() });
-        CCPoint at = m_sigils->convertToNodeSpace(world);
+        CCPoint at = this->convertToNodeSpace(obj->getParent()->convertToWorldSpace(obj->getPosition()));
 
-        float u = std::clamp(s.age / kSigilSeconds, 0.f, 1.f);
-        // Snaps open over the first quarter, then holds while it fades.
-        float grow = std::min(1.f, u / 0.25f);
-        float r = kSigilRadius * (1.f - (1.f - grow) * (1.f - grow));
-        float fade = 1.f - u * u;
-        float spin = s.age * kSpinRate;
-        float inner = r * kInnerRatio;
-        // White (user 2026-09-27).
-        auto ink = [fade](float a) { return premul(1.f, 1.f, 1.f, a * fade); };
-
-        m_sigils->drawCircle(at, r, kNoFill, kRingWidth, ink(0.9f), kSegments);
-        m_sigils->drawCircle(at, inner, kNoFill, kRingWidth, ink(0.55f), kSegments);
-
-        // Runes: short ticks in the band between the rings, turning with it.
-        for (int i = 0; i < kRunes; i++) {
-            float a = spin + static_cast<float>(i) * kTau / kRunes;
-            m_sigils->drawSegment(onCircle(at, inner * 1.06f, a), onCircle(at, r * 0.94f, a), 0.9f, ink(0.7f));
+        if (sigil.flash) {
+            float const f = sigil.age / kFlashTime;
+            bool const lit = f < 1.f;
+            sigil.flash->setVisible(lit);
+            if (lit) {
+                float const grow = 1.f - (1.f - f) * (1.f - f);
+                float const across = kSigilSize * (kFlashFrom + (kFlashTo - kFlashFrom) * grow);
+                sigil.flash->setPosition(at);
+                sigil.flash->setScale(across / sigil.flash->getContentSize().width);
+                sigil.flash->setOpacity(static_cast<GLubyte>(255.f * (1.f - f) * (1.f - f)));
+            }
         }
-        // The star inside, turning the other way so the two read apart.
-        for (int i = 0; i < kStarPoints; i++) {
-            float a1 = -spin + static_cast<float>(i) * kTau / kStarPoints;
-            float a2 = -spin + static_cast<float>(i + kStarStep) * kTau / kStarPoints;
-            m_sigils->drawSegment(onCircle(at, inner, a1), onCircle(at, inner, a2), 0.9f, ink(0.8f));
+
+        // The exit: shrinking eases in and out, the spin picks up speed, and
+        // the second half fades, so nothing snaps. The shaking stops for it.
+        float const u = std::clamp((sigil.age - kSigilHold) / kSigilExit, 0.f, 1.f);
+        float const shrink = smoothstep(u);
+        float const fade = 1.f - smoothstep(std::clamp(u * 2.f - 1.f, 0.f, 1.f));
+        int const shown = static_cast<int>((std::min(sigil.age, kSigilHold) + sigil.phase) / kSigilFlip) % 2;
+        for (int i = 0; i < 2; i++) {
+            sigil.frames[i]->setPosition(at);
+            sigil.frames[i]->setVisible(i == shown);
+            sigil.frames[i]->setScale(sigil.scale * (1.f - shrink));
+            sigil.frames[i]->setRotation(sigil.angle + kSigilExitSpin * u * u);
+            sigil.frames[i]->setOpacity(static_cast<GLubyte>(255.f * fade));
         }
-        // A soft core, so the removal still reads against busy level art.
-        // Filled drawCircle, not drawDot (which GD draws as a square quad).
-        m_sigils->drawCircle(at, inner * 0.35f, ink(0.4f), 0.f, kNoFill, 12);
     }
 }
 

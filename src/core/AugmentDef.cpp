@@ -117,7 +117,7 @@ std::vector<AugmentDef> const& allAugments() {
               "매 어템마다 보호막이 지급됩니다.\n보호막이 깨지면 " + num(tune::NoclipSeconds) + "초간 노클립 상태로 전환됩니다." },
             { "One more shield every attempt.",
               "보호막 개수가 하나 늘어납니다." } },
-        { ids::SlowMo, { "Sloth", "나무늘보" }, 5,
+        { ids::SlowMo, { "Sloth", "나무늘보" }, 3,
             { "The game runs " + pct(tune::SlowMoStep) + "% slower.\nPress X to toggle it.",
               "게임 속도가 " + pct(tune::SlowMoStep) + "% 감소합니다.\nX를 눌러 토글할 수 있습니다." },
             { "The game runs another " + pct(tune::SlowMoStep) + "% slower.",

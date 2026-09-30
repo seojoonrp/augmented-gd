@@ -94,7 +94,8 @@ resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gi
 resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
 resources/sfx/           hover / select / missile .wav, cut from the user's picks in source/ by scripts/sfxcut.py
 resources/ui/            aug-logo.png (the mark inside the round AUG button — every new export goes through
-                         scripts/logocrop.py, or its margin shrinks the mark); logo.png at the root = mod list
+                         scripts/logocrop.py, or its margin shrinks the mark); cat-idle-1/2 + cat-cast.png (the corner
+                         cat's frames, placeholders from scripts/catgen.py); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
   Lang.hpp               Lang { English, Korean } + LocalText { en, ko }
   AugmentDef.*           table: ids::*, names (en + ko), maxLevel, descriptions built from tune:: at startup
@@ -138,7 +139,7 @@ src/ui/                  Fonts.hpp, CardStyle.hpp (rim/panel/art slot), AugButto
                          AugmentCard (the card itself, shared), AugmentDraftPopup (cards, reveal from visit()),
                          RunInfoPopup (pause-menu run summary: stat chips + tile grid, hover ring, click →
                          AugmentInfoPopup = the card at the held level's text), RunHud (bottom gauge, debug-mode rows,
-                         bottom-left notices), ProgressMarks (dots on GD's bar), CatNode (white magic circles), MissileNode (reticle / drop / blast, world space, white),
+                         bottom-left notices), ProgressMarks (dots on GD's bar), CatNode (the corner cat's frames + doodle magic circle sprites), MissileNode (reticle / drop / blast, world space, white),
                          BerserkNode (screen frame + smash bursts), BerserkAura (fire on the player, object layer under the icon)
 tests/core_tests.cpp     host tests, plain asserts (scripts/test.ps1)
 docs/                    STATUS / SESSIONS / GD-INTERNALS / DESIGN / RECIPES / HARNESS / ROADMAP / VISUAL-IDEAS / refs/
