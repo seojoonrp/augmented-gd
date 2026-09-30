@@ -38,3 +38,13 @@ Augmented runs never count as real progress. A run attempt does not save a norma
 Found a bug, have an idea for an augment, or a question? Open an issue on [GitHub](https://github.com/seojoonrp/augmented-gd/issues) or email **seojoonrp@gmail.com**.
 
 ## Gallery
+
+![Start a run](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/0-start.jpg)
+
+![Draft an augment](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/1-draft.jpg)
+
+![Check your augments](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/2-record.jpg)
+
+![Ingame image - Bloodbath](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/3-bloodbath.png)
+
+![Ingame image - Retention](https://raw.githubusercontent.com/seojoonrp/augmented-gd/main/docs/gallery/4-retention.png)

@@ -25,6 +25,18 @@ Pause during a run to see the augments you hold and their levels.
 
 All three can be rebound in the mod's settings.
 
+## Gallery
+
+![Start a run](docs/gallery/0-start.jpg)
+
+![Draft an augment](docs/gallery/1-draft.jpg)
+
+![Check your augments](docs/gallery/2-record.jpg)
+
+![Ingame image - Bloodbath](docs/gallery/3-bloodbath.png)
+
+![Ingame image - Retention](docs/gallery/4-retention.png)
+
 ## Notes
 
 - Runs never count as real progress: no normal-mode percent, no New Best!, no level completion. The mod keeps its own record for each level instead.
