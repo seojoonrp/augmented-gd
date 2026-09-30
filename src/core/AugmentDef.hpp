@@ -44,8 +44,14 @@ struct AugmentDef {
     // Shown when drafting level 2+ (same text for every level-up). Empty
     // when maxLevel == 1.
     LocalText levelUpDesc;
+    // Shown instead of levelUpDesc when drafting `lateFrom` or later, for an
+    // augment whose last levels grow differently (cat: count only). Empty
+    // and 0 otherwise.
+    LocalText lateLevelUpDesc{};
+    int lateFrom = 0;
 
-    // Draft card text for drafting `level`: initial at 1, level-up after.
+    // Draft card text for drafting `level`: initial at 1, level-up after
+    // (the late one from lateFrom on).
     std::string const& describe(int level, Lang lang) const;
     // What the augment does *at* `level`, with that level's numbers (the
     // pause menu's detail card): "Get 3 shields every attempt." Level 1
@@ -67,29 +73,39 @@ namespace tune {
     constexpr float HazardStep = 0.05f;
     // Player hitbox shrink while in wave mode at wave-hitbox level n: WaveStep * n.
     constexpr float WaveStep = 0.10f;
-    // Nerve (single level): both shrinks grow to shrink * (1 + NerveMult
-    // * progress), progress = current level percent / 100.
-    constexpr float NerveMult = 1.f;
-    // Floor for either hitbox scale. wave-hitbox Lv5 boosted by nerve at
-    // 100 % would otherwise shrink the box to nothing (0.5 * 2 = 1.0).
+    // Nerve (single level): at X % progress both shrinks are (120 + X/2) %
+    // of themselves, i.e. shrink * (1 + NerveBase + NerveSlope * progress),
+    // progress = current level percent / 100 (user, 2026-09-30; it was
+    // 1 + progress). The card text quotes NerveSlope as "X/2".
+    constexpr float NerveBase = 0.2f;
+    constexpr float NerveSlope = 0.5f;
+    // Floor for either hitbox scale. wave-hitbox Lv7 boosted by nerve would
+    // otherwise shrink the box to almost nothing (0.7 * 1.2 = 0.84 at 0 %).
     constexpr float MinHitboxScale = 0.2f;
     // Cards per draft, with and without draft-count.
     constexpr int DefaultDraftCards = 3;
     constexpr int DraftCountCards = 4;
     // Cat at level n removes CatBaseCount + CatCountStep * (n - 1) hazards in
-    // view every CatBaseInterval - CatIntervalStep * (n - 1) seconds.
+    // view every CatBaseInterval - CatIntervalStep * (n - 1) seconds, up to
+    // CatLateLevel - 1. From CatLateLevel on a level adds CatLateCountStep
+    // hazards and leaves the interval alone (user, 2026-09-30: Lv6-7 = +4).
     constexpr int CatBaseCount = 5;
     constexpr int CatCountStep = 2;   // was 1 (user, 2026-09-29)
     constexpr float CatBaseInterval = 4.f;
     constexpr float CatIntervalStep = 0.5f;
     constexpr float CatMinInterval = 0.5f;
-    // Draft gauge: a death charges by the percent reached, plus every percent
-    // of new best times NewBestBonusMult. A draft costs GaugeThresholdStart
-    // and each gauge-earned draft raises the next cost by GaugeThresholdStep
-    // until GaugeThresholdMax, where the ramp stops (30, 35 … 95, 100, 100 …).
-    constexpr float GaugeThresholdStart = 30.f;
+    constexpr int CatLateLevel = 6;
+    constexpr int CatLateCountStep = 4;
+    // Draft gauge: a death charges by the whole percent reached, plus every
+    // percent of new best times NewBestBonusMult. A draft costs
+    // GaugeThresholdStart and every GaugeThresholdEvery gauge-earned drafts
+    // raise the next cost by GaugeThresholdStep until GaugeThresholdMax,
+    // where the ramp stops (20, 20, 20, 25, 25, 25 … 65, 65, 65, 70, 70 …
+    // — user, 2026-09-30; 30, 30, 35, 35 … felt too slow).
+    constexpr float GaugeThresholdStart = 20.f;
     constexpr float GaugeThresholdStep = 5.f;
-    constexpr float GaugeThresholdMax = 100.f;
+    constexpr int GaugeThresholdEvery = 3;
+    constexpr float GaugeThresholdMax = 70.f;
     constexpr float NewBestBonusMult = 1.f;
     // Brake: game speed 1 - BrakeCut while the key is held (slow-mo is
     // ignored, the cut is absolute), for BrakeSecondsPerLevel * level real
@@ -112,7 +128,7 @@ namespace tune {
     // open a BerserkSeconds window in which touching a hazard destroys it
     // instead of dying. The window does not grow with the level.
     constexpr float BerserkChanceBase = 0.03f;
-    constexpr float BerserkChanceStep = 0.01f;
+    constexpr float BerserkChanceStep = 0.015f;   // was 0.01 (user, 2026-09-30)
     constexpr float BerserkSeconds = 2.5f;   // was 2 (user, 2026-09-29)
 }
 

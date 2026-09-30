@@ -13,7 +13,7 @@
 
 There are 13 augments, each with different maximum levels.
 
-You can check the detailed augment informations here.
+You can check the detailed augment informations [here](https://docs.google.com/spreadsheets/d/1_z0HGqntrP07kUEpNs5o8UhFGAX475KxqDkIrGYIanA/edit?usp=sharing).
 
 ## Controls
 

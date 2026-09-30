@@ -89,7 +89,7 @@ script's flags or a doc's rules matter. Update `docs/STATUS.md` (state) and
 
 ```
 mod.json                 id, GD/Geode versions, fonts (AugDebug generated, charset from src/; baked UI
-                         fonts via resources.files, card art via resources.sprites), settings (language, keybinds, debug-mode)
+                         fonts via resources.files, card art via resources.sprites), settings (language, sound-effects, draft-bar-opacity, keybinds, debug-mode)
 resources/fonts/         ImcreSoojin.ttf (UI) + Pretendard (debug HUD); gen/ (gitignored) = baked AugName/AugText
 resources/augments/      one 480x280 card image per augment, named <id>.png (Geode bakes hd/sd from it)
 resources/sfx/           hover / select / missile .wav, cut from the user's picks in source/ by scripts/sfxcut.py
@@ -97,7 +97,8 @@ resources/ui/            aug-logo.png (the mark inside the round AUG button — 
                          scripts/logocrop.py, or its margin shrinks the mark); logo.png at the root = mod list
 src/core/                pure C++, host-tested (tests/core_tests.cpp)
   Lang.hpp               Lang { English, Korean } + LocalText { en, ko }
-  AugmentDef.*           table: ids::*, names (en + ko), maxLevel, descriptions built from tune:: at startup;
+  AugmentDef.*           table: ids::*, names (en + ko), maxLevel, descriptions built from tune:: at startup
+                         (a late level-up text from `lateFrom` when the last levels differ, e.g. cat Lv6-7);
                          describe(level, lang) / describeAt(level, lang) = card text / that level's numbers (detail card)
   Formulas.hpp           level → effect (slowMoScale, nerveBoost, hazard/waveScale, cat*, draftCardCount)
   RunState.*             one run: gauge economy (GaugeRule injected), levels, pending drafts, slow-mo toggle

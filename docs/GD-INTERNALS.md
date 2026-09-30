@@ -687,3 +687,13 @@ on the left, swap the colours or pass `{ -1.f, 0.f }`.
 - Mod popup links (loader `ModMetadataImpl.cpp`, `ModPopup.cpp`, read 2026-09-29): the link row shows `links.homepage`, `links.source` (a GitHub icon when the host is github.com), `links.community` (Discord icon) and `support.md` (gift icon); a missing one is greyed out. `issues { info, url }` is only read by `geode::openIssueReportPopup`, which nothing in the 5.10.1 loader calls, so player-facing contact info belongs in `about.md`. `about.md` links go through a "Links are spooky!" confirm, then the browser; a `mailto:` link is **(unverified)**, so the email is plain text.
 - Settings: `Mod::get()->getSettingValue<T>("key")`, live updates with
   `listenForSettingChanges<T>("key", fn)` from `$on_mod(Loaded)` (CBF `main.cpp:707-737`).
+  That helper leaks its listener (`.leak()` in `SettingV3.hpp`); for a node that
+  should hear a setting only while it lives, `node->addEventListener(SettingChangedEventV3(Mod::get(), "key"), fn)`
+  with `fn(std::shared_ptr<SettingV3>)` + `typeinfo_pointer_cast<IntSettingV3>` (what
+  the helper does inside; node-scoped like the keybind listeners in `PlayLayerHook.cpp`).
+  Used by `RunHud` for `draft-bar-opacity` (2026-09-30, **(unverified)** in game).
+  An `int` setting with `min` and `max` gets a slider by default (`control.slider`,
+  `slider-step`, `arrow-step`, `big-arrows`, `input`: loader `SettingV3.cpp` `IntSettingV3::parse`).
+- `CCLabelBMFont::setString` may reset the opacity of the glyph sprites it reuses
+  (cocos2d-x 2.x did; GD's copy **(unverified)**), so `RunHud::showGaugeText`
+  re-applies the label's opacity after every change.

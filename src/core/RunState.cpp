@@ -31,15 +31,18 @@ void RunState::end() {
     m_lifeBest = 0.f;
 }
 
-float RunState::gaugeThreshold(GaugeRule const& rule) const {
-    float cost = rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts);
+float RunState::costOf(int n, GaugeRule const& rule) {
+    int steps = n / std::max(1, rule.thresholdEvery);
+    float cost = rule.thresholdStart + rule.thresholdStep * static_cast<float>(steps);
     return std::min(cost, rule.thresholdMax);
 }
 
+float RunState::gaugeThreshold(GaugeRule const& rule) const {
+    return costOf(m_gaugeDrafts, rule);
+}
+
 float RunState::lastDraftCost(GaugeRule const& rule) const {
-    if (m_gaugeDrafts <= 0) return this->gaugeThreshold(rule);
-    float cost = rule.thresholdStart + rule.thresholdStep * static_cast<float>(m_gaugeDrafts - 1);
-    return std::min(cost, rule.thresholdMax);
+    return costOf(std::max(0, m_gaugeDrafts - 1), rule);
 }
 
 DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawning) {
@@ -61,21 +64,28 @@ DeathResult RunState::onDeath(float percent, GaugeRule const& rule, bool respawn
     percent = m_lifeBest;
     m_lifeBest = 0.f;
 
-    // No floor: dying at 3 % is worth 3, so farming early deaths never pays.
-    // New ground is paid twice (at mult 1): the bonuses over a whole run sum
-    // to at most 100 * mult, so this rewards progress and nothing else. A
-    // new best counts in whole percents (4.1 -> 4.4 is not one: a "NEW
-    // BEST +0" annoyed the user), while the best itself keeps the decimals
-    // for the HUD and the progress dot.
+    // No minimum: dying at 3 % is worth 3, so farming early deaths never
+    // pays. New ground is paid twice (at mult 1): the bonuses over a whole
+    // run sum to at most 100 * mult, so this rewards progress and nothing
+    // else. A new best counts in whole percents (4.1 -> 4.4 is not one: a
+    // "NEW BEST +0" annoyed the user), while the best itself keeps the
+    // decimals for the HUD and the progress dot.
+    //
+    // The charge is whole percents too, GD's own death percent: with the
+    // decimals kept, deaths at 2.2, 3.3 and 12.1 % plus 12 bonus made 29.6,
+    // the HUD rounded it to "30/30" and no draft came (user, 2026-09-30).
     float wholeNew = std::floor(percent) - std::floor(m_bestPercent);
-    if (wholeNew > 0.f) r.bonus = wholeNew * rule.newBestMult;
+    if (wholeNew > 0.f) r.bonus = std::floor(wholeNew * rule.newBestMult);
     m_bestPercent = std::max(m_bestPercent, percent);
-    r.charge = percent + r.bonus;
+    r.charge = std::floor(percent) + r.bonus;
     m_gauge += r.charge;
 
     // A big new best can pay for several drafts at once; each one raises
-    // the cost of the next. Leftover charge carries over.
-    while (m_gauge >= this->gaugeThreshold(rule) && this->anyDraftable()) {
+    // the cost of the next. Leftover charge carries over. Every draft
+    // (the opening one too) takes one level, so no more are queued than
+    // there are levels left to give: the last draft of a run shows only
+    // what is left, and none follows it.
+    while (m_gauge >= this->gaugeThreshold(rule) && m_pendingDrafts < this->levelsLeft()) {
         m_gauge -= this->gaugeThreshold(rule);
         m_gaugeDrafts++;
         m_pendingDrafts++;
@@ -108,10 +118,13 @@ int RunState::levelOf(std::string_view id) const {
 }
 
 bool RunState::anyDraftable() const {
-    for (auto const& def : allAugments()) {
-        if (this->levelOf(def.id) < def.maxLevel) return true;
-    }
-    return false;
+    return this->levelsLeft() > 0;
+}
+
+int RunState::levelsLeft() const {
+    int left = 0;
+    for (auto const& def : allAugments()) left += std::max(0, def.maxLevel - this->levelOf(def.id));
+    return left;
 }
 
 std::vector<AugmentDef const*> RunState::rollDraft(std::size_t count, std::mt19937& rng) const {

@@ -16,11 +16,12 @@ inline float slowMoScale(int slowMoLevel) {
     return 1.f - tune::SlowMoStep * static_cast<float>(slowMoLevel);
 }
 
-// What nerve multiplies both hitbox shrinks by. `progress` is level percent
-// / 100, clamped to 0..1. 1.0 when nerve is unowned.
+// What nerve multiplies both hitbox shrinks by: 1.2 at the start, 1.7 at
+// the end. `progress` is level percent / 100, clamped to 0..1. 1.0 when
+// nerve is unowned.
 inline float nerveBoost(int nerveLevel, float progress) {
     if (nerveLevel <= 0) return 1.f;
-    return 1.f + tune::NerveMult * std::clamp(progress, 0.f, 1.f);
+    return 1.f + tune::NerveBase + tune::NerveSlope * std::clamp(progress, 0.f, 1.f);
 }
 
 // shrink is "how much is cut off", so 0 = untouched; floored at MinHitboxScale.
@@ -39,16 +40,19 @@ inline float waveScale(int waveLevel, int nerveLevel, float progress) {
     return shrinkToScale(shrink * nerveBoost(nerveLevel, progress));
 }
 
-// Hazards removed per sweep; 0 when unowned.
+// Hazards removed per sweep; 0 when unowned. The late levels add more.
 inline int catCount(int catLevel) {
     if (catLevel <= 0) return 0;
-    return tune::CatBaseCount + tune::CatCountStep * (catLevel - 1);
+    int const early = std::min(catLevel, tune::CatLateLevel - 1);
+    int const late = catLevel - early;
+    return tune::CatBaseCount + tune::CatCountStep * (early - 1) + tune::CatLateCountStep * late;
 }
 
-// Seconds between sweeps; 0 when unowned.
+// Seconds between sweeps; 0 when unowned. The late levels leave it alone.
 inline float catInterval(int catLevel) {
     if (catLevel <= 0) return 0.f;
-    return std::max(tune::CatMinInterval, tune::CatBaseInterval - tune::CatIntervalStep * static_cast<float>(catLevel - 1));
+    int const early = std::min(catLevel, tune::CatLateLevel - 1);
+    return std::max(tune::CatMinInterval, tune::CatBaseInterval - tune::CatIntervalStep * static_cast<float>(early - 1));
 }
 
 // Seconds between missile strikes; 0 when unowned.

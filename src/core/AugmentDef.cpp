@@ -24,10 +24,13 @@ namespace {
     }
     std::string secondsEn(float v) { return amountEn(v, "second", "seconds"); }
     std::string blocksEn(float v) { return amountEn(v, "block", "blocks"); }
+
+    static_assert(tune::NerveSlope == 0.5f, "the nerve card spells the slope as X/2");
 }
 
 std::string const& AugmentDef::describe(int level, Lang lang) const {
     if (level <= 1 || levelUpDesc.in(lang).empty()) return initialDesc.in(lang);
+    if (lateFrom > 0 && level >= lateFrom && !lateLevelUpDesc.in(lang).empty()) return lateLevelUpDesc.in(lang);
     return levelUpDesc.in(lang);
 }
 
@@ -67,7 +70,7 @@ std::string AugmentDef::describeAt(int level, Lang lang) const {
     }
     if (id == ids::Cat) {
         if (ko) {
-            return "마법 고양이를 소환합니다.\n고양이는 " + num(formula::catInterval(n)) + "초마다 시야에 있는 장애물 "
+            return "마법 고양이를 소환합니다.\n고양이는 " + num(formula::catInterval(n)) + "초마다 시야에 있는 위험 요소 "
                 + std::to_string(formula::catCount(n)) + "개를 랜덤으로 제거합니다.";
         }
         return "Summons a magic cat.\nEvery " + secondsEn(formula::catInterval(n)) + " it removes "
@@ -109,12 +112,12 @@ std::string AugmentDef::describeAt(int level, Lang lang) const {
 // (Shift+1 = the 10th, Shift+2 the 11th, Shift+3 the 12th, Shift+4 the 13th).
 std::vector<AugmentDef> const& allAugments() {
     static std::vector<AugmentDef> const pool = {
-        { ids::Shield, { "Shield", "결계인가?" }, 3,
+        { ids::Shield, { "Shield", "결계인가?" }, 5,
             { "Get a shield every attempt.\nWhen it breaks, you noclip for " + secondsEn(tune::NoclipSeconds) + ".",
               "매 어템마다 보호막이 지급됩니다.\n보호막이 깨지면 " + num(tune::NoclipSeconds) + "초간 노클립 상태로 전환됩니다." },
             { "One more shield every attempt.",
               "보호막 개수가 하나 늘어납니다." } },
-        { ids::SlowMo, { "Sloth", "나무늘보" }, 3,
+        { ids::SlowMo, { "Sloth", "나무늘보" }, 5,
             { "The game runs " + pct(tune::SlowMoStep) + "% slower.\nPress X to toggle it.",
               "게임 속도가 " + pct(tune::SlowMoStep) + "% 감소합니다.\nX를 눌러 토글할 수 있습니다." },
             { "The game runs another " + pct(tune::SlowMoStep) + "% slower.",
@@ -132,34 +135,37 @@ std::vector<AugmentDef> const& allAugments() {
             { "Removes every mirror portal in the level.",
               "레벨 내 모든 미러포탈을 제거합니다." },
             {} },
-        { ids::HazardHitbox, { "Threat Removal", "위협제거" }, 5,
+        { ids::HazardHitbox, { "Threat Removal", "위협제거" }, 7,
             { "Hazard hitboxes (the red ones) shrink by " + pct(tune::HazardStep) + "%.",
               "위험 요소(빨간 히트박스)의 크기가 " + pct(tune::HazardStep) + "% 감소합니다." },
             { "Hazard hitboxes shrink by another " + pct(tune::HazardStep) + "%.",
               "위험 요소의 크기가 " + pct(tune::HazardStep) + "% 더 감소합니다." } },
-        { ids::WaveHitbox, { "Wave Breaker", "웨이브브레이커" }, 5,
+        { ids::WaveHitbox, { "Wave Breaker", "웨이브브레이커" }, 7,
             { "Your hitbox shrinks by " + pct(tune::WaveStep) + "% in wave mode.",
               "웨이브 모드일 때 플레이어 히트박스 크기가 " + pct(tune::WaveStep) + "% 감소합니다." },
             { "Your hitbox shrinks by another " + pct(tune::WaveStep) + "% in wave mode.",
               "웨이브 모드일 때 플레이어 히트박스 크기가 " + pct(tune::WaveStep) + "% 더 감소합니다." } },
         { ids::Nerve, { "Calm Nerves", "청심환" }, 1,
-            { "The further into the level, the stronger [Threat Removal] and [Wave Breaker] get.\nAt X% progress, both work X% better.",
-              "레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다.\nX% 도달 시 두 능력의 효과가 각각 X% 증가합니다." },
+            { "The further into the level, the stronger [Threat Removal] and [Wave Breaker] get.\nAt X% progress, both work at (" + pct(1.f + tune::NerveBase) + " + X/2)% of their strength.",
+              "레벨 후반에 도달할수록 [위협제거]와 [웨이브브레이커]의 효과가 증가합니다.\nX% 도달 시 두 능력의 효과가 각각 기존의 (" + pct(1.f + tune::NerveBase) + " + X/2)%가 됩니다." },
             {} },
         { ids::DraftCount, { "Opportunity Cost", "기회비용" }, 1,
             { "From the next draft on, drafts show " + std::to_string(tune::DraftCountCards) + " cards.",
               "다음 드래프트부터 카드가 " + std::to_string(tune::DraftCountCards) + "개씩 등장합니다." },
             {} },
-        { ids::Cat, { "Cat", "고양이" }, 5,
+        { ids::Cat, { "Cat", "고양이" }, 7,
             { "Summons a magic cat.\nEvery " + secondsEn(tune::CatBaseInterval) + " it removes "
                   + std::to_string(tune::CatBaseCount) + " random hazards in view.",
-              "마법 고양이를 소환합니다.\n고양이는 " + num(tune::CatBaseInterval) + "초마다 시야에 있는 장애물 "
+              "마법 고양이를 소환합니다.\n고양이는 " + num(tune::CatBaseInterval) + "초마다 시야에 있는 위험 요소 "
                   + std::to_string(tune::CatBaseCount) + "개를 랜덤으로 제거합니다." },
             { "The cat removes " + std::to_string(tune::CatCountStep)
                   + (tune::CatCountStep == 1 ? " more hazard" : " more hazards") + " and casts "
                   + secondsEn(tune::CatIntervalStep) + " sooner.",
-              "고양이가 매번 장애물을 " + countKo(tune::CatCountStep) + " 더 제거하고,\n제거 쿨타임이 "
-                  + num(tune::CatIntervalStep) + "초 감소합니다." } },
+              "고양이가 매번 위험 요소를 " + countKo(tune::CatCountStep) + " 더 제거하고,\n제거 쿨타임이 "
+                  + num(tune::CatIntervalStep) + "초 감소합니다." },
+            { "The cat removes " + std::to_string(tune::CatLateCountStep) + " more hazards.",
+              "고양이가 매번 위험 요소를 " + countKo(tune::CatLateCountStep) + " 더 제거합니다." },
+            tune::CatLateLevel },
         { ids::Brake, { "Brake", "브레이크" }, 3,
             { "Hold C to slow the game down by " + pct(tune::BrakeCut) + "%.\nUp to "
                   + secondsEn(tune::BrakeSecondsPerLevel) + " per attempt.",

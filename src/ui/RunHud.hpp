@@ -28,9 +28,14 @@ public:
     void attachGauge(cocos2d::CCLabelBMFont* percentLabel);
     // Gauge charge against a cost; shown as "value/threshold" and as the
     // fill ratio. `full` = a gauge-earned draft is waiting: the bar shows
-    // full and `threshold` is that draft's cost, read as e.g. "30/30". While
-    // a death reward plays this only records the target.
-    void setGauge(float value, float threshold, bool full);
+    // full and `threshold` is that draft's cost, read as e.g. "30/30".
+    // `max` = every augment is maxed: a full bar, "MAX" over it, no count.
+    // While a death reward plays this only records the target.
+    void setGauge(float value, float threshold, bool full, bool max);
+    // The `draft-bar-opacity` setting (0..1): the bar, its fill and its two
+    // labels. Read at create and followed live; the reward particles and
+    // numbers stay opaque.
+    void setBarOpacity(float opacity);
     // Death reward sequence, driven by update() so it plays during GD's
     // death delay: "+normal" (and "+bonus" in gold when > 0) pop up beside
     // `at` (this node's space), particles fly from there into the gauge,
@@ -93,8 +98,15 @@ protected:
     void stepReward(float dt);
     // Stops the sequence with both segments at `ratio`.
     void finishReward(float ratio);
+    // The rim and the see-through track, in the bar's opacity.
+    void drawFrame();
     // Lays out the green and gold segments from m_gaugeShown / m_goldShown.
     void layoutFill();
+    // Sets one of the bar's labels (no-op when unchanged) in its opacity.
+    void setBarText(cocos2d::CCLabelBMFont* label, std::string const& text);
+    // The count readout, through setBarText.
+    void showGaugeText(std::string const& text);
+    GLubyte barAlpha() const;
     // Fill tip for a ratio, in this node's space.
     cocos2d::CCPoint tipAt(float ratio);
     void spawnParticles(int count, bool gold, cocos2d::CCPoint from, cocos2d::CCPoint to, float departAfter);
@@ -102,6 +114,8 @@ protected:
     void animateRewardText(RewardText& text);
 
     cocos2d::CCNode* m_gaugeBar = nullptr;       // rim + track + fills, bottom centre
+    cocos2d::CCDrawNode* m_gaugeFrame = nullptr; // rim + track, child of m_gaugeBar
+    float m_barOpacity = 1.f;                    // draft-bar-opacity, 0..1
     cocos2d::CCLabelBMFont* m_draftLabel = nullptr;   // "DRAFT" over the bar's left end
     float m_gaugeTop = 0.f;                      // top of the gauge's labels (0 until attached)
     // The fill: the green segment and the new-best (gold) one right after it,
@@ -122,6 +136,7 @@ protected:
     float m_gaugeValue = -1.f;  // last setGauge's arguments (-1 = never set)
     float m_gaugeCost = -1.f;
     bool m_gaugeFull = false;   // last setGauge said a draft is waiting
+    bool m_gaugeMax = false;    // last setGauge said every augment is maxed
     std::string m_gaugeText;    // last setGauge readout; applied once no reward runs
 
     Reward m_reward;

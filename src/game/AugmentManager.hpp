@@ -69,8 +69,10 @@ public:
     void dropPendingDrafts() { m_state.dropPendingDrafts(); }
     int pendingGaugeDrafts() const { return m_state.pendingGaugeDrafts(); }
     float gauge() const { return m_state.gauge(); }
-    // Cost of the next draft: the rising ramp (30, +5 per draft, stopping
-    // at 100), the same in debug mode.
+    // Every augment at its max level: the gauge reads MAX and pays nothing.
+    bool allMaxed() const { return !m_state.anyDraftable(); }
+    // Cost of the next draft: the rising ramp (20, 20, 20, 25 ... stopping
+    // at 70), the same in debug mode.
     float gaugeThreshold() const { return m_state.gaugeThreshold(this->gaugeRule()); }
     // Cost of the gauge draft earned last; the HUD shows "cost/cost" while it waits.
     float lastDraftCost() const { return m_state.lastDraftCost(this->gaugeRule()); }

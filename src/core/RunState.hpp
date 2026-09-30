@@ -22,6 +22,8 @@ namespace augment {
 struct GaugeRule {
     float thresholdStart = tune::GaugeThresholdStart;
     float thresholdStep = tune::GaugeThresholdStep;
+    // Gauge-earned drafts per step: 3 = 20, 20, 20, 25, 25, 25 …
+    int thresholdEvery = tune::GaugeThresholdEvery;
     // The ramp stops here: every draft past it costs this much.
     float thresholdMax = tune::GaugeThresholdMax;
     float newBestMult = tune::NewBestBonusMult;
@@ -52,11 +54,13 @@ public:
     std::string const& levelName() const { return m_levelName; }
 
     // --- draft gauge ---
-    // Once per attempt when player 1 dies. Charges by the percent reached
-    // (no floor) plus the new-best delta in whole percents times the bonus
-    // multiplier (bestPercent itself keeps the decimals); while
-    // the gauge covers the (rising) cost and something is still draftable,
-    // a draft is queued and the cost rises. Leftover charge carries over.
+    // Once per attempt when player 1 dies. Charges by the whole percent
+    // reached (no minimum) plus the new-best delta in whole percents times
+    // the bonus multiplier (bestPercent itself keeps the decimals), so the
+    // gauge only ever holds whole numbers — what the HUD reads; while
+    // the gauge covers the (rising) cost and the pending drafts leave levels
+    // to give (levelsLeft), a draft is queued and the cost rises. Leftover
+    // charge carries over.
     //
     // `respawning` = a checkpoint respawn follows this death, so the life
     // goes on: the death is counted, the gauge waits, and the percent is
@@ -95,8 +99,11 @@ public:
     int levelOf(std::string_view id) const;
     bool has(std::string_view id) const { return this->levelOf(id) > 0; }
     Levels const& augments() const { return m_levels; }
-    // Any augment below its max level?
+    // Any augment below its max level? False = the run holds everything
+    // (the HUD's MAX gauge).
     bool anyDraftable() const;
+    // Levels still to be drafted over all augments; each draft takes one.
+    int levelsLeft() const;
     // Up to `count` random augments that are not yet maxed.
     std::vector<AugmentDef const*> rollDraft(std::size_t count, std::mt19937& rng) const;
     // Cards the next draft shows: 3, or DraftCountCards once draft-count is owned.
@@ -128,6 +135,9 @@ public:
     float berserkSeconds() const;
 
 private:
+    // Cost of gauge draft number `n` (0-based) under `rule`.
+    static float costOf(int n, GaugeRule const& rule);
+
     bool m_active = false;
     int m_levelID = 0;
     std::string m_levelName;

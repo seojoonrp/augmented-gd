@@ -3,6 +3,8 @@
 #include "Fonts.hpp"
 #include "../game/Scales.hpp"
 
+#include <Geode/loader/SettingV3.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <random>
@@ -38,6 +40,7 @@ namespace {
     constexpr float kLabelShrink = 0.9f;     // of GD's percent label scale
     constexpr float kFallbackLabelScale = 0.5f;
     constexpr char const* kDraftText = "DRAFT";
+    constexpr char const* kMaxText = "MAX";      // every augment maxed
     constexpr float kGaugeEase = 8.f;        // per second; ~0.4 s to settle
 
     // Death reward timeline (seconds from the death). Both fills are done
@@ -151,6 +154,10 @@ namespace {
         float u = 1.f - t;
         return a * (u * u) + c * (2.f * u * t) + b * (t * t);
     }
+    constexpr char const* kOpacitySetting = "draft-bar-opacity";   // percent, 5..100
+    float opacityOf(int64_t percent) {
+        return std::clamp(static_cast<float>(percent) / 100.f, 0.f, 1.f);
+    }
 }
 
 RunHud* RunHud::create() {
@@ -227,6 +234,22 @@ bool RunHud::init() {
     m_particles->setID("reward-particles");
     this->addChild(m_particles, 2);
 
+    // The bar's opacity follows the setting while the level is up (the
+    // settings page can be opened over a paused level). Node-scoped, so the
+    // listener goes with the HUD.
+    m_barOpacity = opacityOf(Mod::get()->getSettingValue<int64_t>(kOpacitySetting));
+    this->addEventListener(
+        SettingChangedEventV3(Mod::get(), kOpacitySetting),
+        [this](std::shared_ptr<SettingV3> setting) {
+            auto value = cast::typeinfo_pointer_cast<IntSettingV3>(setting);
+            if (!value) {
+                log::info("RunHud: {} changed but is not an int setting", kOpacitySetting);
+                return;
+            }
+            this->setBarOpacity(opacityOf(value->getValue()));
+        }
+    );
+
     this->scheduleUpdate();
     return true;
 }
@@ -236,11 +259,9 @@ bool RunHud::init() {
 void RunHud::attachGauge(CCLabelBMFont* percentLabel) {
     auto winSize = CCDirector::get()->getWinSize();
 
-    // The bar: a white ring on the outside, then one polygon for the black
-    // ring and the see-through inside (each ring is a border drawn centred on
-    // its path, so a path half a ring in covers exactly that ring), and the
-    // fill rectangles on top. The fill sits kFillInset inside the rim, which
-    // keeps its square corners within the rounded inner edge.
+    // The bar: the frame (drawFrame) and the fill rectangles on top. The
+    // fill sits kFillInset inside the rim, which keeps its square corners
+    // within the rounded inner edge.
     auto bar = CCNode::create();
     bar->setContentSize({ kBarWidth, kBarHeight });
     bar->setAnchorPoint({ 0.5f, 0.5f });
@@ -249,17 +270,10 @@ void RunHud::attachGauge(CCLabelBMFont* percentLabel) {
     this->addChild(bar);
     m_gaugeBar = bar;
 
-    auto frame = CCDrawNode::create();
-    auto ring = [&](float inset, float width, ccColor4F fill, ccColor4F border) {
-        float const at = inset + width / 2;
-        auto path = card::roundedRectPoints(
-            { at, at, kBarWidth - 2 * at, kBarHeight - 2 * at }, kBarRadius - at
-        );
-        frame->drawPolygon(path.data(), static_cast<unsigned int>(path.size()), fill, width / 2, border);
-    };
-    ring(0.f, kBarWhite, card::premul({ 0, 0, 0 }, 0.f), card::premul({ 255, 255, 255 }));
-    ring(kBarWhite, kBarBlack, card::premul({ 0, 0, 0 }, kTrackAlpha), card::premul({ 0, 0, 0 }));
-    bar->addChild(frame, 0);
+    m_gaugeFrame = CCDrawNode::create();
+    m_gaugeFrame->setID("gauge-frame");
+    bar->addChild(m_gaugeFrame, 0);
+    this->drawFrame();
 
     m_trackLeft = kBarRim + kFillInset;
     m_trackWidth = kBarWidth - 2 * m_trackLeft;
@@ -288,7 +302,7 @@ void RunHud::attachGauge(CCLabelBMFont* percentLabel) {
     m_gaugeLabel->setAnchorPoint({ 1.f, 0.f });
     m_gaugeLabel->setPosition({ right, labelY });
     m_gaugeLabel->setID("gauge-label");
-    m_draftLabel = CCLabelBMFont::create(kDraftText, font);
+    m_draftLabel = CCLabelBMFont::create(m_gaugeMax ? kMaxText : kDraftText, font);
     if (m_draftLabel) {
         m_draftLabel->setScale(scale);
         m_draftLabel->setAnchorPoint({ 0.f, 0.f });
@@ -298,27 +312,81 @@ void RunHud::attachGauge(CCLabelBMFont* percentLabel) {
     }
     // What sits above the gauge (the berserk banner) starts over the labels.
     m_gaugeTop = labelY + (m_draftLabel ? m_draftLabel->getScaledContentSize().height : 0.f);
+    m_gaugeLabel->setOpacity(this->barAlpha());
+    if (m_draftLabel) m_draftLabel->setOpacity(this->barAlpha());
 
     log::info(
-        "RunHud gauge: bar {:.0f}x{:.0f} r{:.0f} at ({:.1f}, {:.1f}); labels {} scale {:.2f} at y {:.1f}, top {:.1f}",
+        "RunHud gauge: bar {:.0f}x{:.0f} r{:.0f} at ({:.1f}, {:.1f}); labels {} scale {:.2f} at y {:.1f}, top {:.1f}; opacity {:.2f}",
         kBarWidth, kBarHeight, kBarRadius, bar->getPositionX(), bar->getPositionY(),
-        percentLabel ? "GD font" : "fallback", scale, labelY, m_gaugeTop
+        percentLabel ? "GD font" : "fallback", scale, labelY, m_gaugeTop, m_barOpacity
     );
 }
 
-void RunHud::setGauge(float value, float threshold, bool full) {
+void RunHud::setBarOpacity(float opacity) {
+    opacity = std::clamp(opacity, 0.f, 1.f);
+    if (opacity == m_barOpacity) return;
+    log::info("RunHud: bar opacity {:.2f} -> {:.2f}{}", m_barOpacity, opacity, m_gaugeBar ? "" : " (bar not attached yet)");
+    m_barOpacity = opacity;
+    m_gaugeLabel->setOpacity(this->barAlpha());
+    if (m_draftLabel) m_draftLabel->setOpacity(this->barAlpha());
+    this->drawFrame();
+    m_drawnGreen = -1.f;   // the fill is baked in the old alpha: redraw it
+    this->layoutFill();
+}
+
+GLubyte RunHud::barAlpha() const {
+    return static_cast<GLubyte>(std::lround(255.f * m_barOpacity));
+}
+
+// A white ring on the outside, then one polygon for the black ring and the
+// see-through inside (each ring is a border drawn centred on its path, so a
+// path half a ring in covers exactly that ring). CCDrawNode colours are
+// premultiplied, so the opacity scales every channel.
+void RunHud::drawFrame() {
+    if (!m_gaugeFrame) return;
+    m_gaugeFrame->clear();
+    float const a = m_barOpacity;
+    auto ring = [&](float inset, float width, ccColor4F fill, ccColor4F border) {
+        float const at = inset + width / 2;
+        auto path = card::roundedRectPoints(
+            { at, at, kBarWidth - 2 * at, kBarHeight - 2 * at }, kBarRadius - at
+        );
+        m_gaugeFrame->drawPolygon(path.data(), static_cast<unsigned int>(path.size()), fill, width / 2, border);
+    };
+    ring(0.f, kBarWhite, card::premul({ 0, 0, 0 }, 0.f), card::premul({ 255, 255, 255 }, a));
+    ring(kBarWhite, kBarBlack, card::premul({ 0, 0, 0 }, kTrackAlpha * a), card::premul({ 0, 0, 0 }, a));
+}
+
+// Every change of the bar's two labels goes through here: CCLabelBMFont
+// may give the glyphs it reuses full opacity again, so the bar's is put
+// back each time.
+void RunHud::setBarText(CCLabelBMFont* label, std::string const& text) {
+    if (!label || text == label->getString()) return;
+    label->setString(text.c_str());
+    label->setOpacity(this->barAlpha());
+}
+
+void RunHud::showGaugeText(std::string const& text) {
+    this->setBarText(m_gaugeLabel, text);
+}
+
+void RunHud::setGauge(float value, float threshold, bool full, bool max) {
     // The session refreshes this ten times a second; the gauge only moves
     // on deaths and picks.
-    if (value == m_gaugeValue && threshold == m_gaugeCost && full == m_gaugeFull) return;
+    if (value == m_gaugeValue && threshold == m_gaugeCost && full == m_gaugeFull && max == m_gaugeMax) return;
+    if (max != m_gaugeMax) log::info("RunHud gauge: {}", max ? "every augment maxed, MAX" : "draftable again, DRAFT");
     m_gaugeValue = value;
     m_gaugeCost = threshold;
     m_gaugeFull = full;
-    m_gaugeTarget = full ? 1.f : threshold > 0.f ? std::clamp(value / threshold, 0.f, 1.f) : 0.f;
-    m_gaugeText = full
-        ? fmt::format("{0:.0f}/{0:.0f}", threshold)
+    m_gaugeMax = max;
+    m_gaugeTarget = full || max ? 1.f : threshold > 0.f ? std::clamp(value / threshold, 0.f, 1.f) : 0.f;
+    // Maxed: a full bar, "MAX" in place of "DRAFT" and no count.
+    m_gaugeText = max ? ""
+        : full ? fmt::format("{0:.0f}/{0:.0f}", threshold)
         : fmt::format("{:.0f}/{:.0f}", std::min(value, threshold), threshold);
+    this->setBarText(m_draftLabel, max ? kMaxText : kDraftText);
     // During a reward the readout counts up with the fill instead.
-    if (!m_reward.active && m_gaugeText != m_gaugeLabel->getString()) m_gaugeLabel->setString(m_gaugeText.c_str());
+    if (!m_reward.active) this->showGaugeText(m_gaugeText);
 }
 
 // Both segments start at the track's left end, rounded at both ends: gold
@@ -341,7 +409,7 @@ void RunHud::layoutFill() {
         auto points = card::roundedRectPoints({ m_trackLeft, m_fillBottom, width, m_fillHeight }, kFillRadius);
         m_gaugeFill->drawPolygon(
             points.data(), static_cast<unsigned int>(points.size()),
-            card::premul(colour), 0.f, card::premul({ 0, 0, 0 }, 0.f)
+            card::premul(colour, m_barOpacity), 0.f, card::premul({ 0, 0, 0 }, 0.f)
         );
     };
     if (gold > green + 0.05f) segment(gold, m_goldTint);
@@ -517,7 +585,7 @@ void RunHud::stepReward(float dt) {
             // Count up against the cost this death was filling toward (a
             // draft it earns ends on e.g. 30/30 and stays there).
             std::string text = fmt::format("{:.0f}/{:.0f}", std::round(m_goldShown * r.threshold), r.threshold);
-            if (text != m_gaugeLabel->getString()) m_gaugeLabel->setString(text.c_str());
+            this->showGaugeText(text);
         }
     }
 
@@ -535,7 +603,7 @@ void RunHud::finishReward(float ratio) {
     m_goldShown = ratio;
     m_goldTint = kGoldColor;
     this->layoutFill();
-    if (m_gaugeText != m_gaugeLabel->getString()) m_gaugeLabel->setString(m_gaugeText.c_str());
+    this->showGaugeText(m_gaugeText);
 }
 
 void RunHud::settleGauge() {
