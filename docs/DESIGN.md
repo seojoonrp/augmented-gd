@@ -92,9 +92,16 @@ on top of it, so debug mode can be used for screenshots.
 ## Draft
 
 Three random augments that aren't maxed yet, shown on respawn. Picking is
-mandatory (no close button, back key ignored). Picking one you have levels it
-up. `draft-count` makes it 4 cards from the next draft on; the popup narrows
-the cards so four still fit.
+mandatory (no close button, back key ignored, and the game can't be paused
+while a draft is up). Picking one you have levels it up. `draft-count` makes it
+4 cards from the next draft on; the popup narrows the cards so four still fit.
+
+A draft is only used up by the pick. If the level goes away while one is on
+screen, it's still pending and comes back on the next visit.
+
+The round button in the top-right corner (a bit smaller than the pause menu's)
+opens the run summary over the draft, so you can check what you hold before
+picking.
 
 ## Augments
 

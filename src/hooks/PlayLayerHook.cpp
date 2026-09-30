@@ -218,6 +218,9 @@ class $modify(AugPlayLayer, PlayLayer) {
     }
 
     void pauseGame(bool unfocused) {
+        // no pause menu over a draft (esc, focus loss, Custom Keybinds' pause key):
+        // picking is the only way on. the director is paused anyway
+        if (draft::isOpen()) return;
         PlayLayer::pauseGame(unfocused);
         if (auto s = this->session()) s->onPause();
     }

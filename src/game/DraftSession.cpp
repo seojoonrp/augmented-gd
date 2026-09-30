@@ -15,6 +15,8 @@ void close();
 
 bool g_directorPaused = false;
 bool g_cursorWasHidden = false;
+// a popup is up right now (its draft stays pending until the pick)
+bool g_showing = false;
 
 void pauseDirector() {
     if (g_directorPaused) return;
@@ -29,6 +31,9 @@ void pauseDirector() {
 
 void onPick(std::string const& id) {
     auto& mgr = AugmentManager::get();
+    g_showing = false;
+    // taken only now: leaving the level mid-draft keeps it for the next visit
+    mgr.clearPendingDraft();
     mgr.applyPick(id);
 
     // the layer may be gone by now
@@ -53,8 +58,7 @@ void close() {
 
 void showNext() {
     auto& mgr = AugmentManager::get();
-    if (!mgr.hasPendingDraft()) return;
-    mgr.clearPendingDraft();
+    if (g_showing || !mgr.hasPendingDraft()) return;
 
     auto choices = mgr.rollDraft(mgr.draftCardCount());
     if (choices.empty()) {
@@ -66,6 +70,7 @@ void showNext() {
 
     auto popup = AugmentDraftPopup::create(choices, onPick);
     if (!popup) return;
+    g_showing = true;
 
     // the director pause freezes actions too, the pop-in would never finish
     popup->m_noElasticity = true;
@@ -87,6 +92,8 @@ bool isOpen() {
 }
 
 void abandon() {
+    // the popup goes with the scene, its draft stays pending
+    g_showing = false;
     if (!g_directorPaused) return;
     CCDirector::get()->resume();
     g_directorPaused = false;

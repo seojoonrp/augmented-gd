@@ -3,6 +3,7 @@
 #include "../core/AugmentDef.hpp"
 
 #include <Geode/ui/Popup.hpp>
+#include <Geode/utils/cocos.hpp>
 
 #include <chrono>
 #include <functional>
@@ -28,7 +29,9 @@ protected:
     void visit() override;
 
     cocos2d::CCNode* createCard(AugmentDef const& def, int currentLevel);
+    void addRunInfoButton();
     void onCard(cocos2d::CCObject* sender);
+    void onRunInfo(cocos2d::CCObject*);
     void stepReveal();
     // hovered card rises a bit, its hit area stays put
     void stepHover();
@@ -60,6 +63,9 @@ protected:
     float m_cardScale = 1.f;
     // lives in the chosen card's holder
     cocos2d::CCDrawNode* m_pickRing = nullptr;
+    // top-right button to the run summary, and the summary while it's up
+    cocos2d::CCSprite* m_runSprite = nullptr;
+    geode::Ref<cocos2d::CCNode> m_summary;
 };
 
 } // namespace augment

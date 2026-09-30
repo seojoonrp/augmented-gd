@@ -306,6 +306,7 @@ void RunInfoPopup::onTile(CCObject* sender) {
     auto const& held = m_held[index];
     auto popup = AugmentInfoPopup::create(*held.def, held.level);
     if (!popup) return;
+    popup->m_noElasticity = m_noElasticity;
     m_detail = popup;
     popup->show();
 }

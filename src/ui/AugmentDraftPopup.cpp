@@ -1,9 +1,11 @@
 #include "AugmentDraftPopup.hpp"
+#include "AugButton.hpp"
 #include "AugmentCard.hpp"
 #include "CardStyle.hpp"
 #include "Fonts.hpp"
 #include "../game/AugmentManager.hpp"
 #include "../game/Language.hpp"
+#include "../game/RunSummary.hpp"
 #include "../game/Sfx.hpp"
 
 #include <Geode/Geode.hpp>
@@ -48,6 +50,11 @@ namespace {
     constexpr ccColor3B kPickRingColor = { 255, 255, 255 };
 
     constexpr GLubyte kOverlayOpacity = 160;
+
+    // run summary button in the top-right corner, a bit smaller than the pause
+    // menu's (64 pt there)
+    constexpr float kRunButtonSize = 50.f;
+    constexpr float kRunButtonMargin = 8.f;
 
     float easeOutCubic(float t) {
         float const u = 1.f - t;
@@ -132,6 +139,8 @@ bool AugmentDraftPopup::init(std::vector<AugmentDef const*> choices, PickCallbac
         m_reveal.push_back(rc);
     }
 
+    this->addRunInfoButton();
+
     // not pickable until they land
     m_buttonMenu->setEnabled(false);
     m_revealing = true;
@@ -152,6 +161,29 @@ CCNode* AugmentDraftPopup::createCard(AugmentDef const& def, int currentLevel) {
     return card::augmentCard(def, face);
 }
 
+// In m_buttonMenu with the cards, so it's off during the reveal and the pick
+// like they are. The menu shares the centred main layer's space, hence the offset.
+void AugmentDraftPopup::addRunInfoButton() {
+    float const height = kRunButtonSize;
+    auto spr = augButtonSprite(CircleBaseSize::Big);
+    spr->setScale(height / spr->getContentSize().height);
+    spr->setCascadeOpacityEnabled(true);   // the mark is a child
+    auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AugmentDraftPopup::onRunInfo));
+    btn->setID("run-info-button"_spr);
+
+    auto const win = CCDirector::get()->getWinSize();
+    CCPoint const corner{ win.width - kRunButtonMargin - height / 2, win.height - kRunButtonMargin - height / 2 };
+    CCPoint const origin{ (win.width - m_size.width) / 2, (win.height - m_size.height) / 2 };
+    btn->setPosition(corner - origin);
+    m_buttonMenu->addChild(btn);
+    m_runSprite = spr;
+}
+
+void AugmentDraftPopup::onRunInfo(CCObject*) {
+    if (m_picking || (m_summary && m_summary->getParent())) return;
+    m_summary = summary::open();
+}
+
 void AugmentDraftPopup::visit() {
     if (m_picking) {
         // closed, already out of the scene
@@ -168,9 +200,11 @@ void AugmentDraftPopup::stepHover() {
     float const dt = std::min(0.1f, duration<float>(now - m_lastHover).count());
     m_lastHover = now;
 
+    // cards under the run summary don't hover (or play the hover sound)
+    if (m_summary && !m_summary->getParent()) m_summary = nullptr;
     int hovered = -1;
     auto const mouse = getMousePos();
-    for (size_t i = 0; i < m_reveal.size(); i++) {
+    for (size_t i = 0; i < m_reveal.size() && !m_summary; i++) {
         auto const p = m_reveal[i].item->convertToNodeSpace(mouse);
         auto const size = m_reveal[i].item->getContentSize();
         if (p.x >= 0.f && p.y >= 0.f && p.x <= size.width && p.y <= size.height) {
@@ -285,6 +319,7 @@ bool AugmentDraftPopup::stepPick() {
 
     this->setOpacity(static_cast<GLubyte>(kOverlayOpacity * (1.f - out)));
     if (m_title) m_title->setOpacity(static_cast<GLubyte>(255.f * (1.f - out)));
+    if (m_runSprite) m_runSprite->setOpacity(static_cast<GLubyte>(255.f * (1.f - out)));
     return false;
 }
 
